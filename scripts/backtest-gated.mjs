@@ -47,6 +47,7 @@ function run(tape, book0, gates = DEFAULT_GATES, label = "") {
   // day was a day and a half. The desk armed mid-crash because its "24h drift" was
   // really a 1h drift. Units matter.
   const hist = [];              // { t, mid }
+  const week = [];              // 7 days, for the slow-bleed gate
   let vol24 = 0, trades24 = 0;
   const day = [];
   // Warm-up must be measured from the FIRST tick ever seen, not from the pruned
@@ -58,6 +59,8 @@ function run(tape, book0, gates = DEFAULT_GATES, label = "") {
   for (const q of tape) {
     hist.push({ t: q.t, mid: q.mid });
     while (hist.length && q.t - hist[0].t > 86400) hist.shift();
+    week.push({ t: q.t, mid: q.mid });
+    while (week.length && q.t - week[0].t > 7 * 86400) week.shift();
     day.push({ t: q.t, w: q.tradeWeth }); while (day.length && q.t - day[0].t > 86400) day.shift();
     // Refuse to act on a partial window: a rolling stat needs its full lookback.
     if (!warmedUp && q.t - firstT >= 86400) warmedUp = true;
@@ -77,6 +80,7 @@ function run(tape, book0, gates = DEFAULT_GATES, label = "") {
       volume24hWeth: vol24, trades24h: trades24,
       drift24h: drift(hist.map((h) => h.mid)),
       drift1h: drift(lastHour),
+      drift7d: (q.t - week[0].t) >= 6 * 86400 ? drift(week.map((w) => w.mid)) : null,
       // Scale per-observation vol to an hourly figure using the real sample spacing.
       hourlyVol: (() => {
         if (lastHour.length < 5) return 0;

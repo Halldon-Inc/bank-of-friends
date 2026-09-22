@@ -14,7 +14,9 @@
     "book": "node scripts/probe-genesis-book.mjs",
     "check:lib-sync": "node scripts/check-lib-sync.mjs",
     "harvest": "node scripts/harvest.mjs",
-    "visual": "node scripts/visual-check.mjs"
+    "visual": "node scripts/visual-check.mjs",
+    "derive": "node scripts/derive-parameters.mjs",
+    "sweep": "node scripts/sweep-regimes.mjs"
   },
   "dependencies": {
     "viem": "2.56.6"
