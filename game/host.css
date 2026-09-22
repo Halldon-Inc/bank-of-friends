@@ -10,7 +10,20 @@
 */
 
 :root {
-  --rf-game-max-width: 1100px;
+  /*
+    THE FRAME MUST FIT THE VIEWPORT, NOT JUST THE WINDOW WIDTH.
+    The SDK sizes it `max-width: var(--rf-game-max-width); aspect-ratio: 3/2`, so its
+    HEIGHT is width/1.5 and nothing ever consults the available height. At a 1100px
+    cap that is 733px of frame plus toolbar, which overflows a laptop viewport and
+    forces a scroll to see the bottom of the game.
+
+    So the width cap is expressed in terms of height as well: whichever of the two
+    limits binds first wins. 104px covers the runtime toolbar and page margins.
+    svh rather than vh so mobile browser chrome is accounted for; the vh line is a
+    fallback for engines without svh.
+  */
+  --rf-game-max-width: min(1100px, calc((100vh - 104px) * 3 / 2));
+  --rf-game-max-width: min(1100px, calc((100svh - 104px) * 3 / 2));
   --rf-game-aspect-ratio: 3 / 2;
   --bank-paper: #eee;
   --bank-ink: #111;
@@ -31,7 +44,19 @@
 @font-face { font-family: "Archivo"; font-weight: 100 900; font-display: swap;
   src: url("./fonts/archivo-latin-wght-normal.woff2") format("woff2-variations"); }
 
-body { background: var(--bank-paper); color: var(--bank-ink); font-family: var(--bank-font); }
+/*
+  Do NOT make body a grid or flex container to centre the frame. Tried it; the
+  generated box then sat over the runtime's own controls and Playwright reported
+  "<body> intercepts pointer events" on every viewport. The height-aware width cap
+  above is the actual fix, and it needs no layout changes here.
+*/
+body {
+  background: var(--bank-paper);
+  color: var(--bank-ink);
+  font-family: var(--bank-font);
+  margin: 0;
+  padding: 6px 6px 0;
+}
 
 /* ------------------------------------------------------------------ toolbar */
 .rf-frame-toolbar {

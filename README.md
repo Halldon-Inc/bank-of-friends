@@ -1,50 +1,128 @@
-# The Bank of Friends
+# The First Bank of Friends
 
-A regime-gated market-making desk funded by the rewards sitting idle in Rare Friends
-NFT wallets.
+**[Play it](https://halldon-inc.github.io/bank-of-friends/)** &middot; **[Live desk](https://bank-of-friends-nu.vercel.app)** &middot; [Vibeathon submission](SUBMISSION.md)
 
-**Its default state is flat.** It does not try to make money in every market. It waits
-for conditions that pay for the risk, works a wide grid, and stands down again. On the
-only history that exists, it refuses to trade — and that is the point.
+Walk your Rare Friend into a banking hall built on pooled NFT-wallet rewards, and pull
+the lever at the desk to watch a real market-making strategy decide, week after week,
+that it should not trade.
 
-## Why it is built this way
+Built for the [Rare Friends Vibeathon](https://github.com/spokesz/rarefriends-vibeathon).
+The game needs a wallet holding a hardwired Generations NFT (generation 1 or higher) on
+Robinhood mainnet. The desk dashboard needs nothing.
 
-Every gate came from a measured failure, not a hunch. See `docs/ECONOMICS.md` and
-`docs/BACKTEST.md`.
+---
 
-| what was tested | result |
+## Why the desk refuses
+
+We set out to build a market maker for $RAREFRIENDS. Before writing it, we measured
+whether one could work.
+
+**The pool pays its liquidity providers nothing.** `slot0.lpFee` is `0`, while the hook
+takes **5% of every swap** and routes it to `ActivationManager`, which streams it to
+activated Friends. The people who supply the liquidity and the people who collect the
+fees are different people.
+
+**So nobody supplies it.** Third-party liquidity in that pool is **exactly zero** — the
+protocol's own seed position is 100.00% of it, in a market doing ~$37.5k/day. One address
+ever tried: `0x58daec31…` opened a concentrated position, closed it **48 seconds later**,
+tried again, closed that in 46 seconds, and left.
+
+**Every strategy we tested lost money** on the real tape of 8,777 swaps:
+
+| strategy | result |
 | --- | --- |
-| Passive LP in the RF/WETH pool | **-43% to -55%.** `lpFee = 0`: LPs earn nothing and eat full impermanent loss |
-| Quoting a spread as a venue | Profitable, but diverts **68% of Friend rewards** away from Friend holders |
-| Chart bots (grid, mean-reversion, momentum) | Every configuration **lost to simply holding WETH** |
-| Genesis NFT market making | 21% bid-ask, but the asset fell **45% in 5 days** |
-| Reserve to OpenSea arbitrage | **Does not exist.** The Reserve has no sell path |
+| Passive full-range LP | −43% to −55% vs holding |
+| Grid bot, 5%–30% steps | −39% to −87% |
+| Mean reversion (buying the dip) | −63% to −84% |
+| Momentum | the only winner, and it won by selling RF and sitting in WETH — still −18% vs just holding WETH |
+| Genesis NFT market making | a real 21% bid-ask, but the floor fell **45% in five days** |
+| Reserve → OpenSea arbitrage | **does not exist**; the Reserve has no sell path |
 
-## The verified finding underneath it
+The cause is mechanical: **5% in plus 5% out is a ~10% round trip**, so a completed trade
+needs a >10% swing *that comes back*. $RAREFRIENDS did not swing, it slid 89%.
 
-The RF/WETH market is a Uniswap v4 pool whose hook takes **5% of every swap** and sends
-it to `ActivationManager`, which streams it to activated Friends. The pool's own
-`lpFee` is **0**.
+So the desk is **flat by default**, and every arming gate is derived from one of those
+failures. On the real tape it takes **zero fills** and ends **+0.00% vs hold**.
 
-So the people who provide the liquidity and the people who collect the fees are
-different people. Nobody outside the protocol has ever had a reason to provide
-liquidity, and measurably, almost nobody has: the Market's seed position is
-**100.00%** of all liquidity in the pool.
+## The number that reframes it
 
-Run `npm run verify` to check all 37 assertions against live chain state yourself.
+A grid is two-sided: it needs RF to sell and WETH to buy, and **both** sides must clear the
+minimum economic fill. One Friend's idle rewards are 94% WETH / 6% RF, which puts the RF
+side at **$4.94** and its slice at **$0.74** — far under the **$8.71** floor.
+
+**A single Friend can buy and can never economically sell.** Minimum viable balanced book
+is **$116**.
+
+That is not a hole in the argument. It *is* the argument, as a number instead of a slogan:
+one Friend cannot make a market, pooled Friends can, and protocol-wide idle rewards are
+roughly $30,000.
+
+## Repository
+
+```
+game/        the FriendSDK game: a banking hall, one desk, one lever
+app/         the live desk dashboard (Next.js, no wallet needed)
+contracts/   FriendBank.sol + 18 Foundry tests. NOT DEPLOYED
+lib/         protocol reader and the strategy module, shared by everything
+scripts/     verification, backtests, parameter derivation, harvester, harnesses
+docs/        economics, backtests, strategy results
+```
+
+`lib/strategy.mjs` is the single strategy. `app/lib/` and `game/strategy.mjs` are copies so
+each target deploys standalone, and `npm run check:lib-sync` / `check:game-sync` fail the
+build if they ever drift. **The lever in the game runs that exact module** — when the desk
+stands down in the game, it stands down for the reason it would with real money.
 
 ## Commands
 
 ```sh
 npm install
-npm run verify          # 37 assertions against Robinhood Chain. Refuses to pass if it grades nothing.
-npm run history         # pull the complete swap history of the pool
-npm run backtest        # venue / LP / crossing strategies
-npm run backtest:chart  # chart-trading strategies
-npm run backtest:gated  # the actual desk: does it correctly stay flat?
+
+npm run verify           # 37 assertions against live Robinhood Chain state
+npm run derive           # every parameter, labelled MEASURED / DERIVED / CHOICE
+npm run history          # pull all 8,777 swaps in the pool's history
+npm run backtest         # LP / venue / crossing strategies
+npm run backtest:chart   # grid, mean reversion, momentum
+npm run backtest:gated   # the desk itself: does it correctly stay flat?
+npm run sweep            # 40 market regimes x 6 seeds
+npm run check:lever      # can the lever ever arm? prints the rate per regime
+npm run harvest -- --wallet 0xYOU      # dry-run the auto-harvester
 ```
 
-## Status
+Contracts: see [contracts/README.md](contracts/README.md).
+Game: see [game/README.md](game/README.md).
 
-Research and strategy complete and reproducible. Contracts and keeper in progress.
-Nothing is deployed. No third-party funds are accepted.
+## Checks
+
+| check | result |
+| --- | --- |
+| `npm run verify` | **37/37** against live chain state |
+| `forge test` | **18/18** on the contract safety properties |
+| `npm run backtest:gated` | 0 fills on the real tape; arms on a ranging one |
+| `npm run check:lever` | 21% overall arm rate; 0% in dead/falling markets |
+| `npm run sweep:game` | **72/72** across nine viewports, 320px → 2560px |
+| `node scripts/visual-check.mjs <url>` | **70/70** on the dashboard, 320px → 2560px |
+
+## Status and honesty
+
+The desk **has never traded**. Contracts are written, tested and **not deployed**.
+Deposits from anyone other than the builder are closed until an external audit.
+
+5.6 days of one token in one downtrend is a small and unusual sample. Nothing here is a
+forecast; the backtests are evidence of what has happened, not a claim about what will.
+
+## Two SDK limitations we could not work around
+
+- **Genesis holders cannot play any FriendSDK game.** `readGenerationEligibility` reads
+  `ownerOf` and `generation` from the **Generations** contract and requires generation ≥ 1.
+  Genesis NFTs are a different contract and report generation 0, so they are excluded twice
+  over. That locks out the protocol's most valuable holders.
+- **The Friend picker shows no artwork.** It renders the token label as text, so you choose
+  blind between Friends that look nothing alike. The SDK already has a sprite reader; the
+  picker just does not use it. We draw the portrait once you are inside the bank, which is
+  the only place a game can reach.
+
+## Licence
+
+MIT, see [LICENSE](LICENSE). Fonts are SIL OFL; Friend artwork is read from chain and
+rendered unmodified.

@@ -1,18 +1,34 @@
+# dependencies
 node_modules/
-data/
-*.json.bak
+app/node_modules/
+sdk/
+
+# Foundry: installed with `forge install`, not vendored. See contracts/README.md
+contracts/lib/
 contracts/out/
 contracts/cache/
 contracts/broadcast/
-.env
-.env.*
+
+# build output
 app/.next/
-app/node_modules/
-app/bof.log
-app/desk.json
+.vercel/
+**/.friendsdk/
+
+# generated data and local artefacts
+data/
 audit/shots/
 *.log
+*.tsbuildinfo
+next-env.d.ts
+desk.json
+api.json
+page.html
+rf.html
+rf.css
+
+# secrets
+.env
+.env.*
+
 gen-offers.json
 gen-sales.json
-desk.json
-sdk/

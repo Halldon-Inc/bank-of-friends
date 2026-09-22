@@ -44,6 +44,21 @@ for (const vp of VIEWPORTS) {
         page.on("pageerror", (e) => errors.push(String(e)));
         await page.waitForTimeout(900);
 
+        // 0. THE PAGE MUST FIT. Hunt had to scroll on a laptop to see the bottom of
+        //    the game, because the SDK sizes its frame from width alone.
+        const page_ = await page.evaluate(() => ({
+          docH: document.documentElement.scrollHeight,
+          viewH: window.innerHeight,
+          docW: document.documentElement.scrollWidth,
+          viewW: window.innerWidth,
+        }));
+        checks++;
+        if (page_.docH > page_.viewH + 2) fail(label, `page scrolls vertically: ${page_.docH}px of content in a ${page_.viewH}px viewport`);
+        else ok(label, `page fits (${page_.docH} <= ${page_.viewH})`);
+        checks++;
+        if (page_.docW > page_.viewW + 2) fail(label, `page scrolls horizontally by ${page_.docW - page_.viewW}px`);
+        else ok(label, "page fits horizontally");
+
         // 1. the world frame must not scroll sideways
         const overflow = await game.locator("body").evaluate((b) =>
           b.scrollWidth - b.clientWidth).catch(() => 0);
