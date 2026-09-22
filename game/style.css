@@ -204,3 +204,31 @@
 @media (prefers-reduced-motion: reduce) {
   .bank-verdict:not(.spinning) .bank-word { animation: none; }
 }
+
+/* ------------------------------------------------- the one desk, simplified */
+/* Four windows was a menu pretending to be a room. One counter, one loop:
+   deposit, pull, see what happened. Everything explanatory is behind "why?". */
+.bank-lede { font-size: 12px; line-height: 1.6; margin-bottom: 12px; }
+.bank-lede strong { font-weight: 600; }
+
+.bank-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.bank-slips { font-size: 10px; color: var(--dim); letter-spacing: .06em; }
+
+.bank-because {
+  font: 600 13px/1.5 var(--display);
+  letter-spacing: -.01em;
+  margin: 0 auto;
+  max-width: 34ch;
+}
+
+.bank-why { margin-top: 12px; }
+.bank-why summary {
+  cursor: pointer;
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--dim);
+  padding: 6px 0;
+}
+.bank-why summary:hover { color: var(--ink); }
+.bank-why[open] summary { color: var(--ink); }

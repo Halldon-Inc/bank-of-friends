@@ -87,9 +87,12 @@ export const SPAWN = [269, 254] as const;
  * labelOffset lifts a prompt clear of its prop. These track prop scale: raise one
  * and the label ends up printed across the teller screen it points at.
  */
+/**
+ * ONE station. There were four (teller, vault, trading desk, ledger) and it was a
+ * menu pretending to be a room: three of them were exposition you had to walk to.
+ * The lever IS the game, so deposit and lever live at a single counter. Everything
+ * else in the hall is scenery now, which is what scenery is for.
+ */
 export const STATIONS = [
-  { id: "teller", label: "Teller",       position: [269, 152] as const, reach: 102, labelOffset: -186 },
-  { id: "vault",  label: "Vault",        position: [417, 174] as const, reach: 99, labelOffset: -192 },
-  { id: "desk",   label: "Trading desk", position: [135, 182] as const, reach: 99, labelOffset: -168 },
-  { id: "ledger", label: "Ledger",       position: [224, 300] as const, reach: 84, labelOffset: -150 },
+  { id: "desk", label: "The Desk", position: [269, 152] as const, reach: 130, labelOffset: -186 },
 ] as const;

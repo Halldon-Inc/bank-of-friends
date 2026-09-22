@@ -45,32 +45,57 @@ type Menu = Station | "settings" | "receipt" | null;
  * Roll one simulated week of market and ask the real strategy what it would do.
  * The regimes are drawn from the shapes measured in the sweep, not invented here.
  */
+/**
+ * `pull` is the mean-reversion strength. Without it a "chop" week is a pure random
+ * walk, which over 168 hours at 5.5% hourly drifts about 70% and trips the trend
+ * gate every time: the lever then NEVER arms, which is not a game. Chop has to
+ * actually chop, so the range-bound regimes pull back toward their anchor.
+ */
+/** Current RF/WETH mid. The simulated week is anchored here so the strategy sees
+ *  inventory in the same units as the book it is given. */
+const RF_PRICE_WETH = 5.7e-7;
+
 const REGIMES = [
-  { name: "dead calm", trend: 0.0, sigma: 0.004, volume: 8, trades: 90 },
-  { name: "slow bleed", trend: -0.03, sigma: 0.010, volume: 40, trades: 600 },
-  { name: "hard dump", trend: -0.10, sigma: 0.020, volume: 70, trades: 900 },
-  { name: "quiet chop", trend: 0.0, sigma: 0.012, volume: 30, trades: 400 },
-  { name: "live chop", trend: 0.0, sigma: 0.030, volume: 55, trades: 800 },
-  { name: "wild chop", trend: 0.0, sigma: 0.055, volume: 90, trades: 1400 },
-  { name: "steady climb", trend: 0.03, sigma: 0.028, volume: 60, trades: 850 },
-  { name: "melt up", trend: 0.10, sigma: 0.045, volume: 120, trades: 1800 },
+  { name: "dead calm",    trend: 0.0,   sigma: 0.004, pull: 0.02, volume: 8,   trades: 90 },
+  { name: "slow bleed",   trend: -0.03, sigma: 0.010, pull: 0.00, volume: 40,  trades: 600 },
+  { name: "hard dump",    trend: -0.10, sigma: 0.020, pull: 0.00, volume: 70,  trades: 900 },
+  // Chop sigmas must clear the DERIVED vol floor (3.27% hourly) or the desk can
+  // never arm and the lever is a no-op.
+  { name: "quiet chop",   trend: 0.0,   sigma: 0.030, pull: 0.22, volume: 30,  trades: 400 },
+  { name: "live chop",    trend: 0.0,   sigma: 0.048, pull: 0.26, volume: 55,  trades: 800 },
+  { name: "wild chop",    trend: 0.0,   sigma: 0.075, pull: 0.30, volume: 90,  trades: 1400 },
+  { name: "steady climb", trend: 0.03,  sigma: 0.028, pull: 0.05, volume: 60,  trades: 850 },
+  { name: "melt up",      trend: 0.10,  sigma: 0.045, pull: 0.00, volume: 120, trades: 1800 },
 ];
 
 function rollWeek(seedRef: { current: number }) {
+  // LCG with the low bits discarded: the bottom bits of a 32-bit LCG have very
+  // short periods, and taking `rnd() * REGIMES.length` off them repeats badly.
   const rnd = () => {
-    seedRef.current = (seedRef.current * 1664525 + 1013904223) % 4294967296;
-    return seedRef.current / 4294967296;
+    seedRef.current = (Math.imul(seedRef.current, 1664525) + 1013904223) >>> 0;
+    return (seedRef.current >>> 8) / 16777216;
   };
   const regime = REGIMES[Math.floor(rnd() * REGIMES.length)];
   const gauss = () => {
     const u = Math.max(rnd(), 1e-9), v = rnd();
     return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
   };
-  // 168 hourly marks for the week.
+  // 168 hourly marks, Ornstein-Uhlenbeck around a drifting anchor.
+  //
+  // START AT THE REAL RF PRICE, not at 1.0. The strategy values inventory as
+  // (book.rf * market.mid) / book.valueWeth, so feeding it a normalised index while
+  // the book is priced in WETH made the inventory fraction come out at ten million
+  // percent and the inventory gate blocked 100% of every regime. The lever could
+  // never arm. Units have to match across the boundary.
   const path: number[] = [];
-  let p = 1;
+  let p = RF_PRICE_WETH, anchor = RF_PRICE_WETH;
   const perHour = Math.pow(1 + regime.trend, 1 / 24) - 1;
-  for (let i = 0; i < 168; i++) { p = p * (1 + perHour) * Math.exp(regime.sigma * gauss()); path.push(p); }
+  for (let i = 0; i < 168; i++) {
+    anchor *= 1 + perHour;
+    const dev = Math.log(p / anchor);
+    p = p * Math.exp(-regime.pull * dev + regime.sigma * gauss()) * (1 + perHour);
+    path.push(p);
+  }
   const lastDay = path.slice(-24);
   return {
     regime,
@@ -85,6 +110,45 @@ function rollWeek(seedRef: { current: number }) {
       hourlyVol: realisedVol(lastDay),
     },
   };
+}
+
+/**
+ * Turn the blocking gates into ONE sentence a person can act on. The nine-row table
+ * is still available behind "why?", but it is not the headline: a list of nine
+ * thresholds is a diagnostic, not an answer to "can I play".
+ */
+/**
+ * The drift gates block movement in EITHER direction, so the wording has to follow
+ * the sign. A fixed string said "the price has been falling all week" on a STEADY
+ * CLIMB, which is the kind of contradiction that makes a player stop trusting the
+ * thing entirely.
+ */
+function reasonFor(gate: string, m: { drift7d: number | null; drift24h: number; drift1h: number }) {
+  const up7 = (m.drift7d ?? 0) > 0;
+  switch (gate) {
+    case "volume24h":
+    case "trades24h": return "Too quiet. Barely anyone is trading today.";
+    case "drift7d": return up7
+      ? "The price has run up all week. The bank does not chase a rally."
+      : "The price has fallen all week. Buying now is catching a knife.";
+    case "drift24h": return m.drift24h > 0
+      ? "The price jumped hard today. Too late to join."
+      : "The price dropped hard today.";
+    case "drift1h": return "The price is moving too fast right this minute.";
+    case "volFloor": return "The price is barely moving, so there is nothing to earn.";
+    case "volCeiling": return "Way too wild out there.";
+    case "inventory": return "The bank is already holding too much RF.";
+    case "drawdown": return "The bank is down. It stops itself until someone checks.";
+    case "breaker": return "Someone has paused the desk.";
+    default: return "Conditions are not right.";
+  }
+}
+/** Priority order: name the most fundamental problem, not the first in the list. */
+const REASON_ORDER = ["breaker", "drawdown", "drift7d", "drift24h", "volume24h", "trades24h", "volFloor", "volCeiling", "drift1h", "inventory"];
+function plainReason(checks: { gate: string; ok: boolean }[], m: { drift7d: number | null; drift24h: number; drift1h: number }) {
+  const blocked = new Set(checks.filter((c) => !c.ok).map((c) => c.gate));
+  for (const g of REASON_ORDER) if (blocked.has(g)) return reasonFor(g, m);
+  return "Conditions are not right.";
 }
 
 /* ================================================================== component */
@@ -104,7 +168,10 @@ export default function FirstBankOfFriends({ friendId, client, paused }: GameCom
   const sound = useRef<FriendSoundKit | null>(null);
   const locked = useRef(false);
   const epoch = useRef(0);
-  const seed = useRef(Date.now() % 2147483647);
+  // Seed from Math.random(), not Date.now(). An LCG seeded from adjacent
+  // millisecond values produces correlated first draws, which showed up as the
+  // same regime coming back several pulls in a row.
+  const seed = useRef((Math.random() * 4294967296) >>> 0);
   const definition = client.definition;
 
   useEffect(() => {
@@ -162,7 +229,7 @@ export default function FirstBankOfFriends({ friendId, client, paused }: GameCom
   const verdict = useMemo(() => {
     if (!week || !snapshot) return null;
     const bookWeth = 0.029, bookRf = 3159;
-    const valueWeth = bookWeth + bookRf * 5.7e-7;
+    const valueWeth = bookWeth + bookRf * RF_PRICE_WETH;
     return evaluateRegime(week.market, { rf: bookRf, weth: bookWeth, valueWeth, hwmWeth: valueWeth, halted: false }, DEFAULT_GATES);
   }, [week, snapshot]);
 
@@ -233,156 +300,81 @@ export default function FirstBankOfFriends({ friendId, client, paused }: GameCom
         </button>
 
         <p className="bank-status">
-          <span className="bank-desktop">WASD or arrows to walk &middot; tap a destination &middot; E at a window</span>
-          <span className="bank-mobile">Tap to walk &middot; E or tap at a window</span>
-          {visited < STATIONS.length && ` · ${STATIONS.length - visited} of ${STATIONS.length} windows unvisited`}
+          <span className="bank-desktop">Walk to the desk. WASD or arrows, or tap where you want to go.</span>
+          <span className="bank-mobile">Tap to walk to the desk.</span>
         </p>
       </div>
 
       {menu && (
         <GameMenu
           title={
-            menu === "teller" ? "Teller window"
-            : menu === "vault" ? "The vault"
-            : menu === "desk" ? "Trading desk"
-            : menu === "ledger" ? "The ledger"
+            menu === "desk" ? "The Desk"
             : menu === "receipt" ? "Your receipt"
             : "Settings"
           }
           onClose={busy ? undefined : () => go(null)}
         >
-          {/* ---------------------------------------------------------- TELLER */}
-          {menu === "teller" ? (
+          {/* ------------------------------------------------------------ THE DESK */}
+          {menu === "desk" ? (
             <>
-              <p>
-                Deposit one simulated slip of {rf(definition.price)}. The Bank puts it to work only
-                when the desk arms, which is most weeks not at all.
+              <p className="bank-lede">
+                Put 1 RF on the counter, then pull the lever. A week of market rolls, and the
+                bank decides whether to trade it. <strong>Most weeks it will not.</strong>
               </p>
-              <table>
-                <thead><tr><th>What the week did</th><th>Chance</th><th>Returns</th></tr></thead>
-                <tbody>
-                  {definition.outcomes.map((o) => (
-                    <tr key={o.name}>
-                      <td>{o.name}</td>
-                      <td>{o.chanceBps / 100}%</td>
-                      <td>{rf(o.reward)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="bank-small">
-                Expected return 1.0354 RF per slip. One outcome loses. A desk that cannot lose is
-                a desk that is lying to you.
-              </p>
-              <button
-                type="button" className="rf-frame-primary" disabled={!canDeposit || busy || paused}
-                onClick={() => void act(() => client.buy(1n), "purchase", () => setMessage("One simulated slip deposited."))}
-              >
-                Deposit one slip · {rf(definition.price)}
-              </button>
-              {!canDeposit && (
-                <p>{snapshot.rfBalance < definition.price ? "Not enough simulated RF." : "Deposits pause until there is enough free backing."}</p>
-              )}
-            </>
 
-          /* ----------------------------------------------------------- VAULT */
-          ) : menu === "vault" ? (
-            <>
-              <p>The pooled book. This is reward money that was sitting unclaimed in Friend wallets.</p>
-              <dl className="bank-stats">
-                <div><dt>Founding member&rsquo;s idle rewards</dt><dd>$86</dd></div>
-                <div><dt>Split</dt><dd>94% WETH / 6% RF</dd></div>
-                <div><dt>Your simulated slips</dt><dd>{slips.toString()}</dd></div>
-                <div><dt>Minimum viable book</dt><dd>$116 balanced</dd></div>
-              </dl>
-              <p>
-                A grid is two-sided: it needs RF to sell and WETH to buy. At a 15% step each fill
-                must clear <strong>$8.71</strong> to beat gas, and the RF side of one Friend&rsquo;s
-                rewards is <strong>$4.94</strong>. So a single Friend cannot make a market at all.
-              </p>
-              <p className="bank-small">
-                That is the whole reason this is a bank. Pooled, two or three Friends clear the
-                floor. Protocol-wide idle rewards are roughly $30,000, about 250x the minimum.
-              </p>
-            </>
-
-          /* ------------------------------------------------------------ DESK */
-          ) : menu === "desk" ? (
-            <>
-              <p>
-                Roll a week of market. The same strategy module the backtests use decides whether
-                to trade. It refuses more often than it trades, and that is the point.
-              </p>
+              <div className="bank-row">
+                <button
+                  type="button" disabled={!canDeposit || busy || paused}
+                  onClick={() => void act(() => client.buy(1n), "purchase", () => setMessage("Deposited. Now pull the lever."))}
+                >
+                  Deposit 1 RF
+                </button>
+                <span className="bank-slips">{slips.toString()} on the counter</span>
+              </div>
+              {!canDeposit && <p className="bank-small">{snapshot.rfBalance < definition.price ? "Not enough simulated RF." : "Deposits pause until there is enough backing."}</p>}
 
               <button type="button" className="rf-frame-primary bank-lever" disabled={rolling || busy || paused} onClick={pullLever}>
-                {rolling ? "rolling the week…" : week ? "Roll another week" : "Pull the lever"}
+                {rolling ? "rolling the week…" : week ? "Pull again" : "Pull the lever"}
               </button>
 
               {week && verdict && (
                 <div className={`bank-verdict ${verdict.armed ? "armed" : "flat"} ${rolling ? "spinning" : ""}`}>
                   <p className="bank-regime">{week.regime.name}</p>
-                  <p className="bank-word">{verdict.armed ? "ARMED" : "FLAT"}</p>
+                  <p className="bank-word">{verdict.armed ? "TRADED" : "SAT OUT"}</p>
                   {!rolling && (
-                    <ul className="bank-gates">
-                      {verdict.checks.map((c: { gate: string; ok: boolean; detail: string }) => (
-                        <li key={c.gate} className={c.ok ? "ok" : "blocked"}>
-                          <span aria-hidden="true">{c.ok ? "□" : "■"}</span>
-                          <b>{c.gate}</b>
-                          <i>{c.detail}</i>
-                        </li>
-                      ))}
-                    </ul>
+                    <p className="bank-because">
+                      {verdict.armed
+                        ? "Choppy and busy enough to be worth it."
+                        : plainReason(verdict.checks, week.market)}
+                    </p>
                   )}
                 </div>
               )}
 
               {week && !rolling && (
-                <button type="button" disabled={busy || paused || (!pending && slips === 0n)} onClick={() => void settleWeek()}>
-                  {pending ? "Finish the pending week" : slips > 0n ? "Settle a deposit against this week" : "Deposit a slip at the teller first"}
-                </button>
+                <>
+                  <button type="button" disabled={busy || paused || (!pending && slips === 0n)} onClick={() => void settleWeek()}>
+                    {pending ? "Finish the week" : slips > 0n ? "Cash out this week" : "Deposit first, then cash out"}
+                  </button>
+                  <details className="bank-why">
+                    <summary>Why? Show the nine checks</summary>
+                    <ul className="bank-gates">
+                      {verdict!.checks.map((c: { gate: string; ok: boolean; detail: string }) => (
+                        <li key={c.gate} className={c.ok ? "ok" : "blocked"}>
+                          <span aria-hidden="true">{c.ok ? "□" : "■"}</span><b>{c.gate}</b><i>{c.detail}</i>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="bank-small">
+                      The bank pays a 5% toll each way, so it only trades when a swing is big
+                      enough to clear 10% and come back. Break-even step is {(BREAKEVEN_STEP * 100).toFixed(1)}%;
+                      a round trip nets {(edgePerRoundTrip(0.15) * 100).toFixed(1)}%.
+                      These are the real checks, not a mock.
+                    </p>
+                  </details>
+                </>
               )}
-
-              <p className="bank-small">
-                Break-even grid step is {(BREAKEVEN_STEP * 100).toFixed(2)}% because the pool takes 5% each way.
-                At a 15% step a completed round trip nets {(edgePerRoundTrip(0.15) * 100).toFixed(2)}%, not 15%.
-              </p>
             </>
-
-          /* ---------------------------------------------------------- LEDGER */
-          ) : menu === "ledger" ? (
-            <>
-              <p>What the research found, all of it reproducible from chain.</p>
-              <ol className="bank-ledger">
-                <li><b>The pool pays its liquidity providers nothing.</b> lpFee is 0, while the hook takes 5% of every swap and sends it to Friend holders.</li>
-                <li><b>So nobody provides liquidity.</b> Third-party liquidity is exactly zero; the protocol&rsquo;s own seed is 100% of it.</li>
-                <li><b>Every market-making strategy tested lost money</b> on the real tape: passive LP −43% to −55%, grid bots −39% to −87%, buying the dip −63% to −84%.</li>
-                <li><b>A 10% round trip needs a &gt;10% swing that comes back.</b> $RAREFRIENDS did not swing, it slid 89%.</li>
-                <li><b>So the desk is flat by default</b> and every gate here came from one of those failures.</li>
-              </ol>
-              <p className="bank-small">
-                github.com/Halldon-Inc/bank-of-friends &middot; npm run verify checks 37 assertions
-                against live chain state.
-              </p>
-            </>
-
-          /* --------------------------------------------------------- RECEIPT */
-          ) : menu === "receipt" && outcome ? (
-            <div className="bank-receipt">
-              <span aria-hidden="true">◇</span>
-              <h3>{outcome.name}</h3>
-              <p>{rf(outcome.reward)} returned on a {rf(definition.price)} slip · {outcome.chanceBps / 100}% chance</p>
-              <button type="button" disabled={busy || paused} onClick={() => go(null)}>Keep the receipt</button>
-              {outcome.reward > 0n && (
-                <button
-                  type="button" disabled={busy || paused}
-                  onClick={() => void act(() => client.redeem(result!.outcomeId!, 1n), "reward", () => setMessage("Redeemed into your simulated balance."))}
-                >
-                  Redeem · {rf(outcome.reward)}
-                </button>
-              )}
-            </div>
-
-          /* -------------------------------------------------------- SETTINGS */
           ) : menu === "settings" ? (
             <>
               <button
