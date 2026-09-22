@@ -1,0 +1,90 @@
+/*
+  host.css is loaded into the TRUSTED runtime page, not the sandboxed game, so this
+  is the only place the connect flow and the Friend picker can be styled. The
+  runtime owns that flow and games are explicitly told not to reimplement wallet
+  connection, NFT discovery or Friend selection, so this improves how it LOOKS and
+  reads. It cannot remove a step.
+
+  Matched to the same language as the game and the SDK's fishing example:
+  #eee paper, #111 ink, 1px borders, hard 2px 2px 0 offset shadows, mono.
+*/
+
+:root {
+  --rf-game-max-width: 1100px;
+  --rf-game-aspect-ratio: 3 / 2;
+  --bank-paper: #eee;
+  --bank-ink: #111;
+  --bank-dim: #666;
+  --bank-font: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+body { background: var(--bank-paper); color: var(--bank-ink); font-family: var(--bank-font); }
+
+/* ------------------------------------------------------------------ toolbar */
+.rf-frame-toolbar {
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: .04em;
+  background: var(--bank-paper);
+  border-bottom: 1px solid var(--bank-ink);
+}
+.rf-frame-mode { letter-spacing: .18em; text-transform: uppercase; font-size: 9px; color: var(--bank-dim); }
+.rf-frame-toolbar button {
+  border: 1px solid var(--bank-ink);
+  background: var(--bank-paper);
+  box-shadow: 2px 2px 0 var(--bank-ink);
+  font-family: var(--bank-font);
+  font-size: 11px;
+}
+.rf-frame-toolbar button:hover:not(:disabled) { background: #ddd; }
+
+/* ------------------------------------------------------------- Friend picker */
+/*
+  The runtime renders each Friend as <strong>label</strong><small>kind</small> with
+  NO ARTWORK, so you are choosing blind between six Gen-3s that look nothing alike.
+  CSS cannot fetch a per-token SVG, so this cannot be fixed from here; it needs the
+  SDK to render the canonical sprite it already knows how to read. Filed as a known
+  issue in the submission. What CSS CAN do is make the choice legible: big targets,
+  the token id dominant, and a clear pressed state.
+*/
+.rf-frame-friends {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+.rf-frame-friends button {
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+  min-height: 64px;
+  text-align: left;
+  border: 1px solid var(--bank-ink);
+  background: var(--bank-paper);
+  box-shadow: 2px 2px 0 var(--bank-ink);
+  font-family: var(--bank-font);
+  cursor: pointer;
+}
+.rf-frame-friends button strong {
+  font: 600 15px/1.15 system-ui, -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: -.02em;
+}
+.rf-frame-friends button small { font-size: 9px; color: var(--bank-dim); letter-spacing: .06em; }
+.rf-frame-friends button:hover { background: #ddd; }
+.rf-frame-friends button[aria-pressed="true"] {
+  background: #ccff00;
+  border-width: 2px;
+  box-shadow: 3px 3px 0 var(--bank-ink);
+}
+
+/* --------------------------------------------------------------------- menus */
+.rf-frame-menu { border: 2px solid var(--bank-ink); background: var(--bank-paper); box-shadow: 4px 4px 0 var(--bank-ink); }
+.rf-frame-menu-heading { border-bottom: 1px solid var(--bank-ink); }
+.rf-frame-menu-heading h2 { font: 600 12px/1.3 var(--bank-font); letter-spacing: .1em; text-transform: uppercase; }
+.rf-frame-menu-body { font-size: 12px; line-height: 1.55; }
+.rf-frame-menu-body p { color: var(--bank-dim); }
+.rf-frame-primary { background: var(--bank-ink); color: var(--bank-paper); border-color: var(--bank-ink); }
+.rf-frame-primary:hover:not(:disabled) { background: #333; }
+.rf-frame-note { font-size: 10px; color: var(--bank-dim); }
+.rf-frame-address, .rf-frame-wallet-balance { font-family: var(--bank-font); }
+.rf-frame-wallet-balance { font: 600 22px/1.1 system-ui, sans-serif; letter-spacing: -.03em; }

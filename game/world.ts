@@ -1,18 +1,26 @@
 /**
  * THE FIRST BANK OF FRIENDS - a banking hall on the SDK's 576 x 384 ground plane.
  *
- * The supplied presets are gardens, rooftops and caverns; none of them is a bank.
- * WORLD_RULES.md explicitly allows authoring your own scene in the SDK world format,
- * so this is a custom world built from the same vocabulary the presets use:
- * a ground polygon, floor patches, walking paths, props and actors.
+ * GEOMETRY IS BUILT AROUND THE CAMERA, NOT AROUND THE PLANE.
+ * GameWorld crops a fixed 960x640 window out of the 1600x1200 native projection at
+ * screen (320,330), and exposes no camera prop. Working the projection backwards,
+ * the centre of that crop is world point (288, 198):
  *
- * Reading the room, in plan:
+ *     screenX = 800 + 1.299 * (x - y - 96)      crop centre = (800, 650)
+ *     screenY = 690 + 0.420 * (x + y - 480)     =>  x - y ~ 90,  x + y ~ 486
  *
- *        back wall  ---- TELLERS ----          [ VAULT ]
- *          |  desk                                  |
- *        column        (marble floor)          column
- *          |        benches      benches            |
- *        ------------- ENTRANCE ------------- ledger
+ * So the hall is centred on (288, 198) and kept SMALL. A previous version spanned
+ * the whole 576x384 plane, which is what made it read as jam-packed; another sat at
+ * (340, 290) and rendered down in the bottom-left corner.
+ *
+ * Sparse on purpose. The fishing example puts SIX things on a large open floor and
+ * reads clean; this had twenty-two and did not. A banking hall should read as space.
+ *
+ *        back wall ---------- TELLER ----------
+ *          desk                                vault
+ *                     (open marble floor)
+ *          column      bench    planter       column
+ *        ------------- ENTRANCE ------ ledger
  */
 export const BANK_WORLD = {
   id: "first-bank-of-friends",
@@ -20,93 +28,68 @@ export const BANK_WORLD = {
   name: "The First Bank of Friends",
   setting: "Banking hall",
   shape: "Chamfered hall",
-  summary: "A marble hall with three teller windows, a vault, a trading desk and a ledger.",
+  summary: "A marble hall with a teller counter, a vault, a trading desk and a ledger.",
   variant: "complete",
   missingChunks: [] as number[],
 
-  // A chamfered rectangle reads as architecture rather than landscape.
   geometry: {
     polygons: [[
-      [72, 24], [504, 24], [552, 72], [552, 300],
-      [504, 348], [336, 372], [240, 372], [72, 348],
-      [24, 300], [24, 72],
+      [82, 99], [446, 99], [502, 152],
+      [502, 244], [446, 297], [130, 297],
+      [74, 244], [74, 152],
     ]],
     holes: [],
-    depth: 22,
+    depth: 27,
   },
 
-  // Marble. `grid` reads as tiling, `dither` as the inlaid runner down the middle.
+  // Marble: a broad tiled floor with an inlaid runner down the middle.
   patches: [
-    { x: 60, y: 48, w: 456, h: 96, pattern: "grid" },
-    { x: 60, y: 240, w: 456, h: 96, pattern: "grid" },
-    { x: 246, y: 140, w: 84, h: 200, pattern: "dither" },
-    { x: 404, y: 44, w: 120, h: 92, pattern: "dense" },
+    { x: 95, y: 126, w: 386, h: 72, pattern: "grid" },
+    { x: 95, y: 211, w: 386, h: 67, pattern: "grid" },
+    { x: 229, y: 136, w: 83, h: 145, pattern: "dither" },
   ],
 
-  // The queue line: door to teller, then the branch to vault and desk.
+  // Door to counter, then the branches out to vault and desk.
   paths: [
-    { points: [[288, 344], [288, 150], [288, 108]], width: 26 },
-    { points: [[288, 168], [452, 168], [452, 112]], width: 20 },
-    { points: [[288, 200], [132, 200], [132, 150]], width: 20 },
-    { points: [[288, 300], [452, 300]], width: 18 },
+    { points: [[269, 278], [269, 147]], width: 43 },
+    { points: [[269, 193], [425, 193]], width: 36 },
+    { points: [[269, 193], [116, 193]], width: 36 },
   ],
 
   props: [
-    // --- the teller counter: three windows across the back wall ---
-    { type: "terminal", x: 288, y: 62, scale: 2.0 },   // the teller counter, one big landmark
-
-    // --- the vault, right side. A tank is the only cylinder in the kit. ---
-    { type: "tank", x: 470, y: 92, scale: 2.6 },      // the vault
-    { type: "crystal", x: 512, y: 62, scale: 1.5 },
-
-    // --- the trading desk, left side ---
-    { type: "terminal", x: 118, y: 130, scale: 1.8 },  // the trading desk
-    { type: "antenna", x: 84, y: 108, scale: 1.15 },
-
-    // --- columns holding the hall up ---
-    { type: "pipe", x: 100, y: 214, scale: 2.2 },
-    { type: "pipe", x: 476, y: 214, scale: 2.2 },
-
-    // --- the waiting area ---
-    { type: "bench", x: 232, y: 290, scale: 1.2 },
-    { type: "planter", x: 404, y: 248, scale: 1.2 },
-
-    // --- the ledger desk, bottom right ---
-    { type: "terminal", x: 470, y: 296, scale: 1.4 },  // the ledger
-
-    // --- lobby dressing, kept sparse: a banking hall reads as SPACE ---
+    { type: "terminal", x: 269, y: 118, scale: 1.55 },  // the teller counter
+    { type: "tank",     x: 433, y: 147, scale: 1.75 },  // the vault
+    { type: "terminal", x: 116, y: 152, scale: 1.35 },  // the trading desk
+    { type: "terminal", x: 210, y: 288, scale: 1.15 },  // the ledger, front-left, clear of the runner
+    { type: "pipe",     x: 103, y: 260, scale: 1.5 },   // columns
+    { type: "pipe",     x: 451, y: 252, scale: 1.5 },
+    { type: "bench",    x: 192, y: 265, scale: 0.95 },
   ],
 
-  // Other Friends in the hall. The bank should not feel empty.
+  // A few other Friends in the hall so it is not empty.
   actors: [
-    { sprite: 0, x: 258, y: 150 },
-    { sprite: 1, x: 318, y: 168 },
-    { sprite: 2, x: 210, y: 268 },
-    { sprite: 3, x: 392, y: 262 },
-    { sprite: 4, x: 430, y: 196 },
+    { sprite: 0, x: 229, y: 174 },
+    { sprite: 2, x: 317, y: 214 },
   ],
 
-  // Money markers, the kit's own currency glyph.
   signals: [
-    { x: 288, y: 104, kind: "currency" },
-    { x: 452, y: 120, kind: "currency" },
-    { x: 132, y: 160, kind: "node" },
-    { x: 452, y: 292, kind: "node" },
+    { x: 269, y: 155, kind: "currency" },
   ],
 } as const;
 
-/** Front door, dead centre at the bottom of the hall. */
-export const SPAWN = [288, 336] as const;
-
-/** The four things you can walk up to. */
 /**
- * labelOffset lifts the prompt above its prop. The props were scaled up to read as
- * architecture, so these had to grow with them or the label sits across the teller
- * screen it is pointing at.
+ * Front door. Must be WALKABLE: an earlier spawn at (322, 358) sat inside the
+ * ledger desk's collision footprint and the runtime refused the world outright.
+ */
+export const SPAWN = [269, 254] as const;
+
+/**
+ * labelOffset lifts a prompt clear of its prop. These track prop scale: raise one
+ * and the label ends up printed across the teller screen it points at.
  */
 export const STATIONS = [
-  { id: "teller",  label: "Teller window",  position: [288, 96]  as const, reach: 96, labelOffset: -272 },
-  { id: "vault",   label: "The vault",      position: [452, 128] as const, reach: 94, labelOffset: -300 },
-  { id: "desk",    label: "Trading desk",   position: [124, 142] as const, reach: 92, labelOffset: -252 },
-  { id: "ledger",  label: "The ledger",     position: [462, 306] as const, reach: 88, labelOffset: -230 },
+  { id: "teller", label: "Teller",       position: [269, 152] as const, reach: 102, labelOffset: -186 },
+  { id: "vault",  label: "Vault",        position: [417, 174] as const, reach: 99, labelOffset: -192 },
+  { id: "desk",   label: "Trading desk", position: [135, 182] as const, reach: 99, labelOffset: -168 },
+  { id: "ledger", label: "Ledger",       position: [224, 300] as const, reach: 84, labelOffset: -150 },
 ] as const;

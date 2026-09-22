@@ -9,7 +9,7 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 const h = (p) => (fs.existsSync(p) ? crypto.createHash("sha256").update(fs.readFileSync(p)).digest("hex").slice(0, 12) : "MISSING");
 let bad = 0;
-for (const f of ["index.tsx", "game.json", "style.css", "world.ts", "README.md", "strategy.mjs"]) {
+for (const f of ["index.tsx", "game.json", "style.css", "world.ts", "host.css", "README.md", "strategy.mjs"]) {
   const a = h(`game/${f}`), b = h(`sdk/games/first-bank/${f}`);
   const ok = a === b && a !== "MISSING";
   console.log(`${ok ? "  ok  " : " FAIL "} game/${f} ${a}  vs  sdk/games/first-bank/${f} ${b}`);

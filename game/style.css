@@ -102,6 +102,43 @@
 
 .bank-loading { display: grid; place-items: center; gap: 12px; height: 100%; padding: 20px; background: var(--paper); color: var(--ink); }
 
+/* ------------------------------------------------------- station prompts */
+/*
+  The SDK's default out-of-reach state is grey-on-grey with a #888 border, which
+  reads as a broken, half-transparent ghost sitting on top of the furniture. Make
+  BOTH states crisp instead: far = a small solid marker with the station name,
+  near = the full green call to action. Nothing is ever washed out.
+*/
+.bank .rf-world-prompt {
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font: 600 11px/1.1 var(--game-font);
+  letter-spacing: .04em;
+  padding: 5px 8px;
+  box-shadow: 2px 2px 0 var(--ink);
+  transition: none;
+}
+.bank .rf-world-prompt:disabled {
+  opacity: 1;
+  color: var(--ink);
+  border-color: var(--ink);
+  background: var(--paper);
+  font-size: 10px;
+  padding: 3px 6px;
+  box-shadow: 1px 1px 0 var(--ink);
+}
+/* "Walk closer" on all four at once is noise; the marker alone says where to go. */
+.bank .rf-world-prompt:disabled small { display: none; }
+.bank .rf-world-prompt:enabled {
+  background: #ccff00;
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 7px 11px;
+  font-size: 12px;
+}
+.bank .rf-world-prompt:enabled small { display: block; margin-top: 3px; font-weight: 400; font-size: 9px; }
+
 /* -------------------------------------------------------------------- menus */
 .bank .rf-frame-menu { border: 2px solid var(--ink); }
 .bank-small { font-size: 10px; color: var(--dim); line-height: 1.6; }
