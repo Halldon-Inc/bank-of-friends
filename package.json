@@ -1,0 +1,19 @@
+{
+  "name": "bank-of-friends",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The Bank of Friends: pooled, automated market making funded by Rare Friends' idle NFT-wallet rewards.",
+  "scripts": {
+    "verify": "node scripts/verify-protocol.mjs",
+    "history": "node scripts/fetch-history.mjs",
+    "backtest": "node scripts/backtest.mjs",
+    "backtest:chart": "node scripts/backtest-chart.mjs",
+    "backtest:gated": "node scripts/backtest-gated.mjs",
+    "reserve": "node scripts/probe-reserve.mjs",
+    "book": "node scripts/probe-genesis-book.mjs"
+  },
+  "dependencies": {
+    "viem": "2.56.6"
+  }
+}
