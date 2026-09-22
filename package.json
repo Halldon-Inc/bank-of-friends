@@ -19,7 +19,9 @@
     "sweep": "node scripts/sweep-regimes.mjs",
     "check:game-sync": "node scripts/check-game-sync.mjs",
     "check:lever": "node scripts/lever-check.mjs",
-    "sweep:game": "node scripts/game-viewport-sweep.mjs"
+    "sweep:game": "node scripts/game-viewport-sweep.mjs",
+    "sweep:hall": "node scripts/hall-sweep.mjs",
+    "play:hall": "node scripts/hall-play.mjs"
   },
   "dependencies": {
     "viem": "2.56.6"

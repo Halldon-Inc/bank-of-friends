@@ -94,6 +94,9 @@ npm run backtest:gated   # the desk itself: does it correctly stay flat?
 npm run sweep            # 40 market regimes x 6 seeds
 npm run check:lever      # can the lever ever arm? prints the rate per regime
 npm run harvest -- --wallet 0xYOU      # dry-run the auto-harvester
+
+npm run sweep:hall       # the hall at 12 screen sizes: does it FILL them, does anything overlap?
+npm run play:hall        # walk to the desk and pull the lever, in each of the three rooms
 ```
 
 Contracts: see [contracts/README.md](contracts/README.md).
@@ -107,8 +110,24 @@ Game: see [game/README.md](game/README.md).
 | `forge test` | **20/20** on the contract safety properties, including Genesis enrolment |
 | `npm run backtest:gated` | 0 fills on the real tape; arms on a ranging one |
 | `npm run check:lever` | 21% overall arm rate; 0% in dead/falling markets |
+| `npm run sweep:hall` | **120/120** across twelve sizes, 320px → 3440px |
+| `npm run play:hall` | **26/26**: walks, arrives, opens the desk, pulls the lever, in all three rooms |
 | `npm run sweep:game` | **72/72** across nine viewports, 320px → 2560px (SDK build) |
 | `node scripts/visual-check.mjs <url>` | **70/70** on the dashboard, 320px → 2560px |
+
+## The hall fits every screen because there are three of them
+
+An isometric room built as a rectangle always projects **3.09 : 1**, whatever its
+proportions — for any plane rectangle the horizontal and depth ranges are both
+`w + h`. So no single hall can fill both an ultrawide monitor and a phone held
+upright: the first version was 390 x 197 inside an 844 tall page, 23% of the screen,
+with the HUD sitting on top of the desk sign.
+
+Depth is worth a third of width on screen, so `lib/hall-world.ts` generates **three
+rooms from one spec** — a floor you look across (2.40), a hall (1.53) and a corridor
+you look down (0.53) — and the component measures the box it actually has and picks
+the one that wastes least. Each camera is **solved** from that room's own corners,
+prop extents and sign height, so the frame ratio cannot drift from the viewBox.
 
 ## Status and honesty
 

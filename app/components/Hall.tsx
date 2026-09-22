@@ -21,10 +21,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { renderWorld, project, unproject, validateWorld } from "@rarefriends/friendsdk/world";
 import { createWorldMovement } from "@rarefriends/friendsdk/movement";
-import { HALL, SPAWN, DESK, VIEWBOX } from "@/lib/hall-world";
+import { HALLS, hallFor, fit, type Hall as HallShape } from "@/lib/hall-world";
 import { DEFAULT_GATES, evaluateRegime, realisedVol, drift, edgePerRoundTrip, BREAKEVEN_STEP } from "@/lib/strategy.mjs";
 
-const world = validateWorld(HALL as never);
+/** Validated once each, at module load, so switching rooms costs nothing. */
+const WORLDS = {
+  wide: validateWorld(HALLS.wide.world as never),
+  mid: validateWorld(HALLS.mid.world as never),
+  tall: validateWorld(HALLS.tall.world as never),
+} as const;
 
 /* ------------------------------------------------------------------ character */
 
@@ -112,6 +117,9 @@ function cropToSubject(rows: string[]): string[] {
   return out;
 }
 
+/** How tall the player stands, in world canvas units. */
+const CHAR_UNITS = 30;
+
 /* ------------------------------------------------------------------- the week */
 
 const RF_PRICE_WETH = 5.7e-7;
@@ -182,17 +190,53 @@ export type HallFriend = {
 export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave: () => void }) {
   const [rows, setRows] = useState<string[] | null>(null);
   const [near, setNear] = useState(false);
-  // Position lives in a ref, not state. It used to be React state written every
-  // animation frame, which re-ran renderWorld and rebuilt the ENTIRE world SVG
-  // 60 times a second. That is what made walking feel glitchy.
-  const posRef = useRef<[number, number]>([SPAWN[0], SPAWN[1]]);
   const charRef = useRef<HTMLDivElement | null>(null);
   const nearRef = useRef(false);
+
+  /*
+   * THE ROOM IS CHOSEN FROM THE BOX IT GETS, NOT FROM THE WINDOW.
+   *
+   * A rectangular room projects 3.09:1, so on a phone held upright the hall was a
+   * 390x197 letterbox inside an 844 tall page - 23% of the screen, with the HUD
+   * landing on the desk sign. There is a second, corridor-shaped room for that
+   * case. Measuring the stage rather than matching a media query is what makes the
+   * choice correct: the right room depends on the space left AFTER the chrome, and
+   * a media query cannot see that.
+   */
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [box, setBox] = useState<{ width: number; height: number } | null>(null);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => {
+      const { width, height } = e.contentRect;
+      if (width > 0 && height > 0) setBox({ width, height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const hall: HallShape = useMemo(() => (box ? hallFor(box.width / box.height) : HALLS.wide), [box]);
+  const world = WORLDS[hall.key];
+  const frame = useMemo(() => (box ? fit(hall, box) : null), [hall, box]);
+  // The rAF loop is created once and must not be torn down on every resize, so it
+  // reads the live room through a ref rather than through its closure.
+  const hallRef = useRef(hall);
+  useEffect(() => { hallRef.current = hall; }, [hall]);
+
+  /*
+   * The character is sized in WORLD units, not screen pixels. At a fixed 44px it
+   * was 30 units wide on a laptop and 23 on a phone, so your Friend silently
+   * changed size relative to the room depending on the device - and stayed small
+   * while the hall grew on a large display.
+   */
+  const charPx = frame ? Math.max(24, Math.round((CHAR_UNITS * frame.width) / hall.viewBox.width)) : 44;
   const [open, setOpen] = useState(false);
   const [week, setWeek] = useState<ReturnType<typeof rollWeek> | null>(null);
   const [rolling, setRolling] = useState(false);
   const [showGates, setShowGates] = useState(false);
   const [reduced, setReduced] = useState(false);
+  const [touch, setTouch] = useState(false);
   const mover = useRef<ReturnType<typeof createWorldMovement> | null>(null);
   const raf = useRef<number | undefined>(undefined);
   const seed = useRef((Math.random() * 4294967296) >>> 0);
@@ -218,6 +262,15 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
     return () => m.removeEventListener("change", u);
   }, []);
 
+  /* A phone has no WASD. Telling it about the arrow keys is noise on the one
+     screen with the least room for noise. */
+  useEffect(() => {
+    const m = window.matchMedia("(pointer: coarse)");
+    const u = () => setTouch(m.matches); u();
+    m.addEventListener("change", u);
+    return () => m.removeEventListener("change", u);
+  }, []);
+
   /*
    * Movement is the SDK's own: setKey handles the key-to-direction mapping and
    * facing, moveTo does real pathfinding around the props, and update() clamps a
@@ -231,7 +284,7 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
    * a ref instead so the mover survives.
    */
   useEffect(() => {
-    mover.current = createWorldMovement(world as never, SPAWN as never, { speed: 108, radius: 9 });
+    mover.current = createWorldMovement(world as never, hall.spawn as never, { speed: 108, radius: 9 });
     const down = (e: KeyboardEvent) => {
       const k = e.key;
       if (k.toLowerCase() === "e" && nearRef.current) { setOpen(true); return; }
@@ -249,7 +302,10 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
       window.removeEventListener("blur", blur); document.removeEventListener("visibilitychange", blur);
       mover.current?.stop();
     };
-  }, []);
+    // Rebuilt only when the ROOM changes, never on resize within one room: the old
+    // version listed `near` here, so walking up to the desk built a fresh mover and
+    // respawned you at the door, every time.
+  }, [world, hall.spawn]);
 
   useEffect(() => {
     let last = performance.now();
@@ -261,20 +317,20 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
       if (m) {
         if (openRef.current) m.stop();
         const next = m.update(delta);
-        posRef.current = [next.position[0], next.position[1]];
+        const { viewBox, desk } = hallRef.current;
 
-        // Write the transform straight to the node. No setState here: the only
-        // React update in the loop is the `near` flag, and only when it flips.
+        // Write the position straight to the node. No setState here: the only React
+        // update in the loop is the `near` flag, and only when it flips.
         const el = charRef.current;
         if (el) {
           const [px, py] = project(next.position[0], next.position[1], 0);
-          el.style.left = `${((px - VIEWBOX.x) / VIEWBOX.width) * 100}%`;
-          el.style.top = `${((py - VIEWBOX.y) / VIEWBOX.height) * 100}%`;
+          el.style.left = `${((px - viewBox.x) / viewBox.width) * 100}%`;
+          el.style.top = `${((py - viewBox.y) / viewBox.height) * 100}%`;
           el.dataset.walking = next.walking ? "true" : "false";
         }
 
-        const d = Math.hypot(next.position[0] - DESK.position[0], next.position[1] - DESK.position[1]);
-        const isNear = d <= DESK.reach;
+        const d = Math.hypot(next.position[0] - desk.position[0], next.position[1] - desk.position[1]);
+        const isNear = d <= desk.reach;
         if (isNear !== nearRef.current) { nearRef.current = isNear; setNear(isNear); }
       }
       raf.current = requestAnimationFrame(tick);
@@ -284,21 +340,24 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
   }, []);
 
   /* The scene is STATIC. The player is drawn as a separate layer above it. */
-  const svg = useMemo(() => renderWorld(world as never, {} as never), []);
+  const svg = useMemo(() => renderWorld(world as never, {} as never), [world]);
 
-  const deskScreen = useMemo(() => project(DESK.position[0], DESK.position[1], 132), []);
+  const deskScreen = useMemo(
+    () => project(hall.desk.position[0], hall.desk.position[1], hall.promptLift),
+    [hall],
+  );
 
   /* tap to walk: unproject the click into world space and let the SDK path to it */
   const onPointer = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (open) return;
-    const box = e.currentTarget.getBoundingClientRect();
-    // The SVG is letterboxed by preserveAspectRatio, so map through the rendered
-    // box rather than assuming it fills the element.
-    const scale = Math.min(box.width / VIEWBOX.width, box.height / VIEWBOX.height);
-    const drawW = VIEWBOX.width * scale, drawH = VIEWBOX.height * scale;
-    const offX = (box.width - drawW) / 2, offY = (box.height - drawH) / 2;
-    const sx = VIEWBOX.x + (e.clientX - box.left - offX) / scale;
-    const sy = VIEWBOX.y + (e.clientY - box.top - offY) / scale;
+    const { viewBox } = hallRef.current;
+    const r = e.currentTarget.getBoundingClientRect();
+    // The scene is sized at exactly the viewBox ratio, so this scale is uniform;
+    // the min() keeps it honest if that ever stops being true.
+    const scale = Math.min(r.width / viewBox.width, r.height / viewBox.height);
+    const offX = (r.width - viewBox.width * scale) / 2, offY = (r.height - viewBox.height * scale) / 2;
+    const sx = viewBox.x + (e.clientX - r.left - offX) / scale;
+    const sy = viewBox.y + (e.clientY - r.top - offY) / scale;
     const [wx, wy] = unproject(sx, sy);
     // moveTo returns false when the point is unreachable; ignore rather than jump.
     mover.current?.moveTo([wx, wy] as never);
@@ -328,52 +387,60 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
 
   return (
     <div className="hall">
-      <div className="hall-scene" onPointerDown={onPointer}>
-        <div
-          className="hall-svg"
-          style={{ ["--vb" as string]: `${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}` }}
-          dangerouslySetInnerHTML={{
-            // renderWorld returns a complete SVG document we authored the input for.
-            // Re-point its viewBox to our camera window.
-            __html: svg.replace(/viewBox="[^"]*"/, `viewBox="${VIEWBOX.x} ${VIEWBOX.y} ${VIEWBOX.width} ${VIEWBOX.height}"`)
-              .replace(/<svg /, '<svg preserveAspectRatio="xMidYMid meet" '),
-          }}
-        />
-
-        {/* The player, a layer above the static scene. Moved by writing transform
-            in the rAF loop, never by re-rendering the world. */}
-        {rows && (
-          <div ref={charRef} className="hall-char" data-walking="false">
-            <svg viewBox="0 0 16 16" width="44" height="44" shapeRendering="crispEdges" aria-hidden="true">
-              {rows.map((row, y) => [...row].map((c, x) =>
-                c === "#" ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} /> : null))}
-            </svg>
-          </div>
-        )}
-
-        <button
-          type="button"
-          className={`hall-prompt${near ? " is-near" : ""}`}
-          style={{
-            left: `${((deskScreen[0] - VIEWBOX.x) / VIEWBOX.width) * 100}%`,
-            top: `${((deskScreen[1] - VIEWBOX.y) / VIEWBOX.height) * 100}%`,
-          }}
-          onClick={() => near && setOpen(true)}
-          disabled={!near}
-        >
-          <span>The Desk</span>
-          <small>{near ? "E / tap to open" : "walk over"}</small>
-        </button>
-
-        <div className="hall-hud">
-          <strong>{friend.label}</strong>
-          <span>{friend.idleRf.toLocaleString("en-US", { maximumFractionDigits: 0 })} RF idle</span>
-          <button type="button" onClick={onLeave}>Play as yours</button>
-          <a className="hall-docs" href="/docs">How it works</a>
-        </div>
-
-        <p className="hall-hint">Walk with WASD or the arrows, or tap where you want to go.</p>
+      {/* Chrome is a ROW, not an overlay. As an overlay it sat on top of the desk
+          sign the moment the frame got short. */}
+      <div className="hall-bar">
+        <strong>{friend.label}</strong>
+        <span>{friend.idleRf.toLocaleString("en-US", { maximumFractionDigits: 0 })} RF idle</span>
+        <button type="button" onClick={onLeave}>Play as yours</button>
+        <a className="hall-docs" href="/docs">How it works</a>
       </div>
+
+      <div className="hall-stage" ref={stageRef}>
+        <div
+          className="hall-scene"
+          onPointerDown={onPointer}
+          style={frame ? { width: `${frame.width}px`, height: `${frame.height}px` } : { visibility: "hidden" }}
+        >
+          <div
+            className="hall-svg"
+            dangerouslySetInnerHTML={{
+              // renderWorld returns a complete SVG document we authored the input
+              // for. Re-point its viewBox to our camera window.
+              __html: svg
+                .replace(/viewBox="[^"]*"/, `viewBox="${hall.viewBox.x} ${hall.viewBox.y} ${hall.viewBox.width} ${hall.viewBox.height}"`)
+                .replace(/<svg /, '<svg preserveAspectRatio="xMidYMid meet" '),
+            }}
+          />
+
+          {/* The player, a layer above the static scene. Moved by writing left/top
+              in the rAF loop, never by re-rendering the world. */}
+          {rows && (
+            <div ref={charRef} className="hall-char" data-walking="false">
+              <svg viewBox="0 0 16 16" width={charPx} height={charPx} shapeRendering="crispEdges" aria-hidden="true">
+                {rows.map((row, y) => [...row].map((c, x) =>
+                  c === "#" ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} /> : null))}
+              </svg>
+            </div>
+          )}
+
+          <button
+            type="button"
+            className={`hall-prompt${near ? " is-near" : ""}`}
+            style={{
+              left: `${((deskScreen[0] - hall.viewBox.x) / hall.viewBox.width) * 100}%`,
+              top: `${((deskScreen[1] - hall.viewBox.y) / hall.viewBox.height) * 100}%`,
+            }}
+            onClick={() => near && setOpen(true)}
+            disabled={!near}
+          >
+            <span>The Desk</span>
+            <small>{near ? "E / tap to open" : "walk over"}</small>
+          </button>
+        </div>
+      </div>
+
+      <p className="hall-hint">{touch ? "Tap where you want to go." : "Walk with WASD or the arrows, or tap where you want to go."}</p>
 
       {open && (
         <div className="hall-modal" role="dialog" aria-modal="true" aria-label="The Desk">
