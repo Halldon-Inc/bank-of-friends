@@ -181,17 +181,22 @@ export type HallFriend = {
 
 export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave: () => void }) {
   const [rows, setRows] = useState<string[] | null>(null);
-  const [pos, setPos] = useState<[number, number]>([SPAWN[0], SPAWN[1]]);
   const [near, setNear] = useState(false);
+  // Position lives in a ref, not state. It used to be React state written every
+  // animation frame, which re-ran renderWorld and rebuilt the ENTIRE world SVG
+  // 60 times a second. That is what made walking feel glitchy.
+  const posRef = useRef<[number, number]>([SPAWN[0], SPAWN[1]]);
+  const charRef = useRef<HTMLDivElement | null>(null);
+  const nearRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [week, setWeek] = useState<ReturnType<typeof rollWeek> | null>(null);
   const [rolling, setRolling] = useState(false);
   const [showGates, setShowGates] = useState(false);
   const [reduced, setReduced] = useState(false);
-  const [walking, setWalking] = useState(false);
   const mover = useRef<ReturnType<typeof createWorldMovement> | null>(null);
   const raf = useRef<number | undefined>(undefined);
   const seed = useRef((Math.random() * 4294967296) >>> 0);
+  const openRef = useRef(false);
 
   /* character artwork, from whichever collection the Friend belongs to */
   useEffect(() => {
@@ -219,11 +224,17 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
    * suspended tab to 40ms so a backgrounded page does not teleport you across the
    * hall. Rolling my own would have reimplemented collision badly.
    */
+  /*
+   * Created ONCE. This effect used to list `near` in its deps, so the instant you
+   * got close to the desk it re-ran, built a fresh mover, and respawned you at the
+   * door. Walking up to the desk restarted you, every time. `near` is read through
+   * a ref instead so the mover survives.
+   */
   useEffect(() => {
-    mover.current = createWorldMovement(world as never, SPAWN as never, { speed: 96, radius: 9 });
+    mover.current = createWorldMovement(world as never, SPAWN as never, { speed: 108, radius: 9 });
     const down = (e: KeyboardEvent) => {
       const k = e.key;
-      if (k.toLowerCase() === "e" && near) { setOpen(true); return; }
+      if (k.toLowerCase() === "e" && nearRef.current) { setOpen(true); return; }
       if (k === "Escape") { setOpen(false); return; }
       if (mover.current?.setKey(k, true)) e.preventDefault();
     };
@@ -236,8 +247,9 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
     return () => {
       window.removeEventListener("keydown", down); window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur); document.removeEventListener("visibilitychange", blur);
+      mover.current?.stop();
     };
-  }, [near]);
+  }, []);
 
   useEffect(() => {
     let last = performance.now();
@@ -247,29 +259,32 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
       const delta = Math.max(0, t - last); last = t;
       const m = mover.current;
       if (m) {
-        if (open) m.stop();
+        if (openRef.current) m.stop();
         const next = m.update(delta);
-        setPos([next.position[0], next.position[1]]);
-        setWalking(next.walking);
+        posRef.current = [next.position[0], next.position[1]];
+
+        // Write the transform straight to the node. No setState here: the only
+        // React update in the loop is the `near` flag, and only when it flips.
+        const el = charRef.current;
+        if (el) {
+          const [px, py] = project(next.position[0], next.position[1], 0);
+          el.style.left = `${((px - VIEWBOX.x) / VIEWBOX.width) * 100}%`;
+          el.style.top = `${((py - VIEWBOX.y) / VIEWBOX.height) * 100}%`;
+          el.dataset.walking = next.walking ? "true" : "false";
+        }
+
+        const d = Math.hypot(next.position[0] - DESK.position[0], next.position[1] - DESK.position[1]);
+        const isNear = d <= DESK.reach;
+        if (isNear !== nearRef.current) { nearRef.current = isNear; setNear(isNear); }
       }
       raf.current = requestAnimationFrame(tick);
     };
     raf.current = requestAnimationFrame(tick);
     return () => { if (raf.current) cancelAnimationFrame(raf.current); };
-  }, [open]);
+  }, []);
 
-  useEffect(() => {
-    const d = Math.hypot(pos[0] - DESK.position[0], pos[1] - DESK.position[1]);
-    setNear(d <= DESK.reach);
-  }, [pos]);
-
-  /* scene */
-  const svg = useMemo(() => {
-    const actors = rows
-      ? [{ x: pos[0], y: pos[1], rows, pixelScale: 3 }]
-      : [];
-    return renderWorld(world as never, { actors } as never);
-  }, [pos, rows, friend.collection]);
+  /* The scene is STATIC. The player is drawn as a separate layer above it. */
+  const svg = useMemo(() => renderWorld(world as never, {} as never), []);
 
   const deskScreen = useMemo(() => project(DESK.position[0], DESK.position[1], 132), []);
 
@@ -285,6 +300,7 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
     const sx = VIEWBOX.x + (e.clientX - box.left - offX) / scale;
     const sy = VIEWBOX.y + (e.clientY - box.top - offY) / scale;
     const [wx, wy] = unproject(sx, sy);
+    // moveTo returns false when the point is unreachable; ignore rather than jump.
     mover.current?.moveTo([wx, wy] as never);
   }, [open]);
 
@@ -294,6 +310,8 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
     const valueWeth = bookWeth + bookRf * RF_PRICE_WETH;
     return evaluateRegime(week.market, { rf: bookRf, weth: bookWeth, valueWeth, hwmWeth: valueWeth, halted: false }, DEFAULT_GATES);
   }, [week, friend.idleRf, friend.idleWeth]);
+
+  useEffect(() => { openRef.current = open; }, [open]);
 
   function pull() {
     if (rolling) return;
@@ -322,6 +340,17 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
           }}
         />
 
+        {/* The player, a layer above the static scene. Moved by writing transform
+            in the rAF loop, never by re-rendering the world. */}
+        {rows && (
+          <div ref={charRef} className="hall-char" data-walking="false">
+            <svg viewBox="0 0 16 16" width="44" height="44" shapeRendering="crispEdges" aria-hidden="true">
+              {rows.map((row, y) => [...row].map((c, x) =>
+                c === "#" ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} /> : null))}
+            </svg>
+          </div>
+        )}
+
         <button
           type="button"
           className={`hall-prompt${near ? " is-near" : ""}`}
@@ -338,8 +367,9 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
 
         <div className="hall-hud">
           <strong>{friend.label}</strong>
-          <span>{friend.idleRf.toLocaleString("en-US", { maximumFractionDigits: 2 })} RF idle</span>
-          <button type="button" onClick={onLeave}>Change Friend</button>
+          <span>{friend.idleRf.toLocaleString("en-US", { maximumFractionDigits: 0 })} RF idle</span>
+          <button type="button" onClick={onLeave}>Play as yours</button>
+          <a className="hall-docs" href="/docs">How it works</a>
         </div>
 
         <p className="hall-hint">Walk with WASD or the arrows, or tap where you want to go.</p>

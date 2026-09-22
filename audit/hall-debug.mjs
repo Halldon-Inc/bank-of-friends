@@ -8,7 +8,7 @@ let exe=null; for(const d of fs.readdirSync(root).filter(x=>x.startsWith("chromi
 const b = await chromium.launch({ executablePath: exe });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
 const errs=[]; p.on("console",m=>{if(m.type()==="error")errs.push(m.text())}); p.on("pageerror",e=>errs.push("PAGEERROR: "+String(e)));
-await p.goto("http://localhost:3188/hall", { waitUntil: "domcontentloaded", timeout: 60000 });
+await p.goto("https://bank-of-friends-nu.vercel.app/hall", { waitUntil: "domcontentloaded", timeout: 60000 });
 await p.waitForTimeout(1200);
 await p.fill('input[aria-label="Wallet address or ENS name"]', "huntclubhero.eth");
 await p.click('button:has-text("Look up")');
@@ -17,5 +17,5 @@ await p.locator(".picker-friend").first().click();
 await p.waitForTimeout(3000);
 console.log("errors:"); errs.slice(0,5).forEach(e=>console.log("  "+e.slice(0,300)));
 console.log("\nbody text now:", (await p.locator("body").innerText()).replace(/\s+/g," ").slice(0,300));
-await p.screenshot({ path: "audit/shots/hall-debug.png" });
+await p.screenshot({ path: "audit/shots/PROD-hall.png" });
 await b.close(); process.exit(0);

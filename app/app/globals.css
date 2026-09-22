@@ -295,7 +295,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
 .hall-scene {
   position: relative;
   width: min(100%, calc((100svh - 24px) * 1.49));
-  aspect-ratio: 700 / 470;
+  aspect-ratio: 763 / 512;   /* must match VIEWBOX or the scene letterboxes */
   max-height: calc(100svh - 24px);
   border: 1px solid var(--ink);
   background: var(--paper);
@@ -408,3 +408,29 @@ a { color: var(--ink); text-underline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   .hall-prompt.is-near, .hall-verdict:not(.spinning) .hall-word { animation: none; }
 }
+
+/* The player layer. Positioned by the rAF loop writing left/top directly; the
+   world SVG underneath never re-renders. */
+.hall-char {
+  position: absolute;
+  transform: translate(-50%, -86%);
+  pointer-events: none;
+  line-height: 0;
+  will-change: left, top;
+}
+.hall-char svg { display: block; overflow: visible; }
+.hall-char rect { fill: var(--ink); }
+/* A one-pixel paper halo so the character never disappears into dark flooring. */
+.hall-char svg { filter: drop-shadow(1px 0 0 var(--paper)) drop-shadow(-1px 0 0 var(--paper)) drop-shadow(0 1px 0 var(--paper)) drop-shadow(0 -1px 0 var(--paper)); }
+.hall-char[data-walking="true"] { animation: step 320ms steps(2, end) infinite; }
+@keyframes step { from { transform: translate(-50%, -86%); } to { transform: translate(-50%, -90%); } }
+@media (prefers-reduced-motion: reduce) { .hall-char[data-walking="true"] { animation: none; } }
+
+.hall-docs {
+  font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--dim); text-decoration: none; border-bottom: 1px solid var(--line);
+  padding-bottom: 1px;
+}
+.hall-docs:hover { color: var(--ink); border-color: var(--ink); }
+.masthead-back { margin: 0.5rem 0 0; font-size: 0.72rem; }
+.masthead-back a { color: var(--dim); }

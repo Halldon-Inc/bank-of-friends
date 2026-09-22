@@ -1,14 +1,21 @@
 # The First Bank of Friends
 
-**[Play it](https://halldon-inc.github.io/bank-of-friends/)** &middot; **[Live desk](https://bank-of-friends-nu.vercel.app)** &middot; [Vibeathon submission](SUBMISSION.md)
+**[Play it](https://bank-of-friends-nu.vercel.app)** &middot; **[The research](https://bank-of-friends-nu.vercel.app/docs)** &middot; [Vibeathon submission](SUBMISSION.md)
 
 Walk your Rare Friend into a banking hall built on pooled NFT-wallet rewards, and pull
 the lever at the desk to watch a real market-making strategy decide, week after week,
 that it should not trade.
 
 Built for the [Rare Friends Vibeathon](https://github.com/spokesz/rarefriends-vibeathon).
-The game needs a wallet holding a hardwired Generations NFT (generation 1 or higher) on
-Robinhood mainnet. The desk dashboard needs nothing.
+**No wallet, no signature, no install.** You land inside the hall with a Friend already on the
+marble, and can swap to any Friend in your own wallet from the HUD.
+
+**This is deliberately not a FriendSDK game.** `readGenerationEligibility` reads `ownerOf` and
+`generation` from the *Generations* contract and requires generation >= 1, so no SDK game can
+ever admit a **Genesis** &mdash; and a Genesis holds ~4,500 RF of idle rewards against ~31 RF
+across six Gen-3s. The Genesis *is* the bank. The SDK is used here as a **library** under its
+Apache-2.0 licence for world rendering and movement; the identity gate and the character are
+ours, which is what lets a Genesis walk in.
 
 ---
 
@@ -60,8 +67,8 @@ roughly $30,000.
 ## Repository
 
 ```
-game/        the FriendSDK game: a banking hall, one desk, one lever
-app/         the live desk dashboard (Next.js, no wallet needed)
+game/        the original FriendSDK build, kept for reference (cannot admit a Genesis)
+app/         THE PRODUCT: the hall at /, the research at /docs
 contracts/   FriendBank.sol + 18 Foundry tests. NOT DEPLOYED
 lib/         protocol reader and the strategy module, shared by everything
 scripts/     verification, backtests, parameter derivation, harvester, harnesses
@@ -100,7 +107,7 @@ Game: see [game/README.md](game/README.md).
 | `forge test` | **18/18** on the contract safety properties |
 | `npm run backtest:gated` | 0 fills on the real tape; arms on a ranging one |
 | `npm run check:lever` | 21% overall arm rate; 0% in dead/falling markets |
-| `npm run sweep:game` | **72/72** across nine viewports, 320px → 2560px |
+| `npm run sweep:game` | **72/72** across nine viewports, 320px → 2560px (SDK build) |
 | `node scripts/visual-check.mjs <url>` | **70/70** on the dashboard, 320px → 2560px |
 
 ## Status and honesty
@@ -116,11 +123,13 @@ forecast; the backtests are evidence of what has happened, not a claim about wha
 - **Genesis holders cannot play any FriendSDK game.** `readGenerationEligibility` reads
   `ownerOf` and `generation` from the **Generations** contract and requires generation ≥ 1.
   Genesis NFTs are a different contract and report generation 0, so they are excluded twice
-  over. That locks out the protocol's most valuable holders.
+  over. That locks out the protocol's most valuable holders, and it is why this project left
+  the SDK runtime. `contracts/test` proves a Genesis enrols and is collected from exactly like
+  a Generations Friend.
 - **The Friend picker shows no artwork.** It renders the token label as text, so you choose
   blind between Friends that look nothing alike. The SDK already has a sprite reader; the
-  picker just does not use it. We draw the portrait once you are inside the bank, which is
-  the only place a game can reach.
+  picker does not use it. Ours shows every Friend's on-chain art, which is free: the artwork
+  is already served as a data URI.
 
 ## Licence
 

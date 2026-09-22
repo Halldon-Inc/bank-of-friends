@@ -1,39 +1,46 @@
-import DeskView from "@/components/Desk";
-import FriendPicker from "@/components/FriendPicker";
+import HallShell from "@/components/HallShell";
 
 /**
- * The shell renders instantly and never touches the chain. An earlier version did
- * the full 24h scan here AND in /api/desk, which meant two heavy functions doing
- * identical work; the page one kept failing in production and fell through to its
- * error state while the API was fine. The data now loads client-side from the one
- * endpoint that does the work.
+ * The front door IS the hall.
+ *
+ * It used to be a dashboard, and before that a wallet-lookup form, both of which
+ * made you read or type before anything happened. You now land already inside,
+ * with a Friend on the marble, and swap to your own from the HUD. The research that
+ * used to live here is at /docs, which is the right way round: fun in front,
+ * evidence behind it.
  */
-export default function Page() {
-  return (
-    <main className="shell">
-      <header className="masthead">
-        <h1 className="wordmark">The First Bank of Friends</h1>
-        <p className="tagline">a desk that is flat until the market pays it</p>
-      </header>
 
-      <DeskView />
+export const revalidate = 300;
 
-      <FriendPicker />
+const SHOWCASE = "0x913105f2d2bfb8392f7845ef79e0c2c62f2755df";
 
-      <hr className="rule" />
+async function showcaseFriend() {
+  try {
+    const r = await fetch(`https://rarefriends.com/api/protocol/state?address=${SHOWCASE}`, {
+      next: { revalidate: 300 },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    // The Genesis: the Friend FriendSDK will not admit, and the one holding
+    // essentially all of the idle rewards. Exactly the right host for the hall.
+    const f = (j.account?.friends ?? []).find((x: any) => x.collection === "Genesis" && x.activated)
+      ?? (j.account?.friends ?? []).find((x: any) => x.activated);
+    if (!f) return null;
+    return {
+      id: String(f.id),
+      label: f.collection === "Genesis" ? `Genesis #${f.id}` : `Gen-${f.generation} #${f.id}`,
+      collection: String(f.collection),
+      generation: Number(f.generation ?? 0),
+      imageUrl: typeof f.imageUrl === "string" && f.imageUrl.startsWith("data:image/") ? f.imageUrl : null,
+      idleRf: Number(f.earnings ?? 0),
+      idleWeth: Number(f.earningsWeth ?? 0),
+    };
+  } catch {
+    return null;
+  }
+}
 
-      <footer>
-        <p>
-          Nothing here is financial advice and nothing here is a forecast. The desk holds no
-          third-party funds and has never executed a trade. Backtests cover 8,777 swaps across
-          the pool&rsquo;s entire 5.6-day history; that is a short and unusual sample, presented as
-          evidence of what has happened, not a claim about what will.
-        </p>
-        <p>
-          Built for the Rare Friends Vibeathon. Source, backtests and the verification harness:{" "}
-          <a href="https://github.com/Halldon-Inc/bank-of-friends">github.com/Halldon-Inc/bank-of-friends</a>
-        </p>
-      </footer>
-    </main>
-  );
+export default async function Page() {
+  return <HallShell showcase={await showcaseFriend()} />;
 }

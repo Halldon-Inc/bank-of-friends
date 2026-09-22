@@ -1,6 +1,5 @@
-**Try it now: <https://halldon-inc.github.io/bank-of-friends/>**
-Requires a browser wallet holding a hardwired Rare Friends Generations NFT, generation 1 or
-higher, on Robinhood mainnet. Everything in it is simulated.
+**Play it: <https://bank-of-friends-nu.vercel.app>** &mdash; no wallet, no signature, no install.
+You land inside the hall with a Friend already on the marble.
 
 **Project name**
 
@@ -8,7 +7,7 @@ The First Bank of Friends
 
 **Builder / contact**
 
-Hunt · GitHub [@huntclubhero](https://github.com/huntclubhero) · wallet `huntclubhero.eth`
+Hunt &middot; GitHub [@huntclubhero](https://github.com/huntclubhero) &middot; wallet `huntclubhero.eth`
 
 **Category**
 
@@ -16,41 +15,67 @@ Economy Potential (also relevant: Character Spotlight)
 
 **One sentence**
 
-Walk your Rare Friend into a banking hall built on pooled NFT-wallet rewards, and pull the
-lever at the trading desk to watch a real market-making strategy decide, week after week,
-that it should not trade.
+Walk any Rare Friend &mdash; **Genesis included** &mdash; into a banking hall built on pooled
+NFT-wallet rewards, and pull the lever at the desk to watch a real market-making strategy
+decide, week after week, that it should not trade.
 
 **Source code**
 
-<https://github.com/Halldon-Inc/bank-of-friends> · **FriendSDK v0.1.2**, plus Next.js 16,
-viem and Solidity 0.8.30 + Foundry for the research and contracts.
+<https://github.com/Halldon-Inc/bank-of-friends> &middot; Next.js 16, viem, Solidity 0.8.30 +
+Foundry. **FriendSDK is used as a library, not a runtime** (see below).
 
-**Playable preview**
+**Playable demo**
 
-<https://halldon-inc.github.io/bank-of-friends/> (GitHub Pages, static build from
-`friendsdk build`). A live data dashboard also runs at
-<https://bank-of-friends-nu.vercel.app>, which needs no wallet.
+<https://bank-of-friends-nu.vercel.app> &middot; the research and live desk are at
+<https://bank-of-friends-nu.vercel.app/docs>.
 
 ---
 
-## The game
+## Why this is not a FriendSDK game
 
-A banking hall on the SDK's ground plane, authored as a **custom world** because the supplied
-presets are gardens, rooftops and caverns and none of them is a bank. Four windows:
+We built one first. Then we measured the wallet.
 
-| Window | What happens |
+`readGenerationEligibility` reads `ownerOf` **and** `generation` from the **Generations**
+contract and requires `generation >= 1`. A Genesis is a different contract and reports 0, so
+**no FriendSDK game can ever admit a Genesis.**
+
+For this project that is fatal rather than annoying:
+
+| | idle rewards |
 | --- | --- |
-| **Teller** | Deposit a simulated 1 RF slip |
-| **The vault** | The pooled book, and the arithmetic showing why one Friend cannot make a market |
-| **Trading desk** | **Pull the lever.** A week of market rolls and the real strategy decides |
-| **The ledger** | The five findings that produced the gates |
+| **Genesis #259** | **~4,500 RF** |
+| six Gen-3s, combined | ~31 RF |
 
-**The trading desk is not a mock.** `game/strategy.mjs` is byte-identical to the
-`lib/strategy.mjs` the backtests and keeper use, and `npm run check:game-sync` fails the build
-if that stops being true. When the desk stands down in the game, it stands down for exactly
-the reason it would with real money, and it names the gate that blocked it.
+The Genesis *is* the bank. Everything else is garnish. A bank that excludes 99% of its own
+deposits is not a bank.
 
-Walk with WASD, arrows, or tap. Press `E` at a window.
+The vibeathon rules make the SDK optional for **"a launchpad, tool or agent"**, and a market
+maker is a tool. So the SDK is used as a **library** under its Apache-2.0 licence:
+`renderWorld` draws the hall, `createWorldMovement` handles walking, collision and pathing,
+`project`/`unproject` map world to screen. What we supply is the identity gate and the
+character.
+
+**The unlock:** `renderWorld` accepts live actors as `rows` of arbitrary bitmap, not as a
+token id. So the character is rasterised from whatever artwork a Friend actually has, which
+works for *both* collections where the SDK's sprite reader (Generations families registry
+only) cannot. A Genesis walks the marble.
+
+`contracts/test` proves the same thing in Solidity: `test_GenesisCanJoinAndBeCollectedFrom`
+enrols a Genesis and collects from it exactly like a Generations Friend, bounded by the same
+member cap.
+
+## The hall
+
+You land inside it. One destination: **The Desk**. Walk with WASD, arrows, or tap.
+
+Pull the lever and a week of market rolls. The **real strategy module** decides whether to
+trade &mdash; `lib/strategy.mjs`, the same file the backtests and the keeper use, guarded by
+`npm run check:lib-sync`. Most weeks it refuses, and it tells you which gate blocked it in one
+sentence: *"Too quiet. Barely anyone is trading today."* The nine checks are behind a
+disclosure, not the headline.
+
+Measured arm rate across regimes: **21%** overall &mdash; 77% in live chop, **0%** in dead
+calm, a slow bleed, or a hard dump. `npm run check:lever` prints that table.
 
 ## Why the desk refuses: what the research found
 

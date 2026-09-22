@@ -77,40 +77,30 @@ export const HALL = {
     depth: 20,
   },
 
-  // Marble. One broad field and a runner leading to the desk, nothing busy.
+  // Marble. One runner to the desk and one field either side. Three patches was
+  // already the busiest this can be without the floor competing with the desk.
   patches: [
-    { x: 196, y: 100, w: 196, h: 92, pattern: "grid" },
-    { x: 196, y: 208, w: 196, h: 92, pattern: "grid" },
-    { x: 238, y: 126, w: 96, h: 150, pattern: "dither" },
+    { x: 240, y: 128, w: 92, h: 146, pattern: "dither" },
   ],
 
-  // One path: the door to the desk, straight up the centre line.
+  // One path: door to desk, straight up the centre line.
   paths: [{ points: [at(D.door), at(D.seating), at(D.desk + 26)], width: 30 }],
 
+  // TWO props. Nothing else.
+  //
+  // This room has been through crystal monuments, four pipe columns, benches and
+  // planters, and every version read as clutter. The lesson kept repeating: a
+  // banking hall is mostly FLOOR, the floor is where the player is, and anything
+  // else competes with the one thing you are meant to walk to. So: the desk, and a
+  // vault so it reads as a bank rather than an office.
   props: [
-    // The single destination, dead centre at the back.
-    { type: "terminal", x: at(D.desk)[0], y: at(D.desk)[1], scale: 1.7 },
-
-    // The vault, just behind and to one side of the desk. One landmark, not a wall
-    // of them: `pipe` was tried as columns and read as abstract blocks rather than
-    // architecture, which is what made the hall look like junk piled up.
-    { type: "tank", x: at(320, 40)[0], y: at(320, 40)[1], scale: 1.45 },
-
-    // Two monuments flanking the approach, at one depth so they read as a pair.
-    { type: "crystal", x: at(D.columnsBack, -150)[0], y: at(D.columnsBack, -150)[1], scale: 1.5 },
-    { type: "crystal", x: at(D.columnsBack, 150)[0], y: at(D.columnsBack, 150)[1], scale: 1.5 },
-
-    // Seating, further out and on its own rung so nothing overlaps.
-    { type: "bench", x: at(D.seating, -170)[0], y: at(D.seating, -170)[1], scale: 1.1 },
-    { type: "bench", x: at(D.seating, 170)[0], y: at(D.seating, 170)[1], scale: 1.1 },
-    { type: "planter", x: at(D.columnsFront, -120)[0], y: at(D.columnsFront, -120)[1], scale: 1.1 },
-    { type: "planter", x: at(D.columnsFront, 120)[0], y: at(D.columnsFront, 120)[1], scale: 1.1 },
+    { type: "terminal", x: at(D.desk)[0], y: at(D.desk)[1], scale: 1.6 },
+    { type: "tank", x: at(324, 52)[0], y: at(324, 52)[1], scale: 1.15 },
   ],
 
-  // Static bystanders, off the runner so they never block the walk.
+  // One other Friend in the room, well off the runner, so it is not a morgue.
   actors: [
-    { sprite: 1, x: at(D.seating - 40, -62)[0], y: at(D.seating - 40, -62)[1] },
-    { sprite: 4, x: at(D.seating + 30, 70)[0], y: at(D.seating + 30, 70)[1] },
+    { sprite: 4, x: at(D.seating - 30, 96)[0], y: at(D.seating - 30, 96)[1] },
   ],
 
   signals: [{ x: at(D.desk + 40)[0], y: at(D.desk + 40)[1], kind: "currency" }],
@@ -132,4 +122,12 @@ export const DESK = {
  * Centred on the midpoint between the door and the desk so the whole approach is in
  * frame, with the desk sitting slightly above centre where the eye lands first.
  */
-export const VIEWBOX = { x: 452, y: 386, width: 700, height: 470 };
+export const VIEWBOX = { x: 419, y: 321, width: 763, height: 512 };
+
+/**
+ * Not eyeballed. The room's eight corners were projected, the geometry depth skirt
+ * added below, and the desk's lift subtracted above, giving a content box of
+ * x 545-1055, y 347-807 centred on (800, 577). The window is that box plus a small
+ * margin at the frame's aspect ratio. A hand-picked camera left the hall floating
+ * low and to one side with dead space above it.
+ */
