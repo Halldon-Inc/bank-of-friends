@@ -69,7 +69,7 @@ roughly $30,000.
 ```
 game/        the original FriendSDK build, kept for reference (cannot admit a Genesis)
 app/         THE PRODUCT: the hall at /, the research at /docs
-contracts/   FriendBank.sol + 18 Foundry tests. NOT DEPLOYED
+contracts/   FriendBank.sol + 20 Foundry tests. NOT DEPLOYED
 lib/         protocol reader and the strategy module, shared by everything
 scripts/     verification, backtests, parameter derivation, harvester, harnesses
 docs/        economics, backtests, strategy results
@@ -104,7 +104,7 @@ Game: see [game/README.md](game/README.md).
 | check | result |
 | --- | --- |
 | `npm run verify` | **37/37** against live chain state |
-| `forge test` | **18/18** on the contract safety properties |
+| `forge test` | **20/20** on the contract safety properties, including Genesis enrolment |
 | `npm run backtest:gated` | 0 fills on the real tape; arms on a ranging one |
 | `npm run check:lever` | 21% overall arm rate; 0% in dead/falling markets |
 | `npm run sweep:game` | **72/72** across nine viewports, 320px → 2560px (SDK build) |
