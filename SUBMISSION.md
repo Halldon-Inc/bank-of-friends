@@ -1,6 +1,10 @@
+**Try it now: <https://halldon-inc.github.io/bank-of-friends/>**
+Requires a browser wallet holding a hardwired Rare Friends Generations NFT, generation 1 or
+higher, on Robinhood mainnet. Everything in it is simulated.
+
 **Project name**
 
-The Bank of Friends
+The First Bank of Friends
 
 **Builder / contact**
 
@@ -12,26 +16,43 @@ Economy Potential (also relevant: Character Spotlight)
 
 **One sentence**
 
-The Bank of Friends pools the $RAREFRIENDS and WETH rewards sitting idle in Rare Friends
-NFT wallets and runs a regime-gated market-making desk with them, which is flat by
-default and tells you, live, exactly which conditions are keeping it flat.
+Walk your Rare Friend into a banking hall built on pooled NFT-wallet rewards, and pull the
+lever at the trading desk to watch a real market-making strategy decide, week after week,
+that it should not trade.
 
 **Source code**
 
-<https://github.com/Halldon-Inc/bank-of-friends> · no FriendSDK. Stack: Next.js 16, viem,
-Solidity 0.8.30 + Foundry, plain ESM for the research harnesses.
+<https://github.com/Halldon-Inc/bank-of-friends> · **FriendSDK v0.1.2**, plus Next.js 16,
+viem and Solidity 0.8.30 + Foundry for the research and contracts.
 
-**Working demo**
+**Playable preview**
 
-<https://bank-of-friends-nu.vercel.app>
-
-No wallet needed to view. It reads Robinhood Chain (4663) directly and shows live desk
-status, the arming conditions and how far each one is from its threshold, the pool state,
-and the founding member's seven activated Friends rendered from their own on-chain artwork.
+<https://halldon-inc.github.io/bank-of-friends/> (GitHub Pages, static build from
+`friendsdk build`). A live data dashboard also runs at
+<https://bank-of-friends-nu.vercel.app>, which needs no wallet.
 
 ---
 
-## What we actually found
+## The game
+
+A banking hall on the SDK's ground plane, authored as a **custom world** because the supplied
+presets are gardens, rooftops and caverns and none of them is a bank. Four windows:
+
+| Window | What happens |
+| --- | --- |
+| **Teller** | Deposit a simulated 1 RF slip |
+| **The vault** | The pooled book, and the arithmetic showing why one Friend cannot make a market |
+| **Trading desk** | **Pull the lever.** A week of market rolls and the real strategy decides |
+| **The ledger** | The five findings that produced the gates |
+
+**The trading desk is not a mock.** `game/strategy.mjs` is byte-identical to the
+`lib/strategy.mjs` the backtests and keeper use, and `npm run check:game-sync` fails the build
+if that stops being true. When the desk stands down in the game, it stands down for exactly
+the reason it would with real money, and it names the gate that blocked it.
+
+Walk with WASD, arrows, or tap. Press `E` at a window.
+
+## Why the desk refuses: what the research found
 
 We started out to build a market maker for $RAREFRIENDS. Before writing it we measured
 whether one could work. Every number below is reproducible with `npm run verify`
@@ -103,7 +124,7 @@ failures above rather than chosen by feel.
 | --- | --- |
 | flat unless ranging (drift bands) | mean reversion lost 76–84% fading a one-way slide |
 | minimum 24h volume and trade count | gas on 8,777 fills was $290, i.e. 3.4× the whole book |
-| volatility floor | a 10% toll needs >10% swings to clear |
+| volatility floor | a 10% toll needs >10% swings to clear, and they must arrive often enough to matter |
 | grid step ≥ 15% | never quote inside the toll |
 | minimum fill size | only 61% of trades were large enough to beat gas |
 | inventory cap and auto-flatten | flow ran 84.6% one-way by value |
@@ -124,20 +145,40 @@ RUN 2  synthetic ranging tape, volume restored (clearly labelled synthetic)
 ```
 
 Live right now the desk is **FLAT**, blocked on three gates: 24h volume 13.7 WETH against a
-25 minimum, 145 trades against 200, and hourly realised vol 1.49% against a 4% floor. The
-site shows this and updates it.
+25 minimum, 145 trades against 200, and hourly realised vol 1.49% against the derived 3.27%
+floor. At today's volatility a single 15% rung takes about **101 hours** to traverse, i.e.
+0.83 round trips a week against a target of 4. That is the real reason the desk is flat,
+stated as a measurement rather than a threshold someone invented.
 
-## How to use it
+## The parameters are derived, not invented
 
-1. Open <https://bank-of-friends-nu.vercel.app>. No wallet required.
-2. The hero reads **FLAT** or **ARMED**. Under it, every arming condition with its live
-   value and its threshold. Filled squares are blocking.
-3. **The market** panel is the live pool: price, 24h volume and trades measured from the
-   hook's own `FeeCollected` events, realised vol, and pool depth.
-4. **The book** is the founding member's idle, unclaimed rewards: $86 across seven
-   activated Friends, each rendered from its own on-chain artwork.
+An earlier draft of this desk carried numbers I had simply chosen and then tuned against
+synthetic data my own code generated, which is circular. `npm run derive` now labels every
+input **MEASURED**, **DERIVED** or **CHOICE** and shows the algebra, grounded in the standard
+dealer-inventory literature (Ho-Stoll 1981, Avellaneda-Stoikov 2008, Grossman-Miller 1988).
 
-To run the research yourself:
+It caught three real errors:
+
+| | was | now |
+| --- | --- | --- |
+| minimum fill | $0.33 | **$8.71** — the old figure was "10x gas" and ignored that a round trip nets 3.79%, not 100%. **26x too low** |
+| volatility floor | 4.00%, picked | **3.27%**, derived from the grid step and a stated target of 4 round trips/week |
+| inventory cap | 60% fixed | **volatility-scaled**: 40% at today's 1.49%, 10% at 6% |
+
+Two numbers that should have been stated from the start: the **break-even grid step is
+10.80%** (`s > 1/(1-f)^2 - 1` at f=5%), and a round trip at a 15% step nets **3.79%, not 15%**
+— the fee takes 75% of the gross move.
+
+And the finding that reframes the whole project: a grid is two-sided, so **both** sides must
+clear the minimum fill. One Friend's rewards are 94% WETH / 6% RF, which puts the RF side at
+**$4.94** and its slice at **$0.74**, far under the $8.71 floor. **A single Friend can buy and
+can never economically sell**, so it cannot make a market at all. Minimum viable balanced book
+is **$116**.
+
+That is not a hole in the argument. It *is* the argument, as a number rather than a slogan:
+one Friend cannot, pooled Friends can, and protocol-wide idle rewards are roughly $30,000.
+
+## Run the research yourself
 
 ```sh
 npm install
@@ -146,7 +187,16 @@ npm run history          # pull all 8,777 swaps
 npm run backtest         # LP / venue / crossing strategies
 npm run backtest:chart   # grid, mean reversion, momentum
 npm run backtest:gated   # the actual desk: does it correctly stay flat?
+npm run derive           # every parameter, labelled and derived
+npm run sweep            # 40 market regimes x 6 seeds
 npm run harvest -- --wallet 0xYOURWALLET    # dry run the auto-harvester
+```
+
+To run the game locally, from a FriendSDK v0.1.2 checkout:
+
+```sh
+npm ci && npm run build
+npx friendsdk dev ./games/first-bank      # after copying game/ into games/first-bank
 ```
 
 ## Economy and RF integration
@@ -184,7 +234,10 @@ member's cap, and can only ratchet risk caps tighter.
 | `npm run verify` | **37/37** assertions against live chain state |
 | `forge test` | **18/18**, asserting the safety properties above |
 | `npm run backtest:gated` | RUN 1 takes 0 fills on the real tape; RUN 2 arms and trades |
+| `npx friendsdk check` | **valid**; expected reward 1.0354 RF, max 1.2 RF |
+| `npx friendsdk test` | **PASS** at 960px and at 360px |
 | `node scripts/visual-check.mjs <url>` | **70/70** across 320px → 2560px, against production |
+| `npm run check:game-sync` | game/ matches the SDK working copy, and its strategy matches lib/ |
 | `npx tsc --noEmit`, `next build` | clean |
 | `npm run check:lib-sync` | app/lib is byte-identical to lib |
 
@@ -206,7 +259,23 @@ member's cap, and can only ratchet risk caps tighter.
   is read from chain; if their API is down, discovery degrades and the page says so rather
   than inventing numbers.
 
+## Known issues, game
+
+- At 360px the SDK frame is only about 240px tall, so all four station prompts are visible at
+  once and overlap. Only the one in reach activates, but it is busy. Not yet solved.
+- The preview requires a wallet with an eligible Friend, as the SDK mandates, so it cannot be
+  tried by someone who holds none. The Vercel dashboard needs no wallet and shows the same
+  live data.
+- The lever's market regimes are generated, clearly labelled, and shaped from the measured
+  sweep. They are illustrations of the decision, not predictions.
+
 ## Credits
+
+The banking hall is a **custom world** in `game/world.ts`, authored in the SDK's own scene
+format from its supplied prop kit (`terminal` as teller windows, `tank` as the vault, `pipe`
+as columns, `bench` and `planter` for the lobby). Visual direction was matched against the
+SDK's own fishing example: `#eee` paper, `#111` ink, hard `2px 2px 0` offset shadows, 44px
+square icon buttons inset 18px, mono labels with `system-ui` display numbers.
 
 Friend artwork is each NFT's own on-chain SVG, read unmodified from
 `rarefriends.com/api/protocol/state` and rendered at its native resolution. Hardwired
