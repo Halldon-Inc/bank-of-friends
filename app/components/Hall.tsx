@@ -23,10 +23,14 @@ import { renderWorld, project, unproject, validateWorld } from "@rarefriends/fri
 import { createWorldMovement } from "@rarefriends/friendsdk/movement";
 import { HALLS, hallFor, fit, type Hall as HallShape } from "@/lib/hall-world";
 import { renderBank } from "@/lib/hall-art";
-import { DEFAULT_GATES, evaluateRegime, realisedVol, drift, edgePerRoundTrip, BREAKEVEN_STEP } from "@/lib/strategy.mjs";
 import { loadAccounts, addAccount, removeAccount, accountId, type Account } from "@/lib/accounts";
 import AccountPanel from "./AccountPanel";
 import VaultPanel from "./VaultPanel";
+import FloorPanel, { plainReason, type LiveDesk } from "./FloorPanel";
+import { Tick, compact, dollars, plaqueLines, readTotals, weth as wethFmt } from "./VaultHolds";
+
+type Station = "desk" | "floor" | "vault";
+const TITLES: Record<Station, string> = { desk: "The Desk", floor: "The Trading Floor", vault: "The Vault" };
 
 /** Validated once each, at module load, so switching rooms costs nothing. */
 const WORLDS = {
@@ -121,68 +125,46 @@ function cropToSubject(rows: string[]): string[] {
   return out;
 }
 
-/** How tall the player stands, in world canvas units. */
-const CHAR_UNITS = 30;
+/**
+ * How tall the player stands, in world canvas units. It was 30, which left the
+ * Friend a 50px speck on the carpet of a 1920 screen: the product's hero, barely
+ * visible. 44 is as tall as the counter is deep and still clears the aisle.
+ */
+const CHAR_UNITS = 44;
 
-/* ------------------------------------------------------------------- the week */
+/** How often the floor re-reads the chain. The API caches for 30s itself. */
+const LIVE_EVERY_MS = 60_000;
 
-const RF_PRICE_WETH = 5.7e-7;
-const REGIMES = [
-  { name: "dead calm", trend: 0, sigma: 0.004, pull: 0.02, volume: 8, trades: 90 },
-  { name: "slow bleed", trend: -0.03, sigma: 0.010, pull: 0, volume: 40, trades: 600 },
-  { name: "hard dump", trend: -0.10, sigma: 0.020, pull: 0, volume: 70, trades: 900 },
-  { name: "quiet chop", trend: 0, sigma: 0.030, pull: 0.22, volume: 30, trades: 400 },
-  { name: "live chop", trend: 0, sigma: 0.048, pull: 0.26, volume: 55, trades: 800 },
-  { name: "wild chop", trend: 0, sigma: 0.075, pull: 0.30, volume: 90, trades: 1400 },
-  { name: "steady climb", trend: 0.03, sigma: 0.028, pull: 0.05, volume: 60, trades: 850 },
-  { name: "melt up", trend: 0.10, sigma: 0.045, pull: 0, volume: 120, trades: 1800 },
+/** How long one keeper round takes, counter to vault and back. */
+const KEEPER_ROUND_S = 9;
+
+/**
+ * The keeper, drawn as a teller: peaked cap with a visor, face, shoulders and tie,
+ * both arms down to a strongbox carried in front, legs. `#` is ink, `o` is paper
+ * (so the figure reads on the hatched carpet), `L` is the strongbox's lime lock.
+ * 16 wide by 19 tall.
+ */
+const TELLER = [
+  ".....######.....",
+  "....########....",
+  "..############..",
+  "....#oooooo#....",
+  "....#o#oo#o#....",
+  "....#oo##oo#....",
+  ".....######.....",
+  ".......##.......",
+  "...##########...",
+  "..#o#oo##oo#o#..",
+  "..#o#oo##oo#o#..",
+  "..#o#oooooo#o#..",
+  "..############..",
+  "..#ooooLLoooo#..",
+  "..#ooooLLoooo#..",
+  "..############..",
+  "....#o#..#o#....",
+  "....#o#..#o#....",
+  "...###....###...",
 ];
-
-function rollWeek(seed: { current: number }) {
-  const rnd = () => { seed.current = (Math.imul(seed.current, 1664525) + 1013904223) >>> 0; return (seed.current >>> 8) / 16777216; };
-  const gauss = () => { const u = Math.max(rnd(), 1e-9), v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-  const r = REGIMES[Math.floor(rnd() * REGIMES.length)];
-  const path: number[] = [];
-  let p = RF_PRICE_WETH, anchor = RF_PRICE_WETH;
-  const perHour = Math.pow(1 + r.trend, 1 / 24) - 1;
-  for (let i = 0; i < 168; i++) {
-    anchor *= 1 + perHour;
-    p = p * Math.exp(-r.pull * Math.log(p / anchor) + r.sigma * gauss()) * (1 + perHour);
-    path.push(p);
-  }
-  const lastDay = path.slice(-24);
-  return {
-    regime: r,
-    market: {
-      mid: path[path.length - 1], ethUsd: 2734.86,
-      volume24hWeth: r.volume, trades24h: r.trades,
-      drift24h: drift(lastDay), drift1h: drift(path.slice(-2)), drift7d: drift(path),
-      hourlyVol: realisedVol(lastDay),
-    },
-  };
-}
-
-const REASON_ORDER = ["breaker", "drawdown", "drift7d", "drift24h", "volume24h", "trades24h", "volFloor", "volCeiling", "drift1h", "inventory"];
-function reasonFor(gate: string, m: { drift7d: number | null; drift24h: number }) {
-  const up = (m.drift7d ?? 0) > 0;
-  switch (gate) {
-    case "volume24h": case "trades24h": return "Too quiet. Barely anyone is trading today.";
-    case "drift7d": return up ? "The price has run up all week. The bank does not chase a rally."
-      : "The price has fallen all week. Buying now is catching a knife.";
-    case "drift24h": return m.drift24h > 0 ? "The price jumped hard today. Too late to join." : "The price dropped hard today.";
-    case "drift1h": return "The price is moving too fast right this minute.";
-    case "volFloor": return "The price is barely moving, so there is nothing to earn.";
-    case "volCeiling": return "Way too wild out there.";
-    case "inventory": return "The bank is already holding too much RF.";
-    case "drawdown": return "The bank is down. It stops itself until someone checks.";
-    default: return "Conditions are not right.";
-  }
-}
-function plainReason(checks: { gate: string; ok: boolean }[], m: { drift7d: number | null; drift24h: number }) {
-  const blocked = new Set(checks.filter((c) => !c.ok).map((c) => c.gate));
-  for (const g of REASON_ORDER) if (blocked.has(g)) return reasonFor(g, m);
-  return "Conditions are not right.";
-}
 
 /* =================================================================== component */
 
@@ -191,11 +173,17 @@ export type HallFriend = {
   imageUrl: string | null; idleRf: number; idleWeth: number;
 };
 
-export default function Hall({ friend, onLeave, rfUsd, ethUsd }: { friend: HallFriend; onLeave: () => void; rfUsd: number; ethUsd: number }) {
+export type WalletFriend = HallFriend & { activated: boolean };
+
+export default function Hall({ friend, onLeave, rfUsd, ethUsd, walletFriends = [] }: {
+  friend: HallFriend; onLeave: () => void; rfUsd: number; ethUsd: number;
+  /** The looked-up wallet's Friends, so the vault can show the ones not yet enrolled. */
+  walletFriends?: WalletFriend[];
+}) {
   const [rows, setRows] = useState<string[] | null>(null);
-  const [near, setNear] = useState<null | "desk" | "vault">(null);
+  const [near, setNear] = useState<null | Station>(null);
   const charRef = useRef<HTMLDivElement | null>(null);
-  const nearRef = useRef<null | "desk" | "vault">(null);
+  const nearRef = useRef<null | Station>(null);
 
   /*
    * THE ROOM IS CHOSEN FROM THE BOX IT GETS, NOT FROM THE WINDOW.
@@ -235,23 +223,50 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd }: { friend: HallF
    * while the hall grew on a large display.
    */
   const charPx = frame ? Math.max(24, Math.round((CHAR_UNITS * frame.width) / hall.viewBox.width)) : 44;
-  /** Which destination is open: the desk, the vault, or neither. */
-  const [open, setOpen] = useState<null | "desk" | "vault">(null);
+  /** Which destination is open, if any. */
+  const [open, setOpen] = useState<null | Station>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   useEffect(() => { setAccounts(loadAccounts()); }, []);
   const account = useMemo(
     () => accounts.find((a) => a.id === accountId(friend.collection, friend.id)) ?? null,
     [accounts, friend.collection, friend.id],
   );
-  const [week, setWeek] = useState<ReturnType<typeof rollWeek> | null>(null);
-  const [rolling, setRolling] = useState(false);
-  const [showGates, setShowGates] = useState(false);
   const [reduced, setReduced] = useState(false);
   const [touch, setTouch] = useState(false);
   const mover = useRef<ReturnType<typeof createWorldMovement> | null>(null);
   const raf = useRef<number | undefined>(undefined);
-  const seed = useRef((Math.random() * 4294967296) >>> 0);
   const openRef = useRef(false);
+
+  /*
+   * THE LIVE DESK. One read feeds the floor's headline, the board's lamp and the
+   * ticker, so the three can never disagree with each other or with /docs.
+   */
+  const [live, setLive] = useState<LiveDesk | null>(null);
+  const [liveError, setLiveError] = useState("");
+  useEffect(() => {
+    let alive = true, timer: ReturnType<typeof setTimeout> | undefined, fails = 0;
+    const read = async () => {
+      try {
+        const r = await fetch("/api/desk", { cache: "no-store" });
+        const j = await r.json();
+        if (!r.ok || j.error) throw new Error(j.error ?? `HTTP ${r.status}`);
+        fails = 0;
+        if (alive) { setLive(j as LiveDesk); setLiveError(""); }
+      } catch (e) {
+        // A cold read of the chain can fail once and succeed a few seconds later,
+        // so retry soon rather than leaving the floor dark for a whole minute.
+        fails++;
+        if (alive) setLiveError(String((e as Error)?.message ?? e).slice(0, 80));
+      }
+      if (alive) timer = setTimeout(read, fails ? Math.min(30_000, 4_000 * fails) : LIVE_EVERY_MS);
+    };
+    read();
+    return () => { alive = false; if (timer) clearTimeout(timer); };
+  }, []);
+
+  /** A clock for the ticker's countdown. Once a second, and only the ticker reads it. */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
 
   /* character artwork, from whichever collection the Friend belongs to */
   useEffect(() => {
@@ -328,7 +343,7 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd }: { friend: HallF
       if (m) {
         if (openRef.current) m.stop();
         const next = m.update(delta);
-        const { viewBox, desk, vault } = hallRef.current;
+        const { viewBox, stations } = hallRef.current;
 
         // Write the position straight to the node. No setState here: the only React
         // update in the loop is the `near` flag, and only when it flips.
@@ -342,8 +357,8 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd }: { friend: HallF
 
         // Nearest destination within reach, so standing between the two never
         // lights up both signs at once.
-        let hit: null | "desk" | "vault" = null, best = Infinity;
-        for (const t of [desk, vault] as const) {
+        let hit: null | Station = null, best = Infinity;
+        for (const t of stations) {
           const d = Math.hypot(next.position[0] - t.position[0], next.position[1] - t.position[1]);
           if (d <= t.reach && d < best) { best = d; hit = t.id; }
         }
@@ -369,18 +384,16 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd }: { friend: HallF
       const [px, py] = project(xy[0], xy[1], 0);
       return `${(((px - hall.viewBox.x) / hall.viewBox.width) * 100).toFixed(3)},${(((py - hall.viewBox.y) / hall.viewBox.height) * 100).toFixed(3)}`;
     };
-    return { desk: p(hall.desk.position), vault: p(hall.vault.position) };
+    return { desk: p(hall.desk.position), floor: p(hall.floor.position), vault: p(hall.vault.position) };
   }, [hall]);
 
+  /** Signs are pinned in SCREEN space to the artwork they name (see hall-world). */
   const signs = useMemo(
-    () => [hall.desk, hall.vault].map((t) => {
-      const [px, py] = project(t.anchor[0], t.anchor[1], t.lift);
-      return {
-        id: t.id, label: t.label, hint: t.hint,
-        left: ((px - hall.viewBox.x) / hall.viewBox.width) * 100,
-        top: ((py - hall.viewBox.y) / hall.viewBox.height) * 100,
-      };
-    }),
+    () => hall.stations.map((t) => ({
+      id: t.id, label: t.label, hint: t.hint, below: t.sign.hang === "below", art: t.art,
+      left: ((t.sign.x - hall.viewBox.x) / hall.viewBox.width) * 100,
+      top: ((t.sign.y - hall.viewBox.y) / hall.viewBox.height) * 100,
+    })),
     [hall],
   );
 
@@ -400,45 +413,137 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd }: { friend: HallF
     mover.current?.moveTo([wx, wy] as never);
   }, [open]);
 
-  const verdict = useMemo(() => {
-    if (!week) return null;
-    const bookRf = friend.idleRf || 3159, bookWeth = friend.idleWeth || 0.029;
-    const valueWeth = bookWeth + bookRf * RF_PRICE_WETH;
-    return evaluateRegime(week.market, { rf: bookRf, weth: bookWeth, valueWeth, hwmWeth: valueWeth, halted: false }, DEFAULT_GATES);
-  }, [week, friend.idleRf, friend.idleWeth]);
+  /* Where the keeper walks and where the ticker runs, as percentages of the frame. */
+  const pct = useCallback((px: number, py: number) => ({
+    left: ((px - hall.viewBox.x) / hall.viewBox.width) * 100,
+    top: ((py - hall.viewBox.y) / hall.viewBox.height) * 100,
+  }), [hall]);
+  const keeperPath = useMemo(() => ({ from: pct(...hall.keeper.from), to: pct(...hall.keeper.to) }), [hall, pct]);
+
+  /*
+   * WHERE THE KEEPER STOPS IS MEASURED, NOT ASSUMED. The vault's sign is HTML at a
+   * fixed pixel size while the hall scales, so no world coordinate can promise the
+   * keeper clears it on every screen: in shots3 it arrived standing on the sign.
+   * After layout, read the sign's real box and stop the keeper so its right edge is
+   * one body-width left of the sign's left edge, and its feet level with the sign.
+   */
+  const keeperW = Math.round(charPx * 0.62);
+  const sceneRef = useRef<HTMLDivElement | null>(null);
+  const [keeperStop, setKeeperStop] = useState<{ left: number; top: number } | null>(null);
+  useEffect(() => {
+    if (!frame) return;
+    const id = requestAnimationFrame(() => {
+      const scene = sceneRef.current;
+      const sign = scene?.querySelector<HTMLElement>('.hall-prompt[data-station="vault"]');
+      if (!scene || !sign) return;
+      const sr = scene.getBoundingClientRect();
+      // offsetLeft/Top ignore the pop-in transform, so this is the resting box.
+      const left = sign.offsetLeft - sign.offsetWidth / 2;
+      const bottom = sign.offsetTop + (sign.classList.contains("is-below") ? sign.offsetHeight : 0);
+      const cx = left - keeperW * 1.5;
+      setKeeperStop({ left: (cx / sr.width) * 100, top: (bottom / sr.height) * 100 });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [frame, hall, keeperW]);
+  const keeperTo = keeperStop ?? keeperPath.to;
+  const tickerBox = useMemo(() => {
+    const a = pct(hall.ticker.left, hall.ticker.top), b = pct(hall.ticker.right, hall.ticker.bottom);
+    return { left: a.left, top: a.top, width: b.left - a.left, height: b.top - a.top };
+  }, [hall, pct]);
+
+  const plaqueBox = useMemo(() => {
+    const a = pct(hall.plaque.left, hall.plaque.top), b = pct(hall.plaque.right, hall.plaque.bottom);
+    return { left: a.left, top: a.top, width: b.left - a.left, height: b.top - a.top };
+  }, [hall, pct]);
+  const totals = useMemo(() => readTotals(live?.bank, live?.protocolIdle), [live]);
+  const plaque = plaqueLines(totals.bank, totals.idle);
+  /*
+   * Type sized to the plate, never the window: two lines must fit its height and
+   * the longer line must fit its width. The plate is a triangle's worth of room on
+   * a phone, so this is what keeps both figures legible at 320px.
+   */
+  const plaqueWide = frame ? (frame.width * plaqueBox.width) / 100 > 220 : false;
+  /** Keep the type inside the plate's inner rule: hall-art insets that rule by
+   *  max(1.2, 9% of the plate's height) units; add 2.4px of air past it, since
+   *  the sweep requires the text to clear the rule by at least 2px. */
+  const plaquePad = useMemo(() => {
+    if (!frame) return undefined;
+    const scale = frame.width / hall.viewBox.width;
+    const inset = Math.max(1.2, (hall.plaque.bottom - hall.plaque.top) * 0.09) * scale;
+    return `${(inset + 2.4).toFixed(1)}px ${(inset + 2.4).toFixed(1)}px`;
+  }, [frame, hall]);
+  /*
+   * Each line is sized by CSS container units against the plate itself, from its
+   * own character count, so it can never be wider than the plate. A pixel estimate
+   * here once let both lines spill past the plate on a 320px phone.
+   */
+  const plaqueHead = plaque.kind === "idle" && !plaqueWide ? "UNCLAIMED" : plaque.head;
+  const plaqueFigs = plaque.kind === "none" ? "opens at launch"
+    : `${compact(plaque.rf)} RF + ${wethFmt(plaque.weth)} WETH${plaqueWide ? ` ${dollars(plaque.usd)}` : ""}`;
+
+  const bookRf = useMemo(() => accounts.reduce((x, a) => x + a.boxRf + a.pnlRf, 0), [accounts]);
+  const bookWeth = useMemo(() => accounts.reduce((x, a) => x + a.boxWeth + a.pnlWeth, 0), [accounts]);
+
+  const tickerItems = useMemo(() => {
+    const items: string[] = [];
+    const m = live?.market;
+    items.push(m ? `RF $${m.rfUsd.toPrecision(4)}` : `RF $${rfUsd.toPrecision(4)}`);
+    if (m) items.push(`24h volume ${m.volume24hWeth.toFixed(2)} WETH`, `${m.trades24h} trades`);
+    const k = live?.keeper;
+    if (k && (k.harvested24hRf !== undefined || k.harvested24hWeth !== undefined)) {
+      items.push(`harvested 24h ${Math.round(k.harvested24hRf ?? 0).toLocaleString("en-US")} RF + ${(k.harvested24hWeth ?? 0).toFixed(4)} WETH`);
+    } else if (bookRf > 0 || bookWeth > 0) {
+      items.push(`in your boxes ${Math.round(bookRf).toLocaleString("en-US")} RF + ${bookWeth.toFixed(4)} WETH (simulated)`);
+    } else {
+      items.push("keeper round: counter to vault (simulated)");
+    }
+    if (plaque.kind === "bank") items.push(`the vault holds ${compact(plaque.rf)} RF + ${wethFmt(plaque.weth)} WETH (${dollars(plaque.usd)})`);
+    else if (plaque.kind === "idle") items.push(`earned by Friends, not yet claimed: ${compact(plaque.rf)} RF + ${wethFmt(plaque.weth)} WETH (${dollars(plaque.usd)}). bring yours in`);
+    const r = live?.rewards;
+    if (r?.streamWethPerWeek) items.push(`paying Friends ${r.streamWethPerWeek.toFixed(1)} WETH a week`);
+    const next = r?.nextAllocateAt ? Date.parse(r.nextAllocateAt) : NaN;
+    if (Number.isFinite(next)) {
+      const s = Math.max(0, Math.round((next - now) / 1000));
+      const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60;
+      items.push(`next allocate in ${hh ? `${hh}h ` : ""}${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`);
+    }
+    items.push(live ? (live.armed ? "desk ON" : `desk OFF: ${plainReason(live.gates).replace(/\.$/, "").toLowerCase()}`) : "desk: reading");
+    return items;
+  }, [live, rfUsd, bookRf, bookWeth, now, plaque]);
 
   useEffect(() => { openRef.current = open !== null; }, [open]);
-
-  function pull() {
-    if (rolling) return;
-    setRolling(true); setShowGates(false);
-    const spins = reduced ? 1 : 8;
-    let i = 0;
-    const step = () => {
-      setWeek(rollWeek(seed));
-      if (++i < spins) setTimeout(step, 70 + i * 26);
-      else setRolling(false);
-    };
-    step();
-  }
 
   return (
     <div className="hall">
       {/* Chrome is a ROW, not an overlay. As an overlay it sat on top of the desk
           sign the moment the frame got short. */}
       <div className="hall-bar">
+        {friend.imageUrl
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img className={`hall-portrait ${friend.collection === "Generations" && friend.generation >= 1 ? "world" : "portrait"}`} src={friend.imageUrl} alt="" />
+          : null}
         <strong>{friend.label}</strong>
-        <span>{friend.idleRf.toLocaleString("en-US", { maximumFractionDigits: 0 })} RF idle</span>
-        <button type="button" onClick={onLeave}>Play as yours</button>
+        {/* BOTH sides, always: RF and WETH together are the market-making fund, and
+            showing the RF alone hid 90% of its value. */}
+        <span className="hall-idle">
+          <b>{friend.idleRf.toLocaleString("en-US", { maximumFractionDigits: 0 })} RF</b>
+          {" + "}
+          <b>{friend.idleWeth.toFixed(4)} WETH</b> idle
+          <i> (${Math.round(friend.idleRf * (live?.market.rfUsd || rfUsd) + friend.idleWeth * ethUsd).toLocaleString("en-US")})</i>
+        </span>
+        <button type="button" onClick={onLeave}>Use my Friend</button>
         <a className="hall-docs" href="/docs">How it works</a>
       </div>
 
       <div className="hall-stage" ref={stageRef}>
         <div
+          ref={sceneRef}
           className="hall-scene"
           data-room={hall.key}
           data-desk={spots.desk}
           data-vault={spots.vault}
+          data-floor={spots.floor}
+          data-armed={live?.armed ? "true" : "false"}
           onPointerDown={onPointer}
           style={frame ? { width: `${frame.width}px`, height: `${frame.height}px` } : { visibility: "hidden" }}
         >
@@ -459,10 +564,62 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd }: { friend: HallF
             dangerouslySetInnerHTML={{ __html: bank }}
           />
 
+          {/* THE VAULT HOLDS, on the brass plate in the pediment. */}
+          <div className={`hall-plaque is-${plaque.kind}`} aria-label="The vault holds" style={{
+            left: `${plaqueBox.left}%`, top: `${plaqueBox.top}%`, width: `${plaqueBox.width}%`, height: `${plaqueBox.height}%`,
+            ["--n1" as string]: plaqueHead.length, ["--n2" as string]: plaqueFigs.length,
+            padding: plaquePad,
+          }}>
+            <span className="hall-plaque-head">{plaqueHead}</span>
+            {plaque.kind === "none" ? (
+              <span className="hall-plaque-figs">opens at launch</span>
+            ) : (
+              <span className="hall-plaque-figs">
+                <b><Tick value={plaque.rf} format={compact} /> RF</b> + <b><Tick value={plaque.weth} format={wethFmt} /> WETH</b>
+                {plaqueWide && <i> <Tick value={plaque.usd} format={dollars} /></i>}
+              </span>
+            )}
+          </div>
+
+          {/* The ticker, in the marquee's lit screen. */}
+          <div className="hall-ticker" aria-label="Ticker" style={{
+            left: `${tickerBox.left}%`, top: `${tickerBox.top}%`, width: `${tickerBox.width}%`, height: `${tickerBox.height}%`,
+            // Type sized to the lit screen it runs in, not to the window.
+            fontSize: frame ? `${Math.max(7, Math.min(13, (frame.height * tickerBox.height) / 100 * 0.62)).toFixed(1)}px` : undefined,
+          }}>
+            <div className={`hall-ticker-run${reduced ? " is-still" : ""}`}>
+              {[0, 1].map((k) => (
+                <span key={k} aria-hidden={k === 1 ? "true" : undefined}>
+                  {tickerItems.map((t, i) => <b key={i}>{t}</b>)}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* The keeper: carries a coin from the counter, where rewards come in, to
+              the vault. A loop, because the point is that it never stops. */}
+          <div className={`hall-keeper${reduced ? " is-still" : ""}`} aria-hidden="true" data-keeper="true" style={{
+            ["--kx0" as string]: `${keeperPath.from.left}%`, ["--ky0" as string]: `${keeperPath.from.top}%`,
+            ["--kx1" as string]: `${keeperTo.left}%`, ["--ky1" as string]: `${keeperTo.top}%`,
+            ["--kround" as string]: `${KEEPER_ROUND_S}s`,
+            ["--ksize" as string]: `${keeperW}px`,
+          }}>
+            <i className="hall-shadow" />
+            <svg viewBox="0 0 16 19" shapeRendering="crispEdges">
+              {TELLER.map((row, y) => [...row].map((c, x) => c === "." ? null : (
+                <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1}
+                  fill={c === "#" ? "#111" : c === "L" ? "#ccff00" : "#eee"} />
+              )))}
+            </svg>
+            <span className="keeper-tick">+ harvested</span>
+          </div>
+
           {/* The player, a layer above the static scene. Moved by writing left/top
               in the rAF loop, never by re-rendering the world. */}
           {rows && (
             <div ref={charRef} className="hall-char" data-walking="false">
+              {/* A soft shadow, so the Friend stands ON the marble rather than over it. */}
+              <i className="hall-shadow" aria-hidden="true" />
               <svg viewBox="0 0 16 16" width={charPx} height={charPx} shapeRendering="crispEdges" aria-hidden="true">
                 {rows.map((row, y) => [...row].map((c, x) =>
                   c === "#" ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} /> : null))}
@@ -474,9 +631,11 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd }: { friend: HallF
             <button
               key={sg.id}
               type="button"
-              className={`hall-prompt${near === sg.id ? " is-near" : ""}`}
+              className={`hall-prompt${near === sg.id ? " is-near" : ""}${sg.below ? " is-below" : ""}`}
+              data-station={sg.id}
+              data-art={sg.art}
               style={{ left: `${sg.left}%`, top: `${sg.top}%` }}
-              onClick={() => near === sg.id && setOpen(sg.id)}
+              onClick={() => near === sg.id && setOpen(sg.id as Station)}
               disabled={near !== sg.id}
             >
               <span>{sg.label}</span>
@@ -489,80 +648,34 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd }: { friend: HallF
       <p className="hall-hint">{touch ? "Tap where you want to go." : "Walk with WASD or the arrows, or tap where you want to go."}</p>
 
       {open && (
-        <div className="hall-modal" role="dialog" aria-modal="true"
-             aria-label={open === "desk" ? "The Desk" : "The Vault"}>
+        <div className="hall-modal" role="dialog" aria-modal="true" aria-label={TITLES[open]}>
           <div className="hall-panel">
             <header>
-              <h2>{open === "desk" ? "The Desk" : "The Vault"}</h2>
+              <h2>{TITLES[open]}</h2>
               <button type="button" onClick={() => setOpen(null)} aria-label="Close">&times;</button>
             </header>
 
-            {open === "vault" ? (
+            {open === "vault" && (
               <VaultPanel
                 accounts={accounts} rfUsd={rfUsd} ethUsd={ethUsd}
+                current={accountId(friend.collection, friend.id)}
+                walletFriends={walletFriends}
                 onGoToDesk={() => setOpen("desk")}
+                bank={totals.bank}
+                idle={totals.idle}
+                onChange={setAccounts}
               />
-            ) : (
-              <>
-                <AccountPanel
-                  friend={friend}
-                  account={account}
-                  onOpened={(a) => setAccounts(addAccount(a))}
-                  onClosed={(id) => setAccounts(removeAccount(id))}
-                />
-
-                {/* The lever is the BANK'S trading decision and has nothing to do
-                    with whether you may open an account. Keeping them in one place
-                    without saying so is what made "SAT OUT" read as a rejection. */}
-                <hr className="acct-rule" />
-                <p className="acct-kicker">this week, for the bank</p>
-                <p className="hall-lede" style={{ margin: "0 0 10px" }}>
-                  Separate question: given the market, should the desk quote at all?
-                  Pull the lever. <strong>Most weeks it should not, and that is the finding.</strong>
-                </p>
-
-                <button type="button" className="hall-lever" onClick={pull} disabled={rolling}>
-                  {rolling ? "rolling the week…" : week ? "Pull again" : "Pull the lever"}
-                </button>
-
-                {week && verdict && (
-                  <div className={`hall-verdict${verdict.armed ? " armed" : ""}${rolling ? " spinning" : ""}`}>
-                    <p className="hall-regime">{week.regime.name}</p>
-                    <p className="hall-word">{verdict.armed ? "TRADED" : "SAT OUT"}</p>
-                    {!rolling && (
-                      <p className="hall-because">
-                        {verdict.armed ? "Choppy and busy enough to be worth it." : plainReason(verdict.checks, week.market)}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {week && !rolling && (
-                  <>
-                    <p className="hall-small" style={{ marginTop: 0 }}>
-                      This is about the market, not about you. Your account stays open either way.
-                    </p>
-                    <button type="button" className="hall-why" onClick={() => setShowGates((v) => !v)} aria-expanded={showGates}>
-                      {showGates ? "hide the checks" : "why? show the checks"}
-                    </button>
-                    {showGates && (
-                      <ul className="hall-gates">
-                        {verdict!.checks.map((c: { gate: string; ok: boolean; detail: string }) => (
-                          <li key={c.gate} className={c.ok ? "" : "blocked"}>
-                            <span aria-hidden="true">{c.ok ? "□" : "■"}</span><b>{c.gate}</b><i>{c.detail}</i>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    <p className="hall-small">
-                      The pool takes 5% each way, so a round trip only clears above{" "}
-                      {(BREAKEVEN_STEP * 100).toFixed(2)}%. At a 15% step it nets{" "}
-                      {(edgePerRoundTrip(0.15) * 100).toFixed(2)}%. These are the real checks, not a mock.
-                      Every balance here is simulated.
-                    </p>
-                  </>
-                )}
-              </>
+            )}
+            {open === "floor" && <FloorPanel live={live} error={liveError} bookRf={bookRf} bookWeth={bookWeth} onBack={() => setOpen(null)} />}
+            {open === "desk" && (
+              <AccountPanel
+                friend={friend}
+                account={account}
+                onOpened={(a) => setAccounts(addAccount(a))}
+                onClosed={(id) => setAccounts(removeAccount(id))}
+                onGoToVault={() => setOpen("vault")}
+                rfUsd={live?.market.rfUsd || rfUsd} ethUsd={ethUsd}
+              />
             )}
           </div>
         </div>

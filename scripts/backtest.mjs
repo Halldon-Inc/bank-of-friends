@@ -26,10 +26,13 @@
  */
 import fs from "node:fs";
 import { ADDR, ABI, client, scanLogs, blocksPerDay, fmt } from "../lib/protocol.mjs";
+import { loadTape } from "./backtest-engine.mjs";
+// Per-swap times from the engine's block->time fit; the raw `t` is a 2.8-hour bucket start.
+const TIME = new Map(loadTape().tape.map((e) => [e.b, e.t]));
 
 const FEE = 0.05;                     // Hook.FEE_BPS = 500, verified on chain
 const GAS_USD_PER_FILL = 0.033;       // measured from 8 real swap txs
-const ETH_USD = 2734.86;
+const ETH_USD = 2734.86;   // SNAPSHOT (CoinGecko 2026-09-21), fixed so reruns of a historical tape are comparable; not live
 
 const raw = JSON.parse(fs.readFileSync("data/swaps.json", "utf8"));
 const swaps = raw.swaps
@@ -69,7 +72,7 @@ function tape() {
     const takerBuysRf = s.a0 > 0n;                       // swapper receives RF
     const rf = Math.abs(Number(s.a0)) / 1e18;
     const weth = Math.abs(Number(s.a1)) / 1e18;
-    out.push({ b: s.b, t: s.t, takerBuysRf, rf, weth, midBefore: priceOf(prev), realMid: priceOf(s.sq) });
+    out.push({ b: s.b, t: TIME.get(s.b), takerBuysRf, rf, weth, midBefore: priceOf(prev), realMid: priceOf(s.sq) });
     prev = s.sq;
   }
   return out;
@@ -299,8 +302,9 @@ console.log(`  fees diverted from rewards  ${(base.pool.feesToRewards - x.pool.f
 console.log(`\nassumptions, stated so they can be argued with:`);
 console.log(`  - pool simulated as full-range constant product from the real opening liquidity; only`);
 console.log(`    flow the Bank does NOT internalise moves the price`);
-console.log(`  - the Bank wins any fill it quotes, since any spread under 5% beats the only other venue.`);
-console.log(`    Optimistic on capture, realistic on cost.`);
+console.log(`  - MAKER REALITY: nothing routes a taker to a quote outside the pool. The only way the`);
+console.log(`    bank is ever filled is as liquidity INSIDE the pool, when a taker's swap crosses its`);
+console.log(`    range; that is modelled in scripts/backtest-gated.mjs. S2 and S3 here overstate capture.`);
 console.log(`  - inventory is marked at LIQUIDATION value through the simulated pool: 5% + impact`);
 console.log(`  - gas $${GAS_USD_PER_FILL}/fill, measured from real transactions`);
 console.log(`  - ${days.toFixed(1)} days is a SHORT and unusual window (the token fell ~89%). These are not forecasts,`);

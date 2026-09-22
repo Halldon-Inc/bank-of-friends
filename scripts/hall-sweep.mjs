@@ -10,7 +10,10 @@
  *   - the scene FILLS its frame. This is the one that matters: the hall used to sit
  *     marooned in the middle with dead paper either side because the frame ratio and
  *     the viewBox disagreed, and no single screenshot at my own window size showed it.
- *   - the desk prompt is on screen and reachable
+ *   - all three destination signs (desk, trading floor, vault) are on screen
+ *   - the ticker never sits on a sign
+ *   - every sign sits on (within a few px of) the artwork it names
+ *   - the keeper's stop leaves a body width of air beside the vault's sign
  *   - the character is inside the frame
  *   - no clipped text, no console errors
  */
@@ -109,7 +112,7 @@ for (const vp of VIEWPORTS) {
     const collisions = await page.evaluate(() => {
       const pick = (s) => document.querySelector(s)?.getBoundingClientRect() ?? null;
       const signs = [...document.querySelectorAll(".hall-prompt")].map((e) => e.getBoundingClientRect());
-      const parts = { bar: pick(".hall-bar"), hint: pick(".hall-hint"), char: pick(".hall-char") };
+      const parts = { bar: pick(".hall-bar"), hint: pick(".hall-hint"), ticker: pick(".hall-ticker"), char: pick(".hall-char") };
       // Signs must not stack on each other either. The pair of them landed on top
       // of the vault door once and nothing here noticed.
       signs.forEach((r, i) => { parts[`sign${i}`] = r; });
@@ -156,14 +159,112 @@ for (const vp of VIEWPORTS) {
       else ok(label, `content fills ${(fill.w * 100).toFixed(0)}% width, ${(fill.h * 100).toFixed(0)}% height`);
     }
 
-    // 5. BOTH destination signs must be fully on screen.
+    // 5. EVERY destination sign must be fully on screen. There are three now, and a
+    // count that silently stayed at two would stop grading the third.
     const prompts = await page.evaluate(() => [...document.querySelectorAll(".hall-prompt")].map((el) => {
       const r = el.getBoundingClientRect();
       return { name: el.textContent.trim().slice(0, 12), off: r.left < -1 || r.right > innerWidth + 1 || r.top < -1 || r.bottom > innerHeight + 1 };
     }));
-    if (prompts.length !== 2) bad(label, `expected 2 signs, found ${prompts.length}`);
+    if (prompts.length !== 3) bad(label, `expected 3 signs, found ${prompts.length}`);
     else if (prompts.some((p) => p.off)) bad(label, `sign off screen: ${prompts.filter((p) => p.off).map((p) => p.name).join(", ")}`);
-    else ok(label, "both signs on screen");
+    else ok(label, "all three signs on screen");
+
+    // 5b. EVERY SIGN SITS ON THE THING IT NAMES. Measured, not assumed: on the phone
+    // the vault's sign once floated mid-hall and the floor's sat on the frieze, and
+    // every other check here passed, because none asked where a sign was relative
+    // to its artwork. The gap between the sign's box and the artwork's box must be
+    // at most SIGN_SLACK px (0 when they touch or overlap).
+    const SIGN_SLACK = 8;
+    const pinned = await page.evaluate(() => [...document.querySelectorAll(".hall-prompt[data-art]")].map((el) => {
+      const art = document.querySelector(`.hall-bank .art-${el.dataset.art}`);
+      if (!art) return { name: el.dataset.station, gap: null };
+      const a = el.getBoundingClientRect(), b = art.getBoundingClientRect();
+      const dx = Math.max(0, b.left - a.right, a.left - b.right);
+      const dy = Math.max(0, b.top - a.bottom, a.top - b.bottom);
+      return { name: el.dataset.station, gap: Math.hypot(dx, dy) };
+    }));
+    const loose = pinned.filter((p) => p.gap === null || p.gap > SIGN_SLACK);
+    if (pinned.length !== 3) bad(label, `expected 3 pinned signs, found ${pinned.length}`);
+    else if (loose.length) bad(label, `sign off its artwork: ${loose.map((p) => `${p.name} ${p.gap === null ? "no artwork" : `${p.gap.toFixed(0)}px away`}`).join(", ")}`);
+    else ok(label, `every sign sits on its artwork (worst gap ${Math.max(...pinned.map((p) => p.gap)).toFixed(0)}px)`);
+
+    // 5c. THE KEEPER STOPS CLEAR OF THE VAULT'S SIGN. It once arrived standing on
+    // the sign. Read its stop from the custom properties the component measured,
+    // build its box at that stop, and require at least 0.9 of a body width of air
+    // between it and the sign.
+    const keeperGap = await page.evaluate(() => {
+      const k = document.querySelector(".hall-keeper");
+      const sign = document.querySelector('.hall-prompt[data-station="vault"]');
+      const scene = document.querySelector(".hall-scene");
+      if (!k || !sign || !scene) return null;
+      const sr = scene.getBoundingClientRect(), cs = getComputedStyle(k);
+      const w = k.getBoundingClientRect().width, h = k.getBoundingClientRect().height;
+      const x = sr.left + (parseFloat(cs.getPropertyValue("--kx1")) / 100) * sr.width;
+      const y = sr.top + (parseFloat(cs.getPropertyValue("--ky1")) / 100) * sr.height;
+      const kb = { left: x - w / 2, right: x + w / 2, top: y - 0.92 * h, bottom: y + 0.08 * h };
+      const b = sign.getBoundingClientRect();
+      const dx = Math.max(0, b.left - kb.right, kb.left - b.right);
+      const dy = Math.max(0, b.top - kb.bottom, kb.top - b.bottom);
+      return { gap: Math.hypot(dx, dy), w };
+    });
+    if (!keeperGap) bad(label, "could not measure the keeper's stop");
+    else if (keeperGap.gap < keeperGap.w * 0.9) bad(label, `keeper stops ${keeperGap.gap.toFixed(0)}px from the vault sign (body ${keeperGap.w.toFixed(0)}px)`);
+    else ok(label, `keeper stops ${keeperGap.gap.toFixed(0)}px clear of the vault sign (body ${keeperGap.w.toFixed(0)}px)`);
+
+    // 5d. THE HUD SHOWS BOTH SIDES OF THE FUND. It once read "5,076 RF idle", hiding
+    // the WETH that is most of the value. Require an RF figure AND a WETH figure,
+    // and that the figure sits wholly inside the viewport.
+    const hud = await page.evaluate(() => {
+      const el = document.querySelector(".hall-bar .hall-idle");
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { text: el.textContent?.replace(/\s+/g, " ").trim() ?? "", fits: r.left >= -1 && r.right <= innerWidth + 1 && r.width > 0 };
+    });
+    if (!hud) bad(label, "no idle figure in the HUD");
+    else if (!/[\d,]+ RF/.test(hud.text) || !/[\d.]+ WETH/.test(hud.text)) bad(label, `HUD shows one side only: "${hud.text}"`);
+    else if (!hud.fits) bad(label, `HUD idle figure does not fit: "${hud.text}"`);
+    else ok(label, `HUD shows both sides: "${hud.text}"`);
+
+    // 5e. THE VAULT HOLDS PLAQUE shows an RF figure AND a WETH figure, and both lines
+    // fit on the plate at every size. The plate is a triangle's worth of room on a
+    // phone, so "fits" is measured on each line against the plate, not assumed.
+    // The figures arrive with the live read, so wait for them rather than grading
+    // the loading state.
+    await page.waitForFunction(() => /RF/.test(document.querySelector(".hall-plaque-figs")?.textContent ?? ""), null, { timeout: 90_000 }).catch(() => {});
+    const plate = await page.evaluate(() => {
+      const el = document.querySelector(".hall-plaque");
+      const sc = document.querySelector(".hall-scene");
+      if (!el || !sc) return null;
+      const r = el.getBoundingClientRect(), s = sc.getBoundingClientRect();
+      // The TEXT's own box, via a Range: a flex child's box can be the plate's width
+      // while its text spills past both edges, which is how the first version passed.
+      // Measure against the plate's INNER RULE, not the outer box: the head once
+      // sat on the rule itself and every earlier check here still passed.
+      const rule = document.querySelector(".hall-bank .plaque-rule")?.getBoundingClientRect() ?? r;
+      const lines = [...el.children].map((c) => {
+        const range = document.createRange(); range.selectNodeContents(c);
+        const t = range.getBoundingClientRect();
+        return {
+          // Clear air: the text's box must sit at least 2px inside the rule on every side.
+          spill: Math.max(0, rule.left + 2 - t.left, t.right - (rule.right - 2), rule.top + 2 - t.top, t.bottom - (rule.bottom - 2)),
+          air: Math.min(t.left - rule.left, rule.right - t.right, t.top - rule.top, rule.bottom - t.bottom),
+          text: c.textContent?.trim() ?? "",
+        };
+      });
+      return {
+        text: (el.textContent ?? "").replace(/\s+/g, " ").trim(),
+        inside: r.left >= s.left - 1 && r.right <= s.right + 1 && r.top >= s.top - 1 && r.bottom <= s.bottom + 1,
+        overflow: lines.filter((l) => l.spill > 0).map((l) => `${l.text} (air ${l.air.toFixed(1)}px)`),
+        air: Math.min(...lines.map((l) => l.air)),
+        smallest: Math.min(...[...el.children].map((c) => parseFloat(getComputedStyle(c).fontSize))),
+        tooTall: el.scrollHeight > r.height + 1,
+      };
+    });
+    if (!plate) bad(label, "no vault plaque");
+    else if (!/[\d.,]+[KMB]? RF/.test(plate.text) || !/[\d.]+ WETH/.test(plate.text)) bad(label, `plaque lacks an RF and a WETH figure: "${plate.text}"`);
+    else if (!plate.inside || plate.overflow.length || plate.tooTall) bad(label, `plaque does not fit: "${plate.text}" ${plate.overflow.join(" | ")}${plate.tooTall ? " (too tall)" : ""}`);
+    else if (plate.smallest < 5) bad(label, `plaque type is ${plate.smallest.toFixed(1)}px, too small to read`);
+    else ok(label, `plaque reads "${plate.text}" (type >= ${plate.smallest.toFixed(1)}px, air >= ${plate.air.toFixed(1)}px inside the rule)`);
 
     // 6. the character must be inside the frame
     const chr = await page.evaluate(() => {

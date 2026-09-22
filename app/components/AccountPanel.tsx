@@ -1,88 +1,144 @@
 "use client";
 
 /**
- * THE DESK: opening an account.
+ * THE DESK: opening an account, and nothing else.
  *
- * This is deliberately the FIRST thing the desk offers and it does not consult the
- * market at all. Joining and trading are separate: the bank is open whether or not
- * it is quoting this week, and the previous build made a Genesis holder think he
- * had been turned away because the only action available returned "SAT OUT".
+ * It does not consult the market at all. Joining and trading are separate: the bank
+ * is open whether or not it is quoting this week, and the build that put the lever
+ * here made a Genesis holder think he had been turned away because the only action
+ * available returned "SAT OUT".
+ *
+ * DUMMY PROOF: every view has ONE obvious primary button that says what happens.
+ * The calls a button signs sit in a collapsed "what this signs", not in the way.
+ * Honesty is the SIMULATED stamp plus one short line by the guarantees.
+ *
+ * Every grant and guarantee is the contract's own wording, with the tests that
+ * prove it, from lib/accounts. Nothing here may be broader than the contract.
  */
 
 import { useState } from "react";
 import {
-  GRANTS, GUARANTEES, MANDATE_STATEMENT, accountId, hasWallet, signMandate,
+  GRANTS, GUARANTEES, SIGNUP_STEPS, SWEEP_GRANT, WALLET_SCOPE, accountId, onItsWay,
   type Account,
 } from "@/lib/accounts";
 import type { HallFriend } from "./Hall";
+import CloseAccount from "./CloseAccount";
 
 const n = (v: number, d = 0) =>
   v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const usd = (v: number) => `$${n(v, 2)}`;
 
-/** A sensible starting cap: today's idle balance, rounded down to something round. */
-function suggestedCap(idleRf: number) {
-  if (idleRf <= 0) return 100;
-  const mag = 10 ** Math.max(1, Math.floor(Math.log10(idleRf)) - 1);
-  return Math.max(mag, Math.floor(idleRf / mag) * mag);
+/**
+ * Modest starting caps: a quarter of what is idle today, rounded DOWN to one
+ * significant figure. A cap is a ceiling you should be comfortable with, and a
+ * default of "almost everything" (the old default was 4,800 of 4,823 RF) is not one.
+ */
+function modest(idle: number, floor: number) {
+  const q = idle * 0.25;
+  if (q <= floor) return floor;
+  const mag = 10 ** Math.floor(Math.log10(q));
+  return Math.floor(q / mag) * mag;
+}
+
+/** The tests behind a line, small, so anyone can go and read them. */
+const Tests = ({ names }: { names: readonly string[] }) => (
+  <small className="acct-tests">{names.join(" · ")}</small>
+);
+
+/**
+ * Today and on its way. The day-one rule is honest (the contract moves at most the
+ * cap per asset per day), but on its own it made a $106 Friend open a $24 box and
+ * look small for no reason. So both are shown: what is in the box now, and the
+ * rest, with how many days it takes at the member's own caps.
+ */
+export function Arrival({ account, rfUsd, ethUsd }: { account: Account; rfUsd: number; ethUsd: number }) {
+  const today = account.boxRf * rfUsd + account.boxWeth * ethUsd;
+  const way = onItsWay(account, rfUsd, ethUsd);
+  return (
+    <dl className="arrival">
+      <div>
+        <dt>in your box today</dt>
+        <dd>{n(account.boxRf)} RF + {account.boxWeth.toFixed(3)} WETH <i>({usd(today)})</i></dd>
+      </div>
+      {way.days > 0 && (
+        <div className="is-coming">
+          <dt>on its way</dt>
+          <dd>
+            the rest of your idle rewards, about <strong>{usd(way.usd)}</strong>, arriving over{" "}
+            <strong>{way.days} {way.days === 1 ? "day" : "days"}</strong> at your caps
+          </dd>
+        </div>
+      )}
+    </dl>
+  );
 }
 
 export default function AccountPanel({
-  friend, account, onOpened, onClosed,
+  friend, account, onOpened, onClosed, onGoToVault, rfUsd, ethUsd,
 }: {
   friend: HallFriend;
   account: Account | null;
   onOpened: (a: Account) => void;
   onClosed: (id: string) => void;
+  onGoToVault: () => void;
+  rfUsd: number;
+  ethUsd: number;
 }) {
-  const [cap, setCap] = useState(() => suggestedCap(friend.idleRf));
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState("");
+  const [capRf, setCapRf] = useState(() => modest(friend.idleRf, 100));
+  const [capWeth, setCapWeth] = useState(() => Number(modest(friend.idleWeth, 0.001).toPrecision(2)));
+  const [sweep, setSweep] = useState(false);
   const [welcomed, setWelcomed] = useState(false);
+  const [closing, setClosing] = useState(false);
 
-  async function open() {
-    if (busy) return;
-    setBusy(true); setNote("");
-    const signedAt = new Date().toISOString();
-    try {
-      const { signature, signer } = await signMandate(friend.label, cap, signedAt);
-      onOpened({
-        id: accountId(friend.collection, friend.id),
-        label: friend.label,
-        collection: friend.collection,
-        tokenId: friend.id,
-        imageUrl: friend.imageUrl,
-        idleRf: friend.idleRf,
-        idleWeth: friend.idleWeth,
-        capPerDayRf: cap,
-        signature, signer, signedAt,
-      });
-      setWelcomed(true);
-    } catch (e) {
-      // A wallet present and declined is a decision, not a fault.
-      const m = String((e as Error)?.message ?? e);
-      setNote(/reject|denied|4001/i.test(m) ? "You declined the signature. Nothing was opened." : m.slice(0, 140));
-    } finally {
-      setBusy(false);
-    }
+  function open() {
+    // The keeper's first visit: what it can claim today, in kind, up to the caps.
+    onOpened({
+      id: accountId(friend.collection, friend.id),
+      label: friend.label,
+      collection: friend.collection,
+      tokenId: friend.id,
+      imageUrl: friend.imageUrl,
+      idleRf: friend.idleRf,
+      idleWeth: friend.idleWeth,
+      capPerDayRf: capRf,
+      capPerDayWeth: capWeth,
+      boxRf: Math.min(friend.idleRf, capRf),
+      boxWeth: Math.min(friend.idleWeth, capWeth),
+      owedRf: Math.max(0, friend.idleRf - capRf),
+      owedWeth: Math.max(0, friend.idleWeth - capWeth),
+      pnlRf: 0,
+      pnlWeth: 0,
+      sweep,
+      openedAt: new Date().toISOString(),
+    });
+    setWelcomed(true);
+  }
+
+  if (account && closing) {
+    return (
+      <CloseAccount
+        account={account}
+        onConfirm={() => { setClosing(false); onClosed(account.id); }}
+        onCancel={() => setClosing(false)}
+      />
+    );
   }
 
   if (account && welcomed) {
     return (
       <div className="acct-welcome">
-        <p className="acct-kicker">account opened</p>
+        <p className="acct-kicker">account opened <span className="sim-stamp">simulated</span></p>
         <h3>Welcome to the First Bank of Friends.</h3>
         <p className="acct-line">
-          <strong>{account.label}</strong> is a depositor. Its rewards keep arriving in its own
-          wallet, and the bank may draw up to <strong>{n(account.capPerDayRf)} RF a day</strong> from it.
+          <strong>{account.label}</strong> has an account in the vault. In the live bank the keeper would
+          keep claiming on its own; there is nothing more to sign unless you change or close the account.
         </p>
-        <p className="hall-small" style={{ margin: "10px 0 0" }}>
-          {account.signature
-            ? <>Signed by <code>{account.signer?.slice(0, 6)}…{account.signer?.slice(-4)}</code>. That signature granted no allowance and spent no gas.</>
-            : <>Opened without a wallet signature, so it is recorded in this browser only.</>}
-          {" "}Walk to <strong>the vault</strong> to see the book.
-        </p>
-        <button type="button" className="hall-lever" onClick={() => setWelcomed(false)}>
-          See the account
+        <Arrival account={account} rfUsd={rfUsd} ethUsd={ethUsd} />
+        <button type="button" className="hall-lever" onClick={onGoToVault}>
+          See my box in the vault
+        </button>
+        <button type="button" className="acct-close acct-center" onClick={() => setWelcomed(false)}>
+          account details
         </button>
       </div>
     );
@@ -91,20 +147,16 @@ export default function AccountPanel({
   if (account) {
     return (
       <div className="acct">
-        <p className="acct-kicker">your account</p>
+        <p className="acct-kicker">your account <span className="sim-stamp">simulated</span></p>
         <dl className="acct-stats">
           <div><dt>Friend</dt><dd>{account.label}</dd></div>
-          <div><dt>on deposit</dt><dd>{n(account.idleRf)} RF · {account.idleWeth.toFixed(5)} WETH</dd></div>
-          <div><dt>daily cap</dt><dd>{n(account.capPerDayRf)} RF</dd></div>
-          <div><dt>mandate</dt><dd>{account.signature ? "signed" : "unsigned, this browser"}</dd></div>
+          <div><dt>in your box</dt><dd>{n(account.boxRf + account.pnlRf)} RF · {(account.boxWeth + account.pnlWeth).toFixed(5)} WETH</dd></div>
+          <div><dt>daily caps</dt><dd>{n(account.capPerDayRf)} RF · {account.capPerDayWeth} WETH</dd></div>
+          <div><dt>also move extras</dt><dd>{account.sweep ? "on" : "off"}</dd></div>
         </dl>
-        <p className="hall-small">
-          Nothing has actually moved: the contract is written and tested but <strong>not deployed</strong>.
-          Closing the account is instant and needs nobody&rsquo;s permission, which is the same property
-          the contract gives <code>withdraw</code>.
-        </p>
-        <button type="button" className="acct-close" onClick={() => onClosed(account.id)}>
-          Close the account
+        <button type="button" className="hall-lever" onClick={onGoToVault}>See my box in the vault</button>
+        <button type="button" className="acct-close acct-center close-open" onClick={() => setClosing(true)}>
+          Close account and take everything home
         </button>
       </div>
     );
@@ -114,48 +166,66 @@ export default function AccountPanel({
 
   return (
     <div className="acct">
-      <p className="acct-kicker">open an account</p>
-      <p className="hall-lede" style={{ margin: "0 0 10px" }}>
-        <strong>{friend.label}</strong> brings <strong>{n(friend.idleRf)} RF</strong> and{" "}
-        <strong>{friend.idleWeth.toFixed(5)} WETH</strong> of idle rewards. Genesis included: this is
-        not a FriendSDK game, so nothing here turns a Genesis away.
+      <p className="acct-kicker">open an account <span className="sim-stamp">simulated</span></p>
+      <p className="acct-intro">
+        <strong>Sign up once.</strong> Once deployed, the bank&rsquo;s keeper would claim{" "}
+        <strong>{friend.label}</strong>&rsquo;s rewards, today <strong>{n(friend.idleRf)} RF</strong> and{" "}
+        <strong>{friend.idleWeth.toFixed(5)} WETH</strong>, into your own account, and keep doing it.
+        Genesis included.
       </p>
+      <p className="acct-plain">{WALLET_SCOPE}</p>
 
-      <p className="acct-head">You grant</p>
-      <ul className="acct-list">{GRANTS.map((g) => <li key={g}>{g}</li>)}</ul>
-
-      <p className="acct-head">The bank cannot</p>
-      <ul className="acct-list is-cannot">{GUARANTEES.map((g) => <li key={g}>{g}</li>)}</ul>
-
+      <p className="acct-head">Daily caps, each asset on its own</p>
       <label className="acct-cap">
-        <span>Most the bank may take per day</span>
+        <span>RF</span>
         <input
-          type="number" min={1} step={100} value={cap}
-          onChange={(e) => setCap(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+          type="number" min={1} step={100} value={capRf}
+          onChange={(e) => setCapRf(Math.max(1, Math.floor(Number(e.target.value) || 1)))}
           aria-label="Daily cap in RF"
         />
-        <span>RF</span>
       </label>
-      <p className="hall-small" style={{ margin: "0 0 10px" }}>
-        Set it to the smallest number you are comfortable with. It is a ceiling, not a target,
-        and the contract clamps every collection to it.
-      </p>
+      <label className="acct-cap">
+        <span>WETH</span>
+        <input
+          type="number" min={0.0001} step={0.001} value={capWeth}
+          onChange={(e) => setCapWeth(Math.max(0.0001, Number(e.target.value) || 0.0001))}
+          aria-label="Daily cap in WETH"
+        />
+      </label>
+      <label className="acct-switch">
+        <input type="checkbox" checked={sweep} onChange={(e) => setSweep(e.target.checked)} />
+        <span>{SWEEP_GRANT.text} <Tests names={SWEEP_GRANT.tests} /></span>
+      </label>
 
-      <button type="button" className="hall-lever" onClick={open} disabled={busy || !bankable}>
-        {busy ? "waiting for your wallet…" : hasWallet() ? "Sign the mandate" : "Open the account"}
+      <button type="button" className="hall-lever" onClick={open} disabled={!bankable}>
+        Open my account
       </button>
       {!bankable && (
         <p className="picker-error" role="alert">
           This Friend holds no idle rewards, so there is nothing to deposit.
         </p>
       )}
-      {note && <p className="picker-error" role="alert">{note}</p>}
-      <p className="hall-small">
-        {hasWallet()
-          ? "An EIP-712 signature of the statement below. No allowance, no transaction, no gas."
-          : "No browser wallet found, so this is recorded in this browser and marked unsigned rather than dressed up as a signature."}
-        {" "}&ldquo;{MANDATE_STATEMENT}&rdquo;
-      </p>
+
+      <details className="acct-signs">
+        <summary>What this signs</summary>
+        <ol className="acct-steps">
+          {SIGNUP_STEPS.map((s) => <li key={s.what}><b>{s.what}</b> <code>{s.call}</code></li>)}
+        </ol>
+        <p className="hall-small" style={{ margin: "4px 0 8px" }}>
+          One signature if your wallet can batch calls, otherwise three prompts in a row. The NFT never
+          leaves your wallet.
+        </p>
+        <p className="acct-head">You let the Bank</p>
+        <ul className="acct-list">
+          {GRANTS.map((g) => <li key={g.text}>{g.text} <Tests names={g.tests} /></li>)}
+        </ul>
+      </details>
+
+      <p className="acct-head">The bank cannot</p>
+      <ul className="acct-list is-cannot">
+        {GUARANTEES.map((g) => <li key={g.text}>{g.text} <Tests names={g.tests} /></li>)}
+      </ul>
+      <p className="hall-small" style={{ margin: "0 0 4px" }}>Unaudited, not deployed.</p>
     </div>
   );
 }

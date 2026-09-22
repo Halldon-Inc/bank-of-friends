@@ -1,8 +1,9 @@
 import { getAddress, parseAbi } from "viem";
-import { ADDR, ABI, client, readPool, scanLogs, blocksPerDay, fmt } from "../lib/protocol.mjs";
+import { ADDR, ABI, client, readPool, scanLogs, blocksPerDay, fmt, ethUsd as liveEthUsd } from "../lib/protocol.mjs";
 const c = client();
 const RANDO = getAddress("0x00000000000000000000000000000000deadbeef");
-const HUNT  = getAddress("0x913105f2d2bfb8392f7845ef79e0c2c62f2755df");
+// A real holder that is NOT Hunt: no probe may act as Hunt's wallet, even as an eth_call.
+const HOLDER = getAddress("0x97f290319734D0ce22215079417F3fE6A6439932");
 
 const fundAbi = parseAbi([
   "function fund(address asset,uint256 amount)",
@@ -11,7 +12,7 @@ const fundAbi = parseAbi([
 ]);
 
 console.log("=== Q1: can ANYONE donate into the reward stream? (ActivationManager.fund) ===");
-for (const [who, acct] of [["rando", RANDO], ["hunt", HUNT]]) {
+for (const [who, acct] of [["rando", RANDO], ["holder", HOLDER]]) {
   try {
     await c.simulateContract({ address: ADDR.ActivationManager, abi: fundAbi, functionName: "fund",
       args: [ADDR.RF, 10n ** 18n], account: acct });
@@ -43,7 +44,7 @@ const { head, perDay } = await blocksPerDay(c);
 const swapEv = ABI.market.find(x=>x.type==="event"&&x.name==="Swapped");
 const logs = await scanLogs(c, { address: ADDR.Market, event: swapEv, fromBlock: head - perDay/4n, toBlock: head });
 console.log(`\n  sampling ${Math.min(logs.length,8)} of ${logs.length} real Market swaps for gas used:`);
-const ethUsd = 2734.86;
+const ethUsd = (await liveEthUsd())?.usd ?? NaN;   // live; NaN (prints as NaN) rather than a stale constant
 let tot=0n, n=0;
 for (const l of logs.slice(-8)) {
   const r = await c.getTransactionReceipt({ hash: l.transactionHash });

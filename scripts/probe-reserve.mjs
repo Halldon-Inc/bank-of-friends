@@ -6,8 +6,8 @@ const R = cfg.deployment.contracts.Reserve;
 const rd = (fn, args=[]) => c.readContract({ address: R.address, abi: R.abi, functionName: fn, args });
 
 // Price from the pool itself, not their API.
-import { readPool } from "../lib/protocol.mjs";
-const ETH_USD = 2734.86;
+import { readPool, ethUsd } from "../lib/protocol.mjs";
+const ETH_USD = (await ethUsd())?.usd ?? NaN;   // live; NaN (prints as NaN) rather than a stale constant
 const pool = await readPool(c);
 const rfUsd = pool.wethPerRf * ETH_USD;
 

@@ -8,6 +8,18 @@ optimizer = true
 optimizer_runs = 1000
 via_ir = false
 evm_version = "cancun"
+remappings = [
+    "forge-std/=lib/forge-std/src/",
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+]
+
+[fuzz]
+runs = 512
+
+[invariant]
+runs = 256
+depth = 64
+fail_on_revert = false
 
 [rpc_endpoints]
 robinhood = "https://rpc.mainnet.chain.robinhood.com"

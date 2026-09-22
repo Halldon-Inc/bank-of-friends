@@ -15,15 +15,20 @@
  *    has lost coverage, which is a defect, not a pass.
  */
 
-import { getAddress, parseAbi } from "viem";
+import { getAddress, parseAbi, parseEventLogs } from "viem";
 import {
-  ADDR, ABI, POOL_ID, CHAIN, DYNAMIC_FEE_FLAG, FULL_RANGE,
+  ADDR, ABI, POOL_ID, POOL_SEED_BLOCK, CHAIN, DYNAMIC_FEE_FLAG, FULL_RANGE,
   client, readPool, readPosition, scanLogs, blocksPerDay, fmt,
+  readStreams, readRewardsWiring, readOwners, OWNED, readProtocolIdle,
 } from "../lib/protocol.mjs";
+
+const TRANSFER = parseAbi(["event Transfer(address indexed from, address indexed to, uint256 value)"]);
 
 const c = client();
 const results = [];
 const RANDO = getAddress("0x00000000000000000000000000000000deadbeef");
+/** The pass floor. Raise it whenever checks are added; never lower it to make a run green. */
+const MIN_PASS = 59;
 
 function record(status, name, detail) {
   results.push({ status, name, detail });
@@ -39,6 +44,17 @@ const eq = (name, actual, expected, show = String) => {
 };
 const isTrue = (name, cond, detail) => { record(cond ? "PASS" : "FAIL", name, detail); return cond; };
 const skip = (name, why) => record("SKIP", name, why);
+
+/** Custom-error selectors of the Friend wallet implementation (resolved via openchain). */
+const ERR = Object.freeze({ InvalidSigner: "0x815e1d64", UnsupportedOperation: "0x9ba6061b" });
+/** The 4-byte selector a call reverted with, "none" if it succeeded, null if unreadable. */
+async function revertSelector(promise) {
+  try { await promise; return "none"; } catch (e) {
+    const blob = JSON.stringify(e, (k, v) => (typeof v === "bigint" ? String(v) : v)) + String(e?.message ?? "");
+    const m = blob.match(/0x[0-9a-fA-F]{8}(?![0-9a-fA-F])/g);
+    return m ? m.find((x) => Object.values(ERR).includes(x.toLowerCase()))?.toLowerCase() ?? m[0].toLowerCase() : null;
+  }
+}
 
 /* ------------------------------------------------------------------ hook flags */
 const HOOK_FLAGS = {
@@ -143,7 +159,10 @@ async function main() {
   isTrue("the account implementation is deployed", (await c.getBytecode({ address: implementation }))?.length > 2, implementation);
 
   // Use a Friend that is known-activated so earned() is meaningful.
-  const PROBE = { collection: ADDR.Generations, tokenId: 87893n };
+  // Generations #5339 belongs to 0x97f29031..., the largest holder by weight. The
+  // probe must never be Hunt's own Friend: simulating execute from its owner is
+  // impersonation in spirit, even as a read-only eth_call.
+  const PROBE = { collection: ADDR.Generations, tokenId: 5339n };
   const tba = await rd(ADDR.Generations, ABI.generations, "tokenBoundAccount", [PROBE.tokenId]);
   const [tbaOwner, nftOwner, tbaToken] = await Promise.all([
     rd(tba, ABI.tba, "owner"),
@@ -160,11 +179,14 @@ async function main() {
     address: tba, abi: ABI.tba, functionName: "execute",
     args: [ADDR.RF, 0n, "0x095ea7b3" + "0".repeat(24) + ADDR.Market.slice(2).toLowerCase() + "f".repeat(64), 0],
   };
-  let ownerMay = false, randoMay = true;
+  // A refusal only counts if it is the RIGHT refusal. "It reverted" would also be
+  // true of a dead RPC, so match the account's own error selector.
+  let ownerMay = false;
   try { await c.simulateContract({ ...approveCall, account: nftOwner }); ownerMay = true; } catch { ownerMay = false; }
-  try { await c.simulateContract({ ...approveCall, account: RANDO }); randoMay = true; } catch { randoMay = false; }
+  const rando = await revertSelector(c.simulateContract({ ...approveCall, account: RANDO }));
   isTrue("the Friend's owner CAN execute from its wallet (so they can approve the Bank)", ownerMay, nftOwner);
-  isTrue("a stranger CANNOT execute from it (so an approval is the only power the Bank ever gets)", !randoMay);
+  isTrue("a stranger CANNOT execute from it (so an approval is the only power the Bank ever gets)",
+    rando === ERR.InvalidSigner, `reverts ${rando ?? "NOTHING"} (InvalidSigner is ${ERR.InvalidSigner})`);
 
   /* --------------------------------------- 7. harvesting needs nobody's blessing */
   console.log("\n-- harvesting is permissionless --");
@@ -226,6 +248,131 @@ async function main() {
   isTrue("totalWeight is non-zero, so reward shares are computable", totalWeight > 0n, `${fmt.n(Number(totalWeight) / 1e18)} weight`);
   isTrue("claimBatch can harvest many Friends per transaction", maxBatch >= 10n, `MAX_CLAIM_BATCH=${maxBatch}`);
 
+  /* ------------------------------------- 9. the fee is WETH, both directions */
+  console.log("\n-- the 5% is always taken in WETH, on buys AND sells (read from real receipts) --");
+  const swapEvent = ABI.poolManager.find((x) => x.type === "event" && x.name === "Swap");
+  const swaps = await scanLogs(c, { address: ADDR.PoolManager, event: swapEvent, args: { id: POOL_ID }, fromBlock: head - perDay, toBlock: head });
+  isTrue("every swap in the last 24h settled at an LP fee of 0 (the Swap log's own fee field)",
+    swaps.length > 0 && swaps.every((l) => Number(l.args.fee) === 0),
+    `${swaps.length} swaps, fee fields seen: ${[...new Set(swaps.map((l) => Number(l.args.fee)))].join(", ")}`);
+
+  // Classify real swaps by which token went INTO the PoolManager, then read the
+  // Hook's own transfers in the same receipt. Newest first; stop at one of each side.
+  const seen = {};
+  for (const l of [...swaps].reverse()) {
+    if (seen.buy && seen.sell) break;
+    const rc = await c.getTransactionReceipt({ hash: l.transactionHash });
+    const t = parseEventLogs({ abi: TRANSFER, logs: rc.logs, strict: false })
+      .filter((x) => x.args?.from && x.args?.to)
+      .map((x) => ({ token: getAddress(x.address), from: getAddress(x.args.from), to: getAddress(x.args.to), v: x.args.value }));
+    const fees = parseEventLogs({ abi: ABI.hook, logs: rc.logs.filter((x) => getAddress(x.address) === ADDR.Hook), eventName: "FeeCollected" });
+    if (fees.length !== 1) continue;   // several swaps in one transaction; keep the sample clean
+    const intoPm = t.filter((x) => x.to === ADDR.PoolManager && x.from !== ADDR.Hook);
+    const side = intoPm.some((x) => x.token === ADDR.WETH) ? "buy" : intoPm.some((x) => x.token === ADDR.RF) ? "sell" : null;
+    if (!side || seen[side]) continue;
+    seen[side] = { tx: l.transactionHash, fee: fees[0].args.amount, t };
+  }
+  for (const side of ["buy", "sell"]) {
+    const x = seen[side];
+    if (!x) { skip(`a real ${side}: the fee is WETH`, `no clean ${side} in the last 24h`); continue; }
+    const hookRf = x.t.filter((y) => y.token === ADDR.RF && (y.from === ADDR.Hook || y.to === ADDR.Hook));
+    const toAm = x.t.filter((y) => y.token === ADDR.WETH && y.from === ADDR.Hook && y.to === ADDR.ActivationManager);
+    isTrue(`a real ${side}: the Hook sent WETH, exactly the fee, to the ActivationManager`,
+      toAm.length === 1 && toAm[0].v === x.fee, `${fmt.eth(x.fee, 8)} WETH  (tx ${x.tx.slice(0, 12)}...)`);
+    isTrue(`a real ${side}: the Hook touched no RF at all`, hookRf.length === 0, `${hookRf.length} RF transfers involving the Hook`);
+    // The WETH side of the trade: what the swapper paid in (buy) or the gross WETH out (sell).
+    const wethSide = side === "buy"
+      ? x.t.filter((y) => y.token === ADDR.WETH && y.to === ADDR.PoolManager && y.from !== ADDR.Hook).reduce((a, y) => a + y.v, 0n)
+      : x.t.filter((y) => y.token === ADDR.WETH && y.from === ADDR.PoolManager && y.to !== ADDR.Hook).reduce((a, y) => a + y.v, 0n) + x.fee;
+    const share = wethSide > 0n ? Number(x.fee) / Number(wethSide) : 0;
+    isTrue(`a real ${side}: the fee is 5.00% of the WETH side`, Math.abs(share - 0.05) < 0.0001,
+      `${fmt.pct(share, 4)} of ${fmt.eth(wethSide, 6)} WETH ${side === "buy" ? "paid in" : "gross out"}`);
+  }
+
+  /* ------------------------------------------ 10. rewards arrive a week late */
+  console.log("\n-- rewards stream a week behind the fees, and someone has to start each week --");
+  const st = await readStreams(c);
+  const allocEvent = ABI.activationManager.find((x) => x.type === "event" && x.name === "Allocated");
+  // finish = the allocate's own timestamp + DURATION, so the last Allocated log sits
+  // near a KNOWN block. Scan an hour either side of it, not the pool's whole life:
+  // blocks older than ~3 days are very slow on this RPC.
+  const lastAllocBlock = (s) => head - BigInt(Math.round((st.now - Number(s.finish - st.duration)) / spb));
+  const around = (b) => ({ fromBlock: b - 36000n > POOL_SEED_BLOCK ? b - 36000n : POOL_SEED_BLOCK, toBlock: b + 36000n < head ? b + 36000n : head });
+  const allocs = [];
+  for (const k of ["RF", "WETH"]) {
+    for (const l of await scanLogs(c, { address: ADDR.ActivationManager, event: allocEvent, ...around(lastAllocBlock(st[k])) })) {
+      if (!allocs.some((x) => x.transactionHash === l.transactionHash && x.logIndex === l.logIndex)) allocs.push(l);
+    }
+  }
+  allocs.sort((a, b) => Number(a.blockNumber - b.blockNumber) || a.logIndex - b.logIndex);
+  eq("stream DURATION is 7 days", st.duration, 604800n, String);
+  for (const [name, asset, d] of [["RF", ADDR.RF, 0], ["WETH", ADDR.WETH, 4]]) {
+    const s = st[name];
+    const last = allocs.filter((l) => getAddress(l.args.asset) === asset).at(-1);
+    if (!last) { record("FAIL", `${name}: an Allocated log exists for the running stream`, "none found since the pool was seeded"); continue; }
+    eq(`${name}: the running stream ends where its last Allocated log said it would`, s.finish, last.args.finish, String);
+    isTrue(`${name}: its rate is that allocation spread over DURATION`, s.rate === last.args.amount / st.duration,
+      `${fmt.eth(last.args.amount, d)} ${name} / 604800 s = ${s.rate} wei per s`);
+    const bal = await rd(asset, ABI.erc20, "balanceOf", [ADDR.ActivationManager]);
+    isTrue(`${name}: the ActivationManager holds at least pending + the unstreamed remainder`, bal >= s.pending + s.remaining,
+      `holds ${fmt.eth(bal, d)}, owes pending ${fmt.eth(s.pending, d)} + remaining ${fmt.eth(s.remaining, d)}`);
+    isTrue(`${name}: allocate() is due exactly when the stream has ended and something is pending`,
+      s.allocateDue === (st.now >= Number(s.finish) && s.pending > 0n),
+      s.secondsLeft > 0 ? `${(s.secondsLeft / 3600).toFixed(1)} h left; next week ${fmt.eth(s.nextPerWeek, d)} ${name} waiting` : `DUE: ${fmt.eth(s.pending, d)} ${name} waiting`);
+  }
+  const allocSim = await c.simulateContract({ address: ADDR.ActivationManager, abi: ABI.activationManager, functionName: "allocate", args: [ADDR.WETH], account: RANDO })
+    .then(() => "clean")
+    .catch((e) => (/0x764c775e/.test(JSON.stringify(e, (k, v) => (typeof v === "bigint" ? String(v) : v)) + String(e.message)) ? "StreamUnavailable" : `other: ${e.shortMessage}`));
+  isTrue("allocate() needs no permission: from a stranger it succeeds, or reverts ONLY because the stream is still running",
+    allocSim === "clean" || (allocSim === "StreamUnavailable" && st.WETH.secondsLeft > 0),
+    allocSim === "clean" ? "simulates clean" : `reverts ${allocSim} (0x764c775e) with ${(st.WETH.secondsLeft / 3600).toFixed(1)} h left`);
+
+  /* ------------------------------ 10b. the idle pool, derived in three reads */
+  console.log("\n-- rewards earned but unclaimed, protocol-wide --");
+  const idle = await readProtocolIdle(c);
+  // Cross-check the identity against a real sum: every Genesis's earned(), in one
+  // Multicall3 pass. Genesis carry ~95% of active weight, so their sum must fit
+  // UNDER the identity and make up most of it. Both halves are asserted.
+  const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11";
+  const gIds = [...Array(1024)].map((_, i) => BigInt(i + 1));
+  for (const [name, asset, d] of [["RF", ADDR.RF, 0], ["WETH", ADDR.WETH, 6]]) {
+    let sum = 0n, failed = 0;
+    for (let i = 0; i < gIds.length; i += 512) {
+      const r = await c.multicall({
+        contracts: gIds.slice(i, i + 512).map((id) => ({ address: ADDR.ActivationManager, abi: ABI.activationManager, functionName: "earned", args: [asset, ADDR.Genesis, id] })),
+        blockNumber: idle.blockNumber, allowFailure: true, multicallAddress: MULTICALL3,
+      });
+      for (const x of r) x.status === "success" ? (sum += x.result) : failed++;
+    }
+    const share = Number(sum) / Number(idle[name]);
+    isTrue(`${name}: idle = balance - pending - remaining is positive and COVERS every Genesis's earned()`,
+      failed === 0 && idle[name] > 0n && sum <= idle[name],
+      `idle ${fmt.eth(idle[name], d)} >= sum over 1,024 Genesis ${fmt.eth(sum, d)}${failed ? ` (${failed} reads failed)` : ""}`);
+    isTrue(`${name}: Genesis account for most of it (they hold ~95% of active weight)`, share >= 0.8 && share <= 1,
+      `${fmt.pct(share, 2)} of the idle pool`);
+  }
+
+  /* ---------------------------------------------- 11. who can change all this */
+  console.log("\n-- one key owns every protocol contract --");
+  const wiring = await readRewardsWiring(c);
+  eq("Market.rewards() IS the ActivationManager too", wiring.marketRewards, ADDR.ActivationManager);
+  const owners = await readOwners(c);
+  isTrue(`all ${OWNED.length} owned protocol contracts share ONE owner`, owners.distinct.length === 1,
+    OWNED.map((n) => `${n}=${owners.byContract[n].slice(0, 8)}`).join(" "));
+  isTrue("that owner is a plain EOA (no code): one private key, not a multisig or timelock",
+    owners.distinct.every((a) => owners.isEoa[a]), owners.distinct.join(", "));
+  const [gImpl, nImpl] = await Promise.all([
+    rd(ADDR.Genesis, ABI.genesis, "accountImplementation"),
+    rd(ADDR.Generations, ABI.generations, "accountImplementation"),
+  ]);
+  eq("Genesis and Generations wallets run the SAME account implementation", gImpl, nImpl);
+
+  // execute takes a plain call only: no delegatecall, so no batching module can be bolted on.
+  const delegate = { ...approveCall, args: [...approveCall.args.slice(0, 3), 1] };
+  const ownerDelegate = await revertSelector(c.simulateContract({ ...delegate, account: nftOwner }));
+  isTrue("even the Friend's owner CANNOT delegatecall from its wallet (operation 1 is refused)",
+    ownerDelegate === ERR.UnsupportedOperation, `reverts ${ownerDelegate ?? "NOTHING"} (UnsupportedOperation is ${ERR.UnsupportedOperation})`);
+
   /* ----------------------------------------------------------------- verdict */
   const pass = results.filter((r) => r.status === "PASS").length;
   const fail = results.filter((r) => r.status === "FAIL").length;
@@ -237,8 +384,8 @@ async function main() {
     console.error("FATAL: this instrument graded nothing. Treat that as a failure, not a pass.");
     process.exit(2);
   }
-  if (pass < 25) {
-    console.error(`FATAL: only ${pass} checks passed. This harness asserted 30+ when written; fewer checks with no failures means lost coverage.`);
+  if (pass < MIN_PASS) {
+    console.error(`FATAL: only ${pass} checks passed. This harness asserted ${MIN_PASS}+ at its 2026-09-22 revision; fewer checks with no failures means lost coverage.`);
     process.exit(2);
   }
   if (fail > 0) {

@@ -109,17 +109,22 @@ for (const vp of VIEWPORTS) {
   if (errors.length) fail(vp.name, `console error: ${errors[0].slice(0, 90)}`);
   else ok(vp.name, "no console errors");
 
-  // 5. the status word must actually be on screen and legible
+  // 5. the desk's state word must be on screen and legible. /docs no longer has a
+  // giant .status-word: the desk's state is .docs-desk-state inside the hero row.
+  // This used to look for .status-word and failed forever against the new page.
+  // Wait for it, because it only renders once the chain read has answered.
+  await page.waitForSelector(".docs-desk-state", { timeout: 120_000 }).catch(() => {});
   const statusBox = await page.evaluate(() => {
-    const el = document.querySelector(".status-word");
+    const el = document.querySelector(".docs-desk-state");
     if (!el) return null;
     const r = el.getBoundingClientRect();
     return { w: r.width, h: r.height, left: r.left, right: r.right, vw: innerWidth, text: el.textContent?.trim() };
   });
   checks++;
-  if (!statusBox) fail(vp.name, "no status word rendered");
-  else if (statusBox.left < -1 || statusBox.right > statusBox.vw + 1) fail(vp.name, `status word overflows: ${JSON.stringify(statusBox)}`);
-  else ok(vp.name, `status "${statusBox.text}" fits (${Math.round(statusBox.w)}x${Math.round(statusBox.h)})`);
+  if (!statusBox) fail(vp.name, "no desk state rendered");
+  else if (!statusBox.text) fail(vp.name, "desk state is empty");
+  else if (statusBox.left < -1 || statusBox.right > statusBox.vw + 1) fail(vp.name, `desk state overflows: ${JSON.stringify(statusBox)}`);
+  else ok(vp.name, `desk state "${statusBox.text}" fits (${Math.round(statusBox.w)}x${Math.round(statusBox.h)})`);
 
   await page.screenshot({ path: `${OUT}/${vp.width}-${vp.name}.png`, fullPage: true });
   await ctx.close();

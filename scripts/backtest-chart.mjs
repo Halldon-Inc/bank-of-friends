@@ -17,14 +17,17 @@
  */
 import fs from "node:fs";
 import { fmt } from "../lib/protocol.mjs";
+import { loadTape } from "./backtest-engine.mjs";
+// Per-swap times from the engine's block->time fit; the raw `t` is a 2.8-hour bucket start.
+const TIME = new Map(loadTape().tape.map((e) => [e.b, e.t]));
 
 const FEE = 0.05;
-const GAS_WETH = 0.033 / 2734.86;
-const ETH_USD = 2734.86;
+const GAS_WETH = 0.033 / 2734.86;   // measured gas at the same SNAPSHOT ETH price
+const ETH_USD = 2734.86;   // SNAPSHOT (CoinGecko 2026-09-21), fixed so reruns of a historical tape are comparable; not live
 
 const raw = JSON.parse(fs.readFileSync("data/swaps.json", "utf8"));
 const SINCE = process.env.SINCE ? Date.parse(process.env.SINCE) / 1000 : 0;
-const S = raw.swaps.map((s) => ({ t: s.t, b: s.b, sq: BigInt(s.sq), liq: BigInt(s.liq) }))
+const S = raw.swaps.map((s) => ({ t: TIME.get(s.b), b: s.b, sq: BigInt(s.sq), liq: BigInt(s.liq) }))
   .filter((s) => s.t >= SINCE).sort((a, b) => a.b - b.b);
 if (SINCE) console.log(`[filtered to trades on/after ${new Date(SINCE * 1000).toISOString()}]`);
 const P = S.map((s) => { const p = Number(s.sq) / 2 ** 96; return { t: s.t, b: s.b, p: p * p, L: Number(s.liq) / 1e18 }; });

@@ -1,112 +1,132 @@
 /**
- * The Bank of Friends market maker: a REGIME-GATED grid.
+ * The First Bank of Friends desk: a MAKER-ONLY range-order grid, off by default.
  *
- * Design principle: the default state is FLAT. The desk does not try to make money
- * in every market. It sits on its hands until conditions pay for the risk, then it
- * works a wide grid, then it stands down again.
+ * Why maker-only. The pool's hook takes 5% of every SWAP and has no liquidity
+ * callbacks (FLAGS 0x20cc: no beforeAddLiquidity, no beforeRemoveLiquidity). A v4
+ * range order is liquidity, not a swap, so the bank never pays the toll. Takers who
+ * cross the bank's ranges still pay 5% to every activated Friend. The old taker
+ * grid needed a 10.80% step just to break even; a maker grid breaks even at gas.
  *
- * Every gate here was derived from a measured failure in the backtests, not invented:
+ * Why it is still OFF most of the time. With the toll removed, a maker grid was
+ * replayed through the pool's real history and LOST to holding in every window
+ * (-5% to -80%), while the same engine made +49% on synthetic chop. The toll was
+ * never the binding constraint; the trend is. So the desk arms only when the market
+ * has recently swung back and forth, and a replay of the last week agrees:
  *
- *   gate            derived from
- *   ------------    -------------------------------------------------------------
- *   trend           mean-reversion lost 76-84% dip-buying a -89% one-way slide
- *   volume          gas on 8,777 fills was $290, i.e. 3.4x the whole book
- *   volatility      a 10% round-trip toll needs >10% swings to clear
- *   fill size       only 61% of trades were even large enough to beat gas
- *   inventory       flow ran 84.6% one-way; an uncapped bid accumulates the loser
- *   drawdown        the unknown unknown; stop trading and stay stopped
+ *   gate            rule                                           why
+ *   ============    =============================================  ==============================
+ *   reversals72h    >= 6 completed swings of at least one step      a grid earns only on swings
+ *   drift72h        |72h drift| < 2 steps                          a trend fills one side only
+ *   walkForward7d   the same grid replayed on the last 7 days       the rule has to have worked
+ *                   beats holding                                   on the tape it is about to trade
+ *   inventory       RF under 60% of the book; bids sized to a       the flow ran one-way before
+ *                   volatility-scaled cap
+ *   drawdown        within 15% of its best point vs holding         the unknown unknown
+ *   breaker         not manually halted                             a human can always stop it
  *
- * This module is PURE and shared by the backtest and the live keeper, so the thing
- * that decides in simulation is literally the thing that decides with real money.
+ * Every fill is LOSS-LOCKED: RF is never offered below what it cost x (1 + lock),
+ * and never bought back above what it sold for x (1 - lock). RangeDesk.sol enforces
+ * the same constant on chain, so a bug here cannot sell at a loss.
+ *
+ * A gate whose input is missing is UNMEASURED, not failed and not passed. The desk
+ * does not arm on a gate it cannot measure, and the UI says "not yet measurable".
+ *
+ * This module is PURE and shared by the backtests, the live desk API and the hall,
+ * so the thing that decides in simulation is literally the thing that decides live.
  */
 
 /** Costs, all measured on Robinhood Chain. See docs/ECONOMICS.md. */
 export const COSTS = Object.freeze({
-  hookFeeBps: 500,          // 5% per side, Hook.FEE_BPS, verified on chain
+  hookFeeBps: 500,          // MEASURED: 5% per side, Hook.FEE_BPS, paid by TAKERS only
   fee: 0.05,
-  openseaFeeBps: 100,       // 1%, read from a real order's consideration
-  gasUsdPerFill: 0.033,     // 209k gas @ 0.057 gwei, ETH $2,735, from 8 real txs
+  openseaFeeBps: 100,       // MEASURED: 1%, read from a real order's consideration
+  gasUsdPerFill: 0.033,     // MEASURED: 209k gas @ 0.057 gwei, ETH $2,735, from 8 real swap txs
+  gasUsdPerFlip: 0.07,      // CHOICE: remove + re-add one range in one unlock, ~2x a measured swap
 });
 
 /**
- * Break-even grid step. Buying W WETH of RF and selling it back a fraction s higher
- * returns W(1-f)^2(1+s), so a profitable round trip needs s > 1/(1-f)^2 - 1.
- * At f = 5% that is 10.80%. This is arithmetic, not a preference: any step below it
- * loses on EVERY completed round trip regardless of how the market moves.
+ * Break-even step for a TAKER grid: buying W WETH of RF and selling it back a
+ * fraction s higher returns W(1-f)^2(1+s), so s > 1/(1-f)^2 - 1 = 10.80% at f = 5%.
+ * Kept because it is the reason the desk is maker-only.
  */
 export const BREAKEVEN_STEP = 1 / (1 - 0.05) ** 2 - 1;
 
-/** What a round trip actually nets at a given step, after both fees. */
+/** What a TAKER round trip nets at a given step, after both tolls. */
 export const edgePerRoundTrip = (step, fee = COSTS.fee) => (1 - fee) ** 2 * (1 + step) - 1;
 
 /**
- * Volatility a grid needs to traverse a rung often enough to matter.
- * Expected time to move a fraction s scales as (s/sigma)^2; a round trip is two
- * traverses, so R round trips per 168h needs sigma_h >= s * sqrt(2R/168).
+ * What a MAKER round trip nets before gas, under the loss-lock. A bid range filled at
+ * average a is re-offered from a(1+lock) up one step, so it sells at an average of
+ * a(1+lock)(1+step)^0.5: the lock is a floor on the edge, not the whole edge.
  */
+export const makerEdgePerRoundTrip = (step, lock = step) => (1 + lock) * Math.sqrt(1 + step) - 1;
+
+/** Kept for the hall and older callers: the vol a grid needs to traverse R round trips a week. */
 export const volFloorFor = (step, roundTripsPerWeek) => step * Math.sqrt((2 * roundTripsPerWeek) / 168);
 
 /**
  * Inventory ceiling from the Avellaneda-Stoikov inventory-risk term. Tolerating a
  * loss of L of book to a Z-sigma move over horizon H hours gives w <= L/(Z*sigma*sqrt(H)).
- * A FIXED cap is right at one volatility and wrong at every other, so this scales.
  */
 export const inventoryCapFor = (hourlyVol, { lossTolerance = 0.10, z = 2, horizonHours = 72 } = {}) =>
   Math.max(0.05, Math.min(0.95, lossTolerance / (z * Math.max(hourlyVol, 0.005) * Math.sqrt(horizonHours))));
 
 /**
- * Default arming conditions. Deliberately conservative: these are the levels at
- * which the desk is WILLING to risk money, not the levels at which it expects to
- * print. Every one is a live, measurable quantity.
+ * Default parameters. Labelled so nobody has to guess which were measured.
  */
 export const DEFAULT_GATES = Object.freeze({
-  // --- liquidity and activity ---
-  minVolume24hWeth: 25,        // today: ~13.7. Deliberately ABOVE current volume.
-  minTrades24h: 200,           // today: ~40 via the router. Needs real two-way flow.
+  // the grid
+  gridStep: 0.05,              // CHOICE: wide enough that a swing is a swing, not noise
+  rungs: 2,                    // CONTRACT: RangeDesk holds at most ONE ask range and ONE bid range at a time
+  tickSpacing: 60,             // MEASURED: the pool's tickSpacing (Market.seed full range 887220)
 
-  // --- regime: we want chop, not a trend ---
-  maxAbsDrift24h: 0.20,        // stand down if the market moved more than 20% net in a day
-  maxAbsDrift1h: 0.15,         // and if it is moving fast right now, wait
-  // A SLOW BLEED is invisible to a 24h window and is what actually kills a grid.
-  // Measured: a -3%/day grind shows -3% on the 24h gate, passes it, and cost -9.7%
-  // median over 14 days; -10%/day cost -30.7%. Over a week those same regimes show
-  // -19% and -52%, which this gate catches and the 24h one never will.
-  maxAbsDrift7d: 0.12,
-  // ASYMMETRY. The gates above decide whether the desk trades at all. This one
-  // decides which SIDE. Measured across 40 regimes: every losing bucket was a
-  // down-trend bucket, and the loss came entirely from spending WETH buying dips
-  // that kept dipping. Selling RF into a downtrend is not the same trade: it
-  // reduces inventory and raises cash. So below this drift, the desk may sell but
-  // may not buy.
-  // The 7-DAY trend is the signal. A single down day inside a rising market is
-  // noise, and blocking on it costs exactly the dip-buying that works: with a -5%
-  // daily trigger, the +3%/day regimes fell from +12.0% to -0.7%. The daily gate is
-  // kept only as a circuit breaker for a genuine one-day collapse.
-  buyBlockedBelowDrift7d: -0.02,
-  buyBlockedBelowDrift24h: -0.18,
+  // the contract's rules (RangeDesk in RangeDesk.sol), mirrored so the strategy never
+  // asks for anything the contract would revert. Values are the contract's constants.
+  lockBps: 500,                // RangeDesk.LOCK_BPS: ask priceLower >= avgCost x 1.05; bid priceUpper <= lastSellVWAP x 0.95
+  twapEdgeTicks: 100,          // every range at least 100 ticks beyond the observer TWAP, on the correct side of spot
+  minRangeFrac: 0.01,          // each range 1% to 15% of that side's IDLE balance at placement
+  maxRangeFrac: 0.15,
+  maxDailySideFrac: 0.50,      // at most 50% of each side opened per rolling day
+  maxOpsPerDay: 24,            // opens + closes per rolling day (a flip is two)
+  rangeExpiryDays: 7,          // anyone may close a range older than this
+  bidLockLapseDays: 30,        // the bid lock lapses 30 days after the last sale
 
-  // --- volatility must clear the toll ---
-  // DERIVED from the grid step and a stated target of 4 round trips/week = 3.27%.
-  // The old 4.00% was picked by hand; it implied 6/week, which was never stated.
-  targetRoundTripsPerWeek: 4,
-  maxHourlyVol: 0.35,          // [CHOICE] above this it is not chop, it is a repricing
+  // the arming rule
+  minReversals72h: 6,          // CHOICE: two completed swings a day; today: 2 at 5% (MEASURED 2026-09-22)
+  maxDrift72hSteps: 2,         // CHOICE: |72h drift| < 2 x gridStep = 10%; today: -23.7%
+  minWalkForwardEdge: 0,       // CHOICE: the replay must strictly beat holding
 
-  // --- execution ---
-  gridStep: 0.15,              // DERIVED floor 10.80%; this is a 39% margin over it
-  sliceFrac: 0.15,             // fraction of the relevant side deployed per rung
-  // DERIVED, and the old value was simply wrong. It was set to "10x gas" = $0.33,
-  // which ignored that a round trip nets 3.79% of the slice, not 100% of it. The
-  // real condition is notional * edge > k * 2 * gas, i.e. notional > k*2*gas/edge.
-  // At k = 5 that is $8.72. At k = 10 it is $17.43, which an $86 book cannot reach
-  // with a 15% slice, so k is stated rather than hidden.
+  // risk
+  maxInventoryFrac: 0.60,      // ceiling; the live cap is volatility-scaled by inventoryCapFor
+  maxDrawdown: 0.15,           // CHOICE: hard stop, manual reset
+  maxFlipsPerHour: 6,          // CHOICE: no death by a thousand gas fees (the contract's 24 ops/day binds first)
+  // DERIVED: a rung must earn k x its gas. It earns at least lockBps on its notional,
+  // so notional >= k * gasUsdPerFlip / lock. At k = 5 and a 5% lock that is $7.00.
   gasMarginK: 5,
-  maxSpreadFromMid: 0.05,      // do not chase
+});
 
-  // --- risk ---
-  // DERIVED per-tick from volatility via inventoryCapFor(); this is only the ceiling.
-  maxInventoryFrac: 0.60,
-  maxDrawdown: 0.15,           // hard stop; requires a manual reset
-  maxFillsPerHour: 6,          // no death by a thousand gas fees
+/** Human names for every gate. The dashboard and the hall read these. */
+export const GATE_LABELS = Object.freeze({
+  reversals72h: "swings in 72h",
+  drift72h: "trend over 72h",
+  walkForward7d: "last week replayed",
+  inventory: "inventory",
+  drawdown: "drawdown",
+  breaker: "breaker",
+});
+
+/**
+ * Which live input feeds each gate. scripts/check-lib-sync.mjs asserts that the
+ * live desk (app/lib/desk.ts) supplies every `market.*` input listed here, because
+ * a gate with no live input can never pass and the desk silently never arms.
+ */
+export const GATE_INPUTS = Object.freeze({
+  reversals72h: ["market.reversals72h"],
+  drift72h: ["market.drift72h"],
+  walkForward7d: ["market.walkForward7d"],
+  inventory: ["market.mid", "book.rf", "book.valueWeth"],
+  drawdown: ["book.valueWeth", "book.hwmWeth"],
+  breaker: ["book.halted"],
 });
 
 /** Realised volatility of log returns over a window of prices. */
@@ -128,106 +148,288 @@ export function drift(prices) {
 }
 
 /**
+ * Completed zigzag reversals of at least `step`: a move of `step` from the last
+ * extreme in the direction opposite to the previous one. This is the only thing a
+ * grid of that step can earn from, so it is counted directly rather than inferred
+ * from volatility (volatility counts a one-way slide as opportunity; this does not).
+ */
+export function countReversals(prices, step) {
+  if (!prices || prices.length < 2) return 0;
+  let ext = prices[0], dir = 0, n = 0;
+  for (const p of prices) {
+    if (dir >= 0) {
+      if (p > ext) ext = p;
+      else if (p < ext / (1 + step)) { if (dir === 1) n++; dir = -1; ext = p; }
+    } else {
+      if (p < ext) ext = p;
+      else if (p > ext * (1 + step)) { n++; dir = 1; ext = p; }
+    }
+  }
+  return n;
+}
+
+/* =============================================================== range-order maths */
+
+/** Snap a price (WETH per RF) to the pool's tick grid, rounding AGAINST the bank. */
+export function snapPrice(price, tickSpacing = DEFAULT_GATES.tickSpacing, direction = "down") {
+  const t = Math.log(price) / Math.log(1.0001);
+  const k = direction === "up" ? Math.ceil(t / tickSpacing) : Math.floor(t / tickSpacing);
+  return 1.0001 ** (k * tickSpacing);
+}
+
+/** Amounts held by a range [lo, hi] of liquidity L at price p (prices in WETH per RF). */
+export function rangeAmounts(lo, hi, L, p) {
+  const a = Math.sqrt(lo), b = Math.sqrt(hi), s = Math.sqrt(p);
+  if (s <= a) return { rf: L * (1 / a - 1 / b), weth: 0 };
+  if (s >= b) return { rf: 0, weth: L * (b - a) };
+  return { rf: L * (1 / s - 1 / b), weth: L * (s - a) };
+}
+
+/** Liquidity for an ask (all RF, range above price) or a bid (all WETH, range below). */
+export const liquidityForRf = (lo, hi, rf) => rf / (1 / Math.sqrt(lo) - 1 / Math.sqrt(hi));
+export const liquidityForWeth = (lo, hi, weth) => weth / (Math.sqrt(hi) - Math.sqrt(lo));
+
+/** Average price a fully crossed range fills at: the geometric mean of its edges. */
+export const rangeAvgPrice = (lo, hi) => Math.sqrt(lo * hi);
+
+/**
+ * THE LOSS-LOCK. The same inequality RangeDesk.sol checks on chain.
+ * An ask may not start below costBasis x (1 + lock); a bid may not end above
+ * lastSell x (1 - lock). A range with no basis (the opening ladder) is exempt,
+ * because it is not selling anything the desk bought.
+ */
+export function lockOk(range, gates = DEFAULT_GATES, book = {}) {
+  const lock = gates.lockBps / 10_000;
+  // The contract locks asks against the SIZE-WEIGHTED cost of all RF the desk bought
+  // (harvested RF has no basis), and bids against the VWAP of the last ask it closed.
+  const askBasis = Math.max(range.basis ?? 0, book.avgCost ?? 0);
+  const bidBasis = range.basis ?? book.lastSellVwap ?? null;
+  if (range.side === "ask") return askBasis === 0 || range.lo >= askBasis * (1 + lock) * (1 - 1e-12);
+  return bidBasis == null || range.hi <= bidBasis * (1 - lock) * (1 + 1e-12);
+}
+
+/**
+ * Every per-range rule the contract enforces, so a plan that passes here cannot revert
+ * there: loss-lock, correct side of spot, at least twapEdgeTicks beyond the TWAP, and a
+ * size between minRangeFrac and maxRangeFrac of that side. The contract can also let an
+ * ask sell below its lock out of a small loss budget; the strategy never asks it to.
+ */
+export function contractOk(range, { spot, twap, sideValue }, gates = DEFAULT_GATES, book = {}) {
+  if (!lockOk(range, gates, book)) return false;
+  const edge = 1.0001 ** gates.twapEdgeTicks;
+  const t = twap ?? spot;
+  if (range.side === "ask" && !(range.lo > spot && range.lo >= t * edge)) return false;
+  if (range.side === "bid" && !(range.hi < spot && range.hi <= t / edge)) return false;
+  if (sideValue > 0) {
+    const size = range.side === "ask" ? range.rf : range.weth;
+    if (size != null && (size > sideValue * gates.maxRangeFrac * (1 + 1e-9) || size < sideValue * gates.minRangeFrac)) return false;
+  }
+  return true;
+}
+
+/**
+ * Flip a fully crossed range to the other side, one step away, loss-locked.
+ * A filled bid (now RF, bought at avg a) becomes an ask [a(1+lock), a(1+lock)(1+step)].
+ * A filled ask (now WETH, sold at avg a) becomes a bid [a(1-lock)/(1+step), a(1-lock)].
+ */
+export function flipRange(range, gates = DEFAULT_GATES, book = {}) {
+  const g = gates.gridStep, lock = gates.lockBps / 10_000;
+  const avg = rangeAvgPrice(range.lo, range.hi);
+  if (range.side === "bid") {
+    // The contract's basis is the book-wide average cost after this fill, not this range's.
+    const lo = snapPrice(Math.max(avg, book.avgCost ?? 0) * (1 + lock), gates.tickSpacing, "up");
+    return { side: "ask", lo, hi: lo * (1 + g), basis: avg };
+  }
+  const hi = snapPrice(avg * (1 - lock), gates.tickSpacing, "down");
+  return { side: "bid", lo: hi / (1 + g), hi, basis: avg };
+}
+
+/**
+ * The opening ladder around mid: asks above, bids below, one step wide each.
+ * Sizes are split evenly; a caller that cannot afford `minRungUsd` per rung gets
+ * fewer rungs, never smaller ones.
+ */
+export function openingLadder(mid, book, market, gates = DEFAULT_GATES, opts = {}) {
+  const g = gates.gridStep;
+  const minRungUsd = (gates.gasMarginK * COSTS.gasUsdPerFlip) / (gates.lockBps / 10_000);
+  const usd = (weth) => weth * (market.ethUsd ?? 0);
+  const perSide = Math.floor(gates.rungs / 2);
+  // Contract limits: each range at most maxRangeFrac of its side, at most maxDailySideFrac
+  // of a side opened per day, and every range twapEdgeTicks clear of the TWAP.
+  const frac = Math.min(gates.maxRangeFrac, 1 / perSide);
+  const perDay = Math.max(1, Math.floor(gates.maxDailySideFrac / frac + 1e-9));
+  const edge = 1.0001 ** gates.twapEdgeTicks, twap = market.twap ?? mid;
+  // Bids are sized so that if every one fills, RF is still within the vol-scaled cap.
+  const value = book.weth + book.rf * mid;
+  const cap = market.hourlyVol == null ? 0 : Math.min(gates.maxInventoryFrac, inventoryCapFor(market.hourlyVol));
+  const bidBudget = Math.max(0, Math.min(book.weth, cap * value - book.rf * mid));
+  const askSide = opts.askSide ?? book.rf, bidSide = opts.bidSide ?? book.weth;
+  const askSize = askSide * frac, bidSize = bidSide * frac;
+  const nAsk = Math.max(0, Math.min(perSide - (opts.asksOpen ?? 0), perDay, Math.floor(book.rf / askSize || 0),
+    usd(askSize * mid) >= minRungUsd ? Infinity : 0));
+  const nBid = Math.max(0, Math.min(perSide - (opts.bidsOpen ?? 0), perDay, Math.floor(bidBudget / bidSize || 0),
+    usd(bidSize) >= minRungUsd ? Infinity : 0));
+  const out = [];
+  // Asks never start below the contract's lock on the book-wide cost of bought RF.
+  const askLock = (opts.avgCost ?? 0) * (1 + gates.lockBps / 10_000);
+  let lo = snapPrice(Math.max(opts.askFrom ?? 0, askLock, Math.max(mid, twap) * edge), gates.tickSpacing, "up");
+  for (let i = 0; i < nAsk; i++) { out.push({ side: "ask", lo, hi: lo * (1 + g), rf: askSize, basis: null }); lo *= 1 + g; }
+  // Bids never end above the contract's lock on the last ask sale.
+  const bidLock = opts.lastSellVwap != null ? opts.lastSellVwap * (1 - gates.lockBps / 10_000) : Infinity;
+  let hi = snapPrice(Math.min(opts.bidFrom ?? Infinity, bidLock, Math.min(mid, twap) / edge), gates.tickSpacing, "down");
+  for (let i = 0; i < nBid; i++) { out.push({ side: "bid", lo: hi / (1 + g), hi, weth: bidSize, basis: null }); hi /= 1 + g; }
+  return { ranges: out, minRungUsd, bidBudget };
+}
+
+/**
+ * Price-only replay of the desk on a path (oldest first). Used by the arming rule
+ * (walk-forward on the trailing week) and by the hall. It assumes a small book that
+ * does not move the price; scripts/backtest-gated.mjs runs the ENDOGENOUS version
+ * with every contract limit. Like the contract, it holds at most ONE ask and ONE bid,
+ * each maxRangeFrac of that side's IDLE balance, re-quoted TWAP-edge ticks off the
+ * price whenever its side is empty, and loss-locked against the book's cost basis
+ * and last sale. Returns value relative to holding the same opening mix.
+ */
+export function replayGrid(prices, gates = DEFAULT_GATES) {
+  if (!prices || prices.length < 2) return { vsHold: 0, flips: 0 };
+  const p0 = prices[0], g = gates.gridStep, lock = gates.lockBps / 10_000;
+  const edge = 1.0001 ** gates.twapEdgeTicks;
+  let rf = 0.5 / p0, weth = 0.5, costRf = 0, costWeth = 0, lastSell = null, ask = null, bid = null, flips = 0;
+  for (const p of prices) {
+    if (ask && p >= ask.hi) {                     // filled: all WETH now
+      const a = rangeAmounts(ask.lo, ask.hi, ask.L, p);
+      const f = Math.min(1, ask.rf / Math.max(rf + ask.rf, 1e-18)); costRf *= 1 - f; costWeth *= 1 - f;
+      lastSell = a.weth / ask.rf; weth += a.weth; ask = null; flips++;
+    }
+    if (bid && p <= bid.lo) {                     // filled: all RF now
+      const a = rangeAmounts(bid.lo, bid.hi, bid.L, p);
+      costRf += a.rf; costWeth += bid.weth; rf += a.rf; bid = null; flips++;
+    }
+    if (!ask && rf > 0) {
+      const avg = costRf > 0 ? costWeth / costRf : 0;
+      const lo = snapPrice(Math.max(p * edge, avg * (1 + lock)), gates.tickSpacing, "up"), hi = lo * (1 + g);
+      const size = rf * gates.maxRangeFrac;
+      ask = { lo, hi, rf: size, L: liquidityForRf(lo, hi, size) }; rf -= size;
+    }
+    if (!bid && weth > 0) {
+      const hi = snapPrice(Math.min(p / edge, lastSell != null ? lastSell * (1 - lock) : Infinity), gates.tickSpacing, "down"), lo = hi / (1 + g);
+      const size = weth * gates.maxRangeFrac;
+      bid = { lo, hi, weth: size, L: liquidityForWeth(lo, hi, size) }; weth -= size;
+    }
+  }
+  const pEnd = prices[prices.length - 1];
+  let value = weth + rf * pEnd;
+  for (const r of [ask, bid]) if (r) { const a = rangeAmounts(r.lo, r.hi, r.L, pEnd); value += a.weth + a.rf * pEnd; }
+  const hold = 0.5 + (0.5 / p0) * pEnd;
+  return { vsHold: value / hold - 1, flips };
+}
+
+/**
+ * Every market input the arming rule needs, from a price path.
+ * `hourly` is hourly closes, oldest first, ending now. A window the path does not
+ * cover comes back null, which the gates report as "not yet measurable".
+ * `ticks` (optional) is the swap-level path for the last 72h; when given, swings are
+ * counted on it, because hourly closes hide swings that happen inside an hour.
+ * @param {number[]} hourly
+ * @param {typeof DEFAULT_GATES} [gates]
+ * @param {number[] | null} [ticks]
+ */
+export function measurePath(hourly, gates = DEFAULT_GATES, ticks = null) {
+  const n = hourly?.length ?? 0;
+  const back = (h) => (n > h ? hourly.slice(n - 1 - h) : null);
+  const w72 = back(72), w7d = back(168);
+  return {
+    mid: n ? hourly[n - 1] : null,
+    drift1h: back(1) ? drift(back(1)) : null,
+    drift24h: back(24) ? drift(back(24)) : null,
+    drift72h: w72 ? drift(w72) : null,
+    drift7d: w7d ? drift(w7d) : null,
+    hourlyVol: back(24) ? realisedVol(back(24)) : null,
+    reversals72h: ticks ? countReversals(ticks, gates.gridStep) : (w72 ? countReversals(w72, gates.gridStep) : null),
+    walkForward7d: w7d ? replayGrid(w7d, gates).vsHold : null,
+    historyHours: Math.max(0, n - 1),
+  };
+}
+
+/**
  * Evaluate every gate and return a full, human-readable verdict.
- * Returns { armed, reasons: [{gate, ok, detail}] } so the dashboard can show
- * exactly WHY the desk is flat. "It is off" is not an acceptable answer to a member.
+ * Returns { armed, checks: [{gate, ok, status, label, detail}] }. `status` is
+ * "met", "blocking" or "unmeasured"; `ok` is true only for "met".
  */
 export function evaluateRegime(market, book, gates = DEFAULT_GATES) {
   const checks = [];
-  const add = (gate, ok, detail) => checks.push({ gate, ok, detail });
+  const add = (gate, value, pass, detail) => {
+    const status = value == null || Number.isNaN(value) ? "unmeasured" : pass ? "met" : "blocking";
+    checks.push({ gate, ok: status === "met", status, label: GATE_LABELS[gate] ?? gate, detail });
+  };
+  const g = gates.gridStep, pc = (v, d = 1) => `${(v * 100).toFixed(d)}%`;
 
-  add("volume24h", market.volume24hWeth >= gates.minVolume24hWeth,
-    `${market.volume24hWeth.toFixed(2)} WETH vs min ${gates.minVolume24hWeth}`);
-  add("trades24h", market.trades24h >= gates.minTrades24h,
-    `${market.trades24h} vs min ${gates.minTrades24h}`);
-  add("drift24h", Math.abs(market.drift24h) <= gates.maxAbsDrift24h,
-    `${(market.drift24h * 100).toFixed(1)}% vs max +/-${gates.maxAbsDrift24h * 100}%`);
-  add("drift1h", Math.abs(market.drift1h) <= gates.maxAbsDrift1h,
-    `${(market.drift1h * 100).toFixed(1)}% vs max +/-${gates.maxAbsDrift1h * 100}%`);
-  // Undefined 7d drift means we do not know yet, which is NOT the same as zero.
-  // Refuse to arm rather than assume the trend is flat.
-  add("drift7d", market.drift7d != null && Math.abs(market.drift7d) <= gates.maxAbsDrift7d,
-    market.drift7d == null
-      ? "no 7-day history yet"
-      : `${(market.drift7d * 100).toFixed(1)}% vs max +/-${gates.maxAbsDrift7d * 100}%`);
-  const volFloor = volFloorFor(gates.gridStep, gates.targetRoundTripsPerWeek);
-  add("volFloor", market.hourlyVol >= volFloor,
-    `${(market.hourlyVol * 100).toFixed(2)}% vs min ${(volFloor * 100).toFixed(2)}% ` +
-    `(= ${gates.targetRoundTripsPerWeek} round trips/wk at a ${(gates.gridStep * 100).toFixed(0)}% step)`);
-  add("volCeiling", market.hourlyVol <= gates.maxHourlyVol,
-    `${(market.hourlyVol * 100).toFixed(2)}% vs max ${gates.maxHourlyVol * 100}%`);
+  const rev = market.reversals72h;
+  add("reversals72h", rev, rev >= gates.minReversals72h,
+    rev == null ? "not yet measurable: less than 72h of history"
+      : `${rev} completed swings of ${pc(g, 0)} vs min ${gates.minReversals72h}`);
 
+  const d72 = market.drift72h, maxD = gates.maxDrift72hSteps * g;
+  add("drift72h", d72, d72 != null && Math.abs(d72) < maxD,
+    d72 == null ? "not yet measurable: less than 72h of history" : `${pc(d72)} vs max +/-${pc(maxD, 0)}`);
+
+  const wf = market.walkForward7d;
+  add("walkForward7d", wf, wf != null && wf > gates.minWalkForwardEdge,
+    wf == null ? "not yet measurable: less than 7 days of history"
+      : `the grid would have been ${wf >= 0 ? "+" : ""}${pc(wf)} vs holding over the last 7 days`);
+
+  // The ceiling decides whether the desk arms at all. The tighter, volatility-scaled
+  // cap (inventoryCapFor) sizes the BIDS in openingLadder, so a book already heavy in
+  // RF quotes asks only and sells down toward the cap instead of being locked out.
   const invFrac = book.valueWeth > 0 ? (book.rf * market.mid) / book.valueWeth : 0;
-  // Volatility-scaled, not fixed: the tolerable inventory falls as vol rises.
-  const invCap = Math.min(gates.maxInventoryFrac, inventoryCapFor(market.hourlyVol));
-  add("inventory", invFrac <= invCap,
-    `${(invFrac * 100).toFixed(1)}% of book in RF vs max ${(invCap * 100).toFixed(0)}% at this volatility`);
+  add("inventory", invFrac, invFrac <= gates.maxInventoryFrac,
+    `${pc(invFrac)} of book in RF vs max ${pc(gates.maxInventoryFrac, 0)}`);
 
+  // Drawdown is measured against HOLDING the same book (callers pass value and
+  // high-water mark in those terms), so an RF slide the desk did not trade cannot trip it.
   const dd = book.hwmWeth > 0 ? 1 - book.valueWeth / book.hwmWeth : 0;
-  add("drawdown", dd <= gates.maxDrawdown,
-    `${(dd * 100).toFixed(1)}% from high-water mark vs max ${gates.maxDrawdown * 100}%`);
+  add("drawdown", dd, dd <= gates.maxDrawdown, `${pc(dd)} behind its best point vs holding, max ${pc(gates.maxDrawdown, 0)}`);
 
-  add("breaker", !book.halted, book.halted ? "manually halted" : "clear");
+  add("breaker", 0, !book.halted, book.halted ? "manually halted" : "clear");
 
   return { armed: checks.every((c) => c.ok), checks, inventoryFrac: invFrac, drawdown: dd };
 }
 
 /**
- * Given an armed desk and the current price, what order (if any) do we want?
- * Returns null when there is nothing to do. The grid reference only moves when a
- * rung actually fills, so the desk cannot chase a trend down.
+ * What should the desk's ranges be right now? Pure: returns intent, never acts.
+ *
+ *  - not armed: cancel every unfilled BID (never buy into a regime we cannot read)
+ *    and leave loss-locked ASKS resting (selling at a locked profit is always fine).
+ *  - armed with no ranges: place the opening ladder.
+ *  - armed with ranges: flip any range the price has fully crossed.
  */
 export function nextOrder(market, book, state, gates = DEFAULT_GATES) {
   const regime = evaluateRegime(market, book, gates);
-  if (!regime.armed) return { action: "stand-down", regime };
-
-  if (state.fillsThisHour >= gates.maxFillsPerHour) {
-    return { action: "stand-down", regime, throttled: true };
+  const ranges = state.ranges ?? [];
+  if (!regime.armed) {
+    return { action: "stand-down", regime, cancel: ranges.filter((r) => r.side === "bid"), keep: ranges.filter((r) => r.side === "ask") };
   }
-
-  // Anchor the grid the first time the desk arms. This MUST happen here rather
-  // than in the caller: an earlier version only moved gridRef after a fill, so
-  // `ref` defaulted to the current mid, `mid <= ref * (1 - step)` could never be
-  // true, and the grid could never take its first trade because the reference was
-  // only ever set BY a trade. One caller masked it by anchoring on any non-stand-down
-  // tick; another did not, and silently never traded in 40 out of 40 regimes.
-  if (state.gridRef == null) state.gridRef = market.mid;
-  const ref = state.gridRef;
-  const step = Math.max(gates.gridStep, BREAKEVEN_STEP * 1.3);
-
-  // One-way mode: in a falling market the desk is allowed to sell, never to buy.
-  const buyBlocked =
-    (market.drift7d != null && market.drift7d < gates.buyBlockedBelowDrift7d) ||
-    market.drift24h < gates.buyBlockedBelowDrift24h;
-
-  if (market.mid <= ref * (1 - step)) {
-    if (buyBlocked) {
-      // Re-anchor so the desk does not fire a stale buy the moment the trend turns.
-      state.gridRef = market.mid;
-      return { action: "hold", regime, buyBlocked: true };
-    }
-    const spendWeth = book.weth * gates.sliceFrac;
-    const minFillUsd = (gates.gasMarginK * 2 * COSTS.gasUsdPerFill) / edgePerRoundTrip(gates.gridStep);
-    if (spendWeth * market.ethUsd < minFillUsd) return { action: "stand-down", regime, tooSmall: true, minFillUsd };
-    // Respect the inventory cap on the way in, not after.
-    const projected = (book.rf * market.mid + spendWeth) / Math.max(book.valueWeth, 1e-18);
-    if (projected > gates.maxInventoryFrac) return { action: "stand-down", regime, capped: true };
-    return { action: "buy", weth: spendWeth, limitPrice: market.mid * (1 + gates.maxSpreadFromMid), regime, step };
+  if (ranges.length === 0) {
+    const { ranges: open, minRungUsd } = openingLadder(market.mid, book, market, gates);
+    if (open.length === 0) return { action: "stand-down", regime, tooSmall: true, minRungUsd };
+    return { action: "place", regime, orders: open };
   }
-
-  if (market.mid >= ref * (1 + step)) {
-    const sellRf = book.rf * gates.sliceFrac;
-    const minFillUsd = (gates.gasMarginK * 2 * COSTS.gasUsdPerFill) / edgePerRoundTrip(gates.gridStep);
-    if (sellRf * market.mid * market.ethUsd < minFillUsd) return { action: "stand-down", regime, tooSmall: true, minFillUsd };
-    return { action: "sell", rf: sellRf, limitPrice: market.mid * (1 - gates.maxSpreadFromMid), regime, step };
+  if ((state.flipsThisHour ?? 0) >= gates.maxFlipsPerHour) return { action: "hold", regime, throttled: true };
+  const flips = [];
+  for (const r of ranges) {
+    const crossed = r.side === "ask" ? market.mid >= r.hi : market.mid <= r.lo;
+    if (crossed) { const n = flipRange(r, gates); if (lockOk(n, gates)) flips.push({ from: r, to: n }); }
   }
-
-  return { action: "hold", regime, buyBlocked };
+  return flips.length ? { action: "flip", regime, flips } : { action: "hold", regime };
 }
 
-/** One-line summary for logs and the dashboard. */
+/** One sentence, in words, for the dashboard, the hall and the logs. */
 export function explain(regime) {
-  if (regime.armed) return "ARMED";
-  const failed = regime.checks.filter((c) => !c.ok);
-  return `FLAT (${failed.map((f) => `${f.gate}: ${f.detail}`).join("; ")})`;
+  if (regime.armed) return "ARMED: the market is swinging, and the desk is quoting both sides.";
+  const blocking = regime.checks.filter((c) => c.status === "blocking");
+  const unmeasured = regime.checks.filter((c) => c.status === "unmeasured");
+  const parts = [];
+  if (blocking.length) parts.push(`waiting on ${blocking.map((c) => `${c.label} (${c.detail})`).join("; ")}`);
+  if (unmeasured.length) parts.push(`not yet measurable: ${unmeasured.map((c) => c.label).join(", ")}`);
+  return `OFF: ${parts.join(". ")}`;
 }

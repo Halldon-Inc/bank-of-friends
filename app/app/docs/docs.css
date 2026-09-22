@@ -1,0 +1,65 @@
+/* /docs only. Light mode, the hall's tokens (globals.css :root). */
+
+.docs .docs-block { margin-bottom: 1.25rem; }
+
+/* The hero is the bank's status in three plain cells, not one giant word. */
+.docs .docs-hero {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--ink);
+  margin-bottom: 2rem;
+  background: var(--paper);
+}
+.docs .docs-hero-cell {
+  display: flex; flex-direction: column; gap: 0.45rem;
+  padding: clamp(1rem, 3vw, 1.6rem);
+  border-right: 1px solid var(--line);
+  min-width: 0;
+}
+.docs .docs-hero-cell:last-child { border-right: 0; }
+.docs .docs-hero-label {
+  font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim);
+}
+.docs .docs-hero-value {
+  font-family: system-ui, sans-serif; letter-spacing: -0.02em;
+  font-size: clamp(1.6rem, 4.2vw, 2.6rem); line-height: 1.05; color: var(--ink);
+}
+.docs .docs-hero-sub { color: var(--dim); font-size: 0.8rem; line-height: 1.5; overflow-wrap: anywhere; }
+.docs .docs-hero-line { margin: 0; padding: 1.5rem; font-size: 1.1rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.docs .docs-hero[aria-busy="true"] { display: block; text-align: center; }
+@media (max-width: 860px) {
+  .docs .docs-hero { grid-template-columns: 1fr; }
+  .docs .docs-hero-cell { border-right: 0; border-bottom: 1px solid var(--line); }
+  .docs .docs-hero-cell:last-child { border-bottom: 0; }
+}
+
+/* A gate with too little history is neither met nor blocking: dotted, dimmed, never bold. */
+.docs .gate.unmeasured .gate-name,
+.docs .gate.unmeasured .gate-detail,
+.docs .gate.unmeasured .gate-verdict { color: var(--dimmer); }
+.docs .gate.unmeasured { border-bottom-style: dashed; }
+
+/* The "Why" box spans the page like every other block; its text did not. */
+.docs .finding p { max-width: none; }
+
+.docs .docs-alarm {
+  border: 2px solid var(--ink); background: var(--ink); color: var(--paper);
+  padding: 0.9rem 1rem; margin: 0 0 1.25rem; font-size: 0.85rem; line-height: 1.5;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.docs .docs-truth p { margin: 0 0 0.8rem; line-height: 1.55; }
+.docs .docs-truth strong { font-weight: 400; border-bottom: 1px solid var(--ink); }
+.docs .docs-formula {
+  font-family: var(--mono); font-size: 0.95rem; text-align: center;
+  border: 1px dotted var(--line); padding: 0.7rem; margin: 0.4rem 0 1rem;
+}
+.docs .docs-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.docs .docs-table th,
+.docs .docs-table td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px dotted var(--line); vertical-align: top; }
+.docs .docs-table th { color: var(--dim); font-weight: 400; letter-spacing: 0.06em; }
+.docs .docs-table td:not(:first-child),
+.docs .docs-table th:not(:first-child) { text-align: right; }
+@media (max-width: 560px) {
+  .docs .docs-table th:nth-child(2), .docs .docs-table td:nth-child(2) { display: none; }
+}

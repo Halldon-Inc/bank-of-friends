@@ -1,6 +1,12 @@
 **Play it: <https://bank-of-friends-nu.vercel.app>** with no wallet, no signature and no install.
 You land inside the hall with a Friend already on the marble.
 
+| The hall | The Trading Floor |
+| --- | --- |
+| ![The hall: the facade, the marquee and the pooled plaque](https://raw.githubusercontent.com/Halldon-Inc/bank-of-friends/main/docs/media/hall.png) | ![The Trading Floor: the desk's live decision](https://raw.githubusercontent.com/Halldon-Inc/bank-of-friends/main/docs/media/floor.png) |
+| **The Desk: three calls, every guarantee with its test** | **The Vault: a wall of safe deposit boxes** |
+| ![The Desk](https://raw.githubusercontent.com/Halldon-Inc/bank-of-friends/main/docs/media/desk.png) | ![The Vault](https://raw.githubusercontent.com/Halldon-Inc/bank-of-friends/main/docs/media/vault.png) |
+
 **Project name**
 
 The First Bank of Friends
@@ -11,348 +17,256 @@ Hunt &middot; GitHub [@huntclubhero](https://github.com/huntclubhero) &middot; w
 
 **Category**
 
-Economy Potential (also relevant: Character Spotlight)
+Economy Potential
 
 **One sentence**
 
-Walk any Rare Friend, **Genesis included**, into a banking hall built on pooled NFT-wallet
-rewards, open an account at the desk, and pull the lever to watch a real market-making
-strategy decide, week after week, that it should not trade.
+A bank built so that one signup harvests your Friend's RF and WETH rewards into your own safe
+deposit box for good, while its desk rests the outside liquidity the $RAREFRIENDS pool has never
+had, without ever paying the 5% toll itself and without ever touching anyone else's money.
 
 **Source code**
 
 <https://github.com/Halldon-Inc/bank-of-friends> &middot; Next.js 16, viem, Solidity 0.8.30 +
-Foundry. **FriendSDK is used as a library, not a runtime** (see below).
+Foundry. **FriendSDK v0.1.2 is used as a library, not a runtime** (see Credits).
 
 **Playable demo**
 
-<https://bank-of-friends-nu.vercel.app> &middot; the research and live desk are at
+<https://bank-of-friends-nu.vercel.app> &middot; the live desk and the research are at
 <https://bank-of-friends-nu.vercel.app/docs>.
 
 ---
 
-## Why this is not a FriendSDK game
+## What it is built to do
 
-We built one first. Then we measured the wallet.
+A Rare Friend earns RF and WETH every week, and most of it sits unclaimed in the protocol; a
+claim always pays it into the Friend's own wallet. The First Bank of Friends is built to put that money to work without ever taking the
+NFT. **None of it is deployed or running yet**; everything below is what the contract and the
+keeper do in tests, and what the demo simulates.
 
-`readGenerationEligibility` reads `ownerOf` **and** `generation` from the **Generations**
-contract and requires `generation >= 1`. A Genesis is a different contract and reports 0, so
-**no FriendSDK game can ever admit a Genesis.**
+1. **Sign up once.** From your Friend's own wallet: approve RF, approve WETH, and `join` with a
+   daily cap per asset. One confirmation with a wallet that batches calls, otherwise three. The
+   NFT never leaves your wallet, and there is nothing more to sign until you leave.
+2. **The bank harvests for you.** A keeper would claim your Friend's rewards when they are worth at
+   least 20x the gas, and move only what that claim just delivered into **your own box**. Money
+   you keep in the Friend's wallet is never touched.
+3. **Your box is yours, exactly.** Every depositor owns an exact amount of RF and an exact
+   amount of WETH. There are no shares and no price in the accounting, so another member joining,
+   leaving, selling or getting a better fill cannot move your balance by a single wei.
+4. **The desk only ever makes, never takes.** When it trades it posts single-sided range orders
+   in the RF pool. The pool's hook charges no fee on liquidity, so **the bank never pays the
+   5% toll**; the trader who crosses its order does, and that 5% goes to every activated Friend.
+   The desk stays off until the market proves it can pay (see "The desk" below). It is off
+   today, and it says why.
+5. **The bank keeps everyone's stream flowing.** Rewards reach Friends only after someone calls
+   `ActivationManager.allocate()` each week. It has been called once since launch. The keeper is
+   built to call it when it is due, for every activated Friend, member or not.
+6. **Leave whenever you like.** Withdraw RF, WETH or both, at any time, with no owner check, no
+   queue and no pause, including while the desk is halted and even if the protocol's rewards
+   contract is switched off. If you sell your Friend, the next collect sees the sale, suspends
+   the account and pulls nothing from the buyer, and everything collected while you owned it
+   stays yours. **Closing is one action**: "Close account and take everything home" withdraws
+   your deposit and your share of desk gains and revokes the bank's access to your Friend's
+   wallet in the same step (one signature with a wallet that batches calls).
+7. **Your own wallet is never in reach.** Your personal wallet approves nothing. The bank can
+   only ever reach the RF and WETH inside your Friend's wallet, never your ETH or anything else
+   you own, and a fuzzed test proves no sequence of anyone's actions costs it a wei.
 
-For this project that is fatal rather than annoying:
+## How to use the demo
 
-| | idle rewards |
-| --- | --- |
-| **Genesis #259** | **~4,500 RF** |
-| six Gen-3s, combined | ~31 RF |
+Walk with WASD, the arrows, or a tap. Three stations:
 
-The Genesis *is* the bank. Everything else is garnish. A bank that excludes 99% of its own
-deposits is not a bank.
+- **The Desk** opens your account. You see the three signup calls, a daily cap per asset, what
+  you let the bank do, and what it cannot do, each line with the Foundry test that proves it.
+  The box opens with what your caps allow on day one and shows the rest as on its way.
+- **The Trading Floor** shows the desk's live decision, read from the chain right now, with
+  every check it runs and the one that is holding it back. A separate, clearly labelled button
+  simulates a week so you can watch it arm.
+- **The Vault** is a wall of safe deposit boxes, one per Friend, each showing what went in and
+  what the desk made or lost, per asset. The pooled book is drawn as the sum of the boxes.
 
-The vibeathon rules make the SDK optional for **"a launchpad, tool or agent"**, and a market
-maker is a tool. So the SDK is used as a **library** under its Apache-2.0 licence:
-`renderWorld` draws the hall, `createWorldMovement` handles walking, collision and pathing,
-`project`/`unproject` map world to screen. What we supply is the identity gate and the
-character.
+The demo is simulated end to end and stamped SIMULATED: the contract is not deployed and no
+funds move.
 
-**The unlock:** `renderWorld` accepts live actors as `rows` of arbitrary bitmap, not as a
-token id. So the character is rasterised from whatever artwork a Friend actually has, which
-works for *both* collections where the SDK's sprite reader (Generations families registry
-only) cannot. A Genesis walks the marble.
+## How it works
 
-`contracts/test` proves the same thing in Solidity: `test_GenesisCanJoinAndBeCollectedFrom`
-enrols a Genesis and collects from it exactly like a Generations Friend, bounded by the same
-member cap.
+**Signup.** A Rare Friend's wallet is an ERC-6551 account that only the NFT's owner can use, it
+cannot batch calls, RF has no permit, and WETH's permit cannot be signed by a Friend wallet. So
+there is no honest one-signature signup: it is two approvals and a `join`. The Bank records the
+Friend, its wallet (read from the Friend's own collection and checked against the wallet's
+`token()`), and the owner at that moment.
+Only Genesis and real Generations Friends can enrol; temporary Friends cannot.
 
-## The hall
+**Harvest.** `ActivationManager.claim` is permissionless and always pays the Friend's own wallet,
+never the caller. The Bank's `collect` claims, then moves **only what that claim just delivered**,
+up to your daily cap per asset. Before every collect it re-checks who owns the Friend; if the NFT
+has moved, the account is suspended and nothing is pulled from the buyer, while the seller keeps
+everything collected under their ownership. A pull that fails is remembered and retried. Anyone
+may call `collect`; a caller who is not the holder may take a tip of at most 1% of that Friend's
+own WETH, once per 12 hours, so the keeper does not have to be us.
 
-You land inside it, with a Friend already on the marble. Walk with WASD, arrows, or tap.
-Two destinations: **The Desk** and **The Vault**.
+**Your box.** Each holder owns an exact vector: idle RF, idle WETH, and units in the desk's open
+sell and buy orders. There are no shares and no NAV. Every desk action is a linear step applied
+to the holders who funded it, deposits and withdrawals never write a step, and every holder rounds
+down, so claims can never exceed the book and nothing another holder does can move your account.
+A fuzzed invariant suite checks exactly that.
 
-**The desk opens an account, and it does not consult the market to do it.** Joining the
-bank and the bank deciding to quote are different questions, and an earlier build
-collapsed them: the desk's only action was the lever, so a Genesis holder walked up, got
-"SAT OUT" because the market was quiet, and reasonably read it as the bank refusing him.
+**The desk.** Off by default. It arms only when all three hold: at least six completed 5% swings in
+the last 72 hours, a 72-hour trend inside 10%, and a replay of the same ladder over the last seven
+days beats simply holding. When it trades, it rests one single-sided sell range above the price
+(RF only) and one buy range below it (WETH only) directly in the Uniswap v4 pool. It never swaps.
+On chain, every range must sit at least 1% clear of a time-weighted price that anyone can update
+(never the spot price a keeper just moved), no sell may sit below the average cost of RF the desk
+bought plus 5% except inside a loss budget of 5% of the book per 30 days, no buy may sit above the
+last sale minus 5% within 30 days of that sale, a range is 1% to 15% of its side, the desk may change ranges at most 24 times a
+rolling day, and after 7 days anyone may close a range. The owner can never be the keeper, and changing the
+keeper takes two days.
 
-You see what you grant (harvest, a daily cap you set yourself, return on demand) and what
-the bank cannot do, each line of which has a Foundry test behind it. With a browser wallet
-present you sign a real **EIP-712** mandate. It grants nothing: no allowance, no
-transaction, no gas, and the contract is not deployed. Without a wallet the account still
-opens and is labelled **unsigned** rather than dressed up as a signature.
+**Exit.** `withdrawRF`, `withdrawWETH` or both, any time, with no owner check and no pause. Your
+share of an open range can be pulled out by you alone with `exitRanges`, and after seven days
+anyone can close a range. The exit path touches only the pool's liquidity, never the rewards
+contract or a swap, so it keeps working even if the protocol owner switches the rewards off; a
+fork test proves that against the live contracts.
 
-**The vault holds the book**: depositors, pooled RF, pooled WETH, and a bar against the
-**$116 minimum viable balanced book**. The founding Genesis reads about **$103 in total but
-only about $15 balanced**, because rewards arrive roughly 94% WETH and 6% RF. Watching
-that bar fill as Friends join is the whole case for pooling, drawn. Accounts live in this browser
-and the panel says so: there is no backend, so a global depositor count would be a lie.
+**The keeper.** `npm run keeper` plans (and, only with a key and `--execute`, sends) the weekly
+`allocate()`, the claims and the collects. It claims only when a Friend's rewards are worth at
+least 20x the gas, suspends sold Friends first, and stops with an alarm if the 5% fee is ever
+pointed anywhere but the rewards contract.
 
-Below a rule at the desk sits **the lever**, which is the bank's trading decision rather
-than yours. Pull it and a week of market rolls. The **real strategy module** decides
-whether to trade: `lib/strategy.mjs`, the same file the backtests and the keeper use,
-guarded by `npm run check:lib-sync`. Most weeks it refuses, and names the gate that
-blocked it in one sentence: *"Too quiet. Barely anyone is trading today."* The ten checks
-sit behind a disclosure, not in the headline.
+## Why you can trust it: we attacked our own bank first
 
-Measured arm rate across regimes: **21%** overall, 77% in live chop and **0%** in dead
-calm, a slow bleed, or a hard dump. `npm run check:lever` prints that table.
+Before this submission we wrote the attacks. The first version of the contract, which we had
+described as safe, had **three critical bugs**, each of which would have paid one member's
+money to someone else:
 
-## Why the desk refuses: what the research found
-
-We started out to build a market maker for $RAREFRIENDS. Before writing it we measured
-whether one could work. Every number below is reproducible with `npm run verify`
-(37 assertions against live chain state) and `npm run backtest` (all 8,777 swaps in the
-pool's history).
-
-**1. The pool pays its liquidity providers nothing.**
-
-```
-slot0.lpFee       = 0        liquidity providers earn zero
-Hook.FEE_BPS()    = 500      5% of every swap is taken
-Hook.rewards()    = 0xD4A3…83Ac   …and sent to ActivationManager, i.e. to Friend holders
-```
-
-In Rare Friends, **the people who supply the liquidity and the people who collect the fees
-are different people.** That is not a bug, it is the design: the fee is a transfer from
-traders to Friend holders, and LPs were never in the split.
-
-**2. So nobody provides liquidity, and we can prove it.**
-
-```
-pool total liquidity          147,865,847,752,143,433,133,351
-Market's seed position        147,865,847,752,143,433,133,351
-third-party liquidity                                       0
-```
-
-**100.00%** of the liquidity in a market doing ~$37.5k/day is the protocol's own seed.
-Exactly one address ever tried: `0x58daec31…` opened a concentrated position, closed it
-**48 seconds later**, tried again, closed that one in 46 seconds, held a small full-range
-position about seven hours, and left. The hook has no `beforeAddLiquidity` or
-`beforeRemoveLiquidity` flag, so liquidity is ungated *by construction*, not by permission.
-Nobody used that fact because doing so loses money.
-
-**3. Every market-making strategy we tested lost money on this tape.**
-
-| strategy | result |
-| --- | --- |
-| Passive full-range LP | **−43% to −55%** vs holding. `lpFee = 0` means full impermanent loss, zero compensation |
-| Acting as a venue, quoting inside the 5% | Profitable, but diverts **68% of Friend rewards** away from Friend holders |
-| Grid bot, 5% to 30% steps | **−39% to −87%** vs holding |
-| Mean reversion (buy the dip) | **−63% to −84%**. Dip-buying a one-way −89% slide is how desks die |
-| Momentum | The only winner, and it won by selling RF and sitting in WETH: still **−18% vs just holding WETH** |
-| Genesis NFT making | Real 21% bid-ask, but the asset fell **45% in 5 days** |
-| Reserve → OpenSea arbitrage | **Does not exist.** The Reserve has no sell path; `trade`/`tradeAny` require you to hand in a Genesis |
-
-The cause is mechanical: **5% in plus 5% out is a ~10% round trip**, so a completed trade
-needs a >10% swing *that comes back*. Over the pool's whole life RF did not swing, it slid.
-
-**4. There is a Laffer curve on the hook fee.**
-
-Any venue cheaper than 5% must multiply volume to keep Friend holders whole:
-
-| venue fee | round trip | volume needed to hold rewards flat |
+| attack on v1 | what happened | v2 |
 | --- | --- | --- |
-| 1% | 2% | **5.0×** |
-| 2% | 4% | 2.5× |
-| 3% | 6% | 1.7× |
+| RF and WETH counted as equal | 1 RF withdrew half of another member's 1 WETH | each member owns exact RF and exact WETH |
+| a fake Friend collection | the keeper drained a victim's wallet into the attacker's account | only Genesis and Generations; each Friend wallet is read from its own collection and checked against its `token()` |
+| selling the Friend | the seller kept collecting the buyer's rewards | the owner is re-checked at every collect; the next collect after a sale suspends the account and pulls nothing |
+| a donation to the bank | the next member's deposit rounded to zero | donations change nobody's claim |
+| the daily cap | spent twice, once per token | a cap per asset |
+| the owner's own money | swept out of the Friend's wallet with the rewards | only what the bank's own claim delivered |
+| the owner as keeper | could dump the book into its own sandwich | the owner can never be the keeper; the desk never swaps |
 
-We cannot prove from 5.6 days where the peak is. We can state the break-even exactly, and
-we think it is worth the Rare Friends team knowing that their fee may sit above the
-revenue-maximising rate.
+Every row is a test in `contracts/test/WhyV1WasReplaced.t.sol` that **succeeds against v1 and
+fails against v2**. v1 is kept, compiled and never deployable in intent, at
+`contracts/src/legacy/FriendBankV1.sol`, so the claim can be checked rather than trusted.
+Every guarantee the hall shows is mapped to its named Foundry tests in `contracts/README.md`, and the desk panel prints those names under each line.
 
-## So what did we build
+## What the research found
 
-A desk whose **default state is flat**, with every arming gate derived from one of the
-failures above rather than chosen by feel.
+Everything here is reproducible: `npm run verify` checks 63 facts against live
+chain state, none skipped, and the backtests replay every swap in the pool's history.
 
-| gate | derived from |
-| --- | --- |
-| flat unless ranging (drift bands) | mean reversion lost 76–84% fading a one-way slide |
-| minimum 24h volume and trade count | gas on 8,777 fills was $290, i.e. 3.4× the whole book |
-| volatility floor | a 10% toll needs >10% swings to clear, and they must arrive often enough to matter |
-| grid step ≥ 15% | never quote inside the toll |
-| minimum fill size | only 61% of trades were large enough to beat gas |
-| inventory cap and auto-flatten | flow ran 84.6% one-way by value |
-| drawdown breaker | stays stopped until manually reset |
+**1. The pool pays its liquidity providers nothing, so nobody provides any.** `slot0.lpFee = 0`
+and `Hook.FEE_BPS() = 500`: 5% of every swap goes to Friend holders and none to liquidity. The
+Market's seed position is 100% of the pool's liquidity. One outside address ever tried, and
+left within hours.
 
-**The proof it works is that it refuses to trade.** Run `npm run backtest:gated`:
+**2. The fee is always taken in WETH, and it pays out a week late.** Both directions, verified
+on real buy and sell receipts. Fees collect into a pending pot and only stream to Friends after
+`allocate()` rolls them into the next seven days. Friend RF rewards come from activations and
+Reserve fees, never from trading.
 
-```
-RUN 1  real history, the -89% slide
-  armed on     0 ticks (0.0%)
-  FILLS        0
-  vs hold      +0.00%      <- it sat out the entire crash and lost nothing
+**3. "Our volume raises everyone's rewards" is true for the protocol and false for whoever pays
+for it.** A bank round trip of V WETH costs its members `0.0975 V (1 - s)`, where s is their
+share of all Friend weight. At one Genesis (s = 0.20%) every 1 WETH the bank churns needs about
+**964 WETH** of outside volume just to break even. So the bank never trades for volume. It
+adds liquidity, and the volume that crosses it pays Friends.
 
-RUN 2  synthetic ranging tape, volume restored (clearly labelled synthetic)
-  armed on     3067 ticks (51.1%)
-  FILLS        16
-  vs hold      +5.76%      <- given chop and volume, it works the grid
-```
+**4. Every taker strategy lost on this tape, and so did every grid.** Passive LP, grids, mean
+reversion and momentum all lost against holding, as did a toll-free range-order grid (4.5% to 89.5% behind holding across four windows).
+The bank's own desk, run without its arming rule over the pool's whole life, would have lost
+**10.11%** of the book; with the rule it never armed and lost nothing.
+The same engine earns on a choppy synthetic tape, so the losses are the market's, not the
+code's. RF slid, it did not swing, which is why the desk waits for swings to come back before
+it arms.
 
-Live the desk is **FLAT**. As of **2026-09-22 16:17Z** it was blocked on four of its ten
-conditions: 24h volume 9.99 WETH against a 25 minimum, 119 trades against 200, hourly
-realised vol 1.43% against the derived 3.27% floor, and a seven-day drift band with less
-than seven days of history behind it, which is a missing measurement rather than a market
-verdict and is labelled as one. At that volatility a single 15% rung takes about **101
-hours** to traverse, i.e. 0.83 round trips a week against a target of 4. Those figures are
-read live at <https://bank-of-friends-nu.vercel.app/docs>, so check them rather than trust
-them: that is the real reason the desk is flat, stated as a measurement rather than as a
-threshold someone invented.
+**5. There is a Laffer curve on the hook fee.** A venue at 1% a side would need 5x the volume to
+keep Friend holders whole; 2.5x at 2%; 1.7x at 3%.
 
-## The parameters are derived, not invented
+## For the Rare Friends team
 
-An earlier draft of this desk carried numbers I had simply chosen and then tuned against
-synthetic data my own code generated, which is circular. `npm run derive` now labels every
-input **MEASURED**, **DERIVED** or **CHOICE** and shows the algebra, grounded in the standard
-dealer-inventory literature (Ho-Stoll 1981, Avellaneda-Stoikov 2008, Grossman-Miller 1988).
+Things we found that are not in the docs, offered in good faith:
 
-It caught three real errors:
+- `allocate()` has been called once since launch. If nobody calls it when the stream ends,
+  every Friend's rewards pause. The bank's keeper is built to call it for everyone.
+- One externally owned address owns every protocol contract. On a local fork,
+  `migrateRewards` moved all unclaimed rewards and froze swaps, and `Hook.setRewards` can
+  redirect the fee. A multisig and a timelock would let builders like us promise members more.
+- `readGenerationEligibility` can never admit a Genesis, because it reads the Generations
+  contract. The Genesis carries 95% of all Friend weight. That is why this hall is not an SDK
+  game.
+- The 5% fee may sit above the revenue-maximising rate (the table above).
 
-| | was | now |
-| --- | --- | --- |
-| minimum fill | $0.33 | **$8.71**: the old figure was "10x gas" and ignored that a round trip nets 3.79%, not 100%. **26x too low** |
-| volatility floor | 4.00%, picked | **3.27%**, derived from the grid step and a stated target of 4 round trips/week |
-| inventory cap | 60% fixed | **volatility-scaled**: 40% at today's 1.49%, 10% at 6% |
+## Built for this community before the Vibeathon
 
-Two numbers that should have been stated from the start: the **break-even grid step is
-10.80%** (`s > 1/(1-f)^2 - 1` at f=5%), and a round trip at a 15% step nets **3.79%, not 15%**
-because the fee takes 75% of the gross move.
+- **[Rare Friends Cards](https://rare-friends-cards.vercel.app)**: every Friend as a trading
+  card with its live yield, used by holders and shared by the founder.
+- **The meme machine** at `/memes` on the same site, with a Friend on every template.
+- When the reward formula changed on 2026-09-20, the cards site was re-derived from the
+  protocol's own source the same day, and it still audits clean against the published numbers.
 
-And the finding that reframes the whole project: a grid is two-sided, so **both** sides must
-clear the minimum fill. One Friend's rewards are 94% WETH / 6% RF, which puts the RF side at
-**$4.94** and its slice at **$0.74**, far under the $8.71 floor. **A single Friend can buy and
-can never economically sell**, so it cannot make a market at all. Minimum viable balanced book
-is **$116**.
-
-That is not a hole in the argument. It *is* the argument, as a number rather than a slogan:
-one Friend cannot, pooled Friends can. For scale, your own `weekRewardsUsd` puts roughly
-**$30,000 a week** of rewards into Friend wallets, with about **$228,000** left in
-`streamRemainingUsd` still to stream.
-
-## Run the research yourself
+## Run it yourself
 
 ```sh
 npm install
-npm run verify           # 37 assertions against live chain state
-npm run history          # pull all 8,777 swaps
-npm run backtest         # LP / venue / crossing strategies
-npm run backtest:chart   # grid, mean reversion, momentum
-npm run backtest:gated   # the actual desk: does it correctly stay flat?
-npm run derive           # every parameter, labelled and derived
-npm run sweep            # 40 market regimes x 6 seeds
-npm run harvest -- --wallet 0xYOURWALLET    # dry run the auto-harvester
-```
-
-Run the hall itself, which is a plain Next.js app and needs no SDK checkout:
-
-```sh
+npm run verify           # 63 facts against live chain state
+npm run keeper -- --wallet 0xYOURWALLET   # dry run: what the keeper would claim and allocate
+npm run backtest:gated   # the desk against the whole tape
+npm run derive           # every parameter, labelled MEASURED, DERIVED or CHOICE
+cd contracts && forge test
 cd app && npm install && npm run dev      # the hall at /, the research at /docs
-npm run sweep:hall <url>                  # 120 layout checks across twelve screen sizes
-npm run play:hall  <url>                  # walk in, open an account, pull the lever, read the book
 ```
-
-Both harnesses take a URL, so they can be run against the deployed site rather than only
-against localhost. `game/` holds the original FriendSDK build and is kept for reference:
-it is the version that cannot admit a Genesis, so it is not what runs at the link above.
-
-## Economy and RF integration
-
-- **The desk's capital is reward flow**, not fresh money: RF and WETH that Friends have
-  already earned and left unclaimed in their ERC-6551 wallets.
-- **Auto-harvest is live and carries no risk.** `ActivationManager.claim` is permissionless
-  and credits the Friend's *own* wallet, never the caller, so the keeper can sweep every
-  enrolled Friend while taking custody of nothing. Running it for someone else is a gift of
-  gas, never a way to take their rewards.
-- **All trading is simulated for this submission.** No desk trade has been executed on
-  mainnet. The contracts are written and tested but **not deployed**.
-- Costs are modelled from measurements, not assumptions: 5% hook fee per side, ~209k gas
-  per swap = **$0.033** at 0.057 gwei, 1% OpenSea fee read from a real order's consideration.
-
-## Safety
-
-Three properties enforced in `FriendBank.sol`, in code, not policy, with a Foundry test each:
-
-1. **The Bank never holds your NFT.** Its only power is an ERC-20 allowance you set from
-   your own Friend's wallet. Revoke it and the Bank is powerless instantly.
-2. **The Bank can never pull more than you allowed.** You set `capPerEpoch` at join.
-   `collect` takes `min(cap, epoch room, allowance, balance)`, proven in a test where the
-   member grants an *unlimited* allowance and the Bank still only takes the cap.
-3. **Exit is never blocked.** `withdraw` has no timelock, no queue, no pause and no owner
-   check. The owner may halt quoting; the owner may not halt leaving. Tested while halted.
-
-The owner cannot move member funds, cannot upgrade (there is no proxy), cannot raise a
-member's cap, and can only ratchet risk caps tighter.
 
 ## Checks
 
 | check | result |
 | --- | --- |
-| `npm run verify` | **37/37** assertions against live chain state, none skipped |
-| `forge test` | **20/20**, asserting the safety properties above, Genesis enrolment included |
-| `npm run backtest:gated` | RUN 1 takes 0 fills on the real tape; RUN 2 arms and trades |
-| `npm run sweep:hall <url>` | **120/120** across twelve sizes, 320px to 3440px, run against production |
-| `npm run play:hall <url>` | **41/41**: walk in, open an account, pull the lever, read the book, in all three rooms |
-| `node scripts/visual-check.mjs <url>` | **70/70** on /docs across 320px to 2560px, against production |
-| `npm run check:lib-sync` | app/lib is byte-identical to lib, and every gate has a label |
-| `npm run check:game-sync` | the reference SDK build in game/ still matches lib/ |
+| `forge test` (contracts/) | **114/114**: 103 offline (incl. 17 in `WhyV1WasReplaced.t.sol`, 5 proving the owner's own wallet is never touched, and fuzzed invariants) plus 11 on a fork of live Robinhood Chain state, nothing broadcast |
+| `contracts/mutate.sh` | **16/16** planted bugs caught (no ownership re-check, sweeping the whole wallet, rounding up, withdraw gated by halt, TWAP guard off, and eleven more) |
+| `npm run verify` | **63/63** facts asserted against live chain state, none skipped |
+| `npm run keeper -- --wallet huntclubhero.eth` | dry run: no alarm; claims planned for the one Friend worth claiming, the rest below 20x gas |
+| `npm run backtest:gated` | real tape: desk stays off, +0.00% vs hold; ungated it would have lost 10.11% |
+| `npm run sweep` | 60 regimes: gated worst -6.76% vs ungated worst -42.98% |
+| `npm run sweep:hall <url>` | **168/168** across twelve sizes, 320px to 3440px: fill, overlap, signs on their artwork, plaque inside its plate |
+| `npm run play:hall <url>` | **95/95**: open an account, read the live floor, simulate a week, open the vault, take out and close, in all three room shapes |
+| `node scripts/visual-check.mjs <url>` | **70/70** on /docs across seven widths |
+| `npm run check:lib-sync` | copies identical, and every strategy gate is fed by the live desk |
 | `npx tsc --noEmit`, `next build` | clean |
 
 ## Known issues and limitations
 
-- **The sample is small and unusual.** 5.6 days, one token, one violent downtrend. A grid
-  bot in a *ranging* market genuinely can work; we cannot show that from this data, and the
-  synthetic run is labelled synthetic for that reason. Nothing here is a forecast.
-- **The desk has never traded.** Contracts are unaudited and undeployed, and deposits from
-  anyone other than the builder are closed until an external audit. This is deliberate.
-- **The thresholds are judgements.** The gate *shapes* come from measured failures; the
-  exact numbers (25 WETH, 200 trades, 4% vol) are a first calibration, set deliberately
-  above current conditions, and will need revising with more history.
-- The backtest assumes the desk wins any fill it quotes, since any spread under 5% beats
-  the only other venue. That is optimistic on capture and realistic on cost.
-- Volume is collapsing: 5,018 trades on 2026-09-16 against ~145/day now. If it goes to
-  zero the desk simply never arms, which is the correct behaviour but not a business.
-- Discovery of a wallet's Friends uses `rarefriends.com/api/protocol/state`. Every *value*
-  is read from chain; if their API is down, discovery degrades and the page says so rather
-  than inventing numbers.
-
-## Known issues, the hall
-
-- **Accounts are kept in your browser**, in localStorage, because there is no backend. So
-  the vault shows your own book and not a global one. A shared depositor count would be a
-  lie until the contract is deployed, and we would rather show a small true number.
-- The mandate signature is a statement of intent, not an approval. **Nothing on chain
-  changes when you sign it**, and the panel says so rather than implying otherwise.
-- The lever's market regimes are generated, clearly labelled, and shaped from the measured
-  sweep. They are illustrations of the decision, not predictions.
-- `game/` still holds the original FriendSDK build and is kept for reference only. It is
-  the one that cannot admit a Genesis; at 360px its frame left all four station prompts
-  overlapping. The shipped hall has two destinations, three room shapes, and a sweep that
-  fails on any overlap.
+- **The contract is not deployed and has not been audited.** Nothing in this demo moves funds.
+  We will not deploy it to hold anyone's money before an external audit.
+- **The bank's income depends on one key it does not control.** See "For the Rare Friends team".
+  The keeper stops and raises an alarm if the fee is ever re-pointed.
+- **The desk's price guard bounds damage; it does not remove it.** Ranges must sit clear of a
+  time-weighted price, but a patient actor can drag that price about 6% an hour (tested), and
+  because nobody arbitrages inside a 5%-per-side fee the pool can be held about 10% off for
+  free. Members would be trusting the keeper within that band, and the desk's other limits
+  (loss lock, loss budget, size and rate caps) cap how often it can be exploited.
+- **Signing up takes more than one click.** It is two approvals and a `join` per Friend: one confirmation with a wallet that batches calls, otherwise three transactions. No wallet has yet been tested batching on this chain.
+- **The desk is off, and may stay off.** Volume fell from 930 WETH on launch day to about
+  3 WETH over the last 24 hours. The desk arms only on measured chop. The pool is under
+  a week old, so its 7-day replay check reads "not yet measurable" until 2026-09-23 and says so.
+- **Small Friends are not worth enrolling yet.** A collect costs about $0.08 in gas; a Gen-3
+  earns cents a week. The bank is built for the Genesis, which holds 95% of all weight.
+- **A member who claims outside the bank** leaves those rewards in the Friend's wallet unless
+  they turn on sweep mode, which takes only what sits above their balance at signup.
+- **Accounts in the demo live in your browser**, because there is no backend.
 
 ## Credits
 
-**FriendSDK is used as a library, under its Apache-2.0 licence**: `renderWorld` draws the
+**FriendSDK v0.1.2, under its Apache-2.0 licence, used as a library**: `renderWorld` draws the
 scene, `createWorldMovement` handles walking, collision and pathing, `project`/`unproject`
-map world to screen. Thank you for shipping those as importable functions.
+map world to screen. The building itself is ours: `app/lib/hall-art.ts` draws the facade, the
+vault and the counter to match the head-on projection, and the SDK props are kept hidden for
+collision only.
 
-**The building itself is ours.** `app/lib/hall-art.ts` draws the columned facade, the
-pediment, the carved name, the vault door and the teller counter. It had to: in this
-projection an offset moves you across the screen and depth moves you down it, so a room
-bounded by constant offsets and depths projects to a **plain rectangle seen head on**, while
-the SDK's props are drawn as 45-degree isometric boxes. Mixing them put two incompatible
-perspectives in one picture. The SDK props are still loaded, **hidden, and kept for
-collision only**, so the pathfinder still works and the counter still blocks. The original
-SDK-prop world is preserved in `game/world.ts` for reference.
+The contract vendors nine MIT files of Uniswap v4 math (`contracts/src/vendor/`), unmodified apart from import paths, each listed with its source commit in `contracts/README.md`.
 
-Visual direction was matched against the SDK's own fishing example: `#eee` paper, `#111`
-ink, hard `2px 2px 0` offset shadows, 44px square icon buttons inset 18px, mono labels with
-`system-ui` display numbers. **The hall and the research page share one palette**, so the
-two halves read as one product rather than two.
-
-Friend artwork is each NFT's own on-chain SVG, read unmodified from
-`rarefriends.com/api/protocol/state` and rendered at its native resolution. Hardwired
-Generations are zoom-cropped to centre the isometric world; Genesis and temp portraits are
-not. No third-party assets are used anywhere else: no fonts are bundled (the interface
-uses the system mono stack), no images are shipped, and the rest is CSS.
-
-Protocol mechanics were read from the contracts themselves via
+Friend artwork is each NFT's own on-chain SVG, read unmodified. No fonts or images are
+bundled. Protocol mechanics were read from the contracts themselves via
 `rarefriends.com/api/protocol/config`, which ships full ABIs.

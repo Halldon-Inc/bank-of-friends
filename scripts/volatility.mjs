@@ -1,8 +1,7 @@
-import fs from "node:fs";
-const raw = JSON.parse(fs.readFileSync("data/swaps.json","utf8"));
-const swaps = raw.swaps.map(s=>({b:s.b,t:s.t,sq:BigInt(s.sq)})).sort((a,b)=>a.b-b.b);
-const price = s => { const p = Number(s.sq)/2**96; return p*p; };
-const P = swaps.map(s=>({t:s.t,b:s.b,p:price(s)}));
+// Per-swap times come from the engine's block->time fit. The raw `t` field is the
+// 100k-block BUCKET start (~2.8 h), which made "hourly bars" out of 2.8-hour buckets.
+import { loadTape } from "./backtest-engine.mjs";
+const P = loadTape().tape.map((e) => ({ t: e.t, b: e.b, p: e.px }));
 
 console.log("=== RF/WETH price series, full history ===");
 console.log(`${P.length} price points over ${((P[P.length-1].t-P[0].t)/86400).toFixed(2)} days`);

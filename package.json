@@ -21,7 +21,8 @@
     "check:lever": "node scripts/lever-check.mjs",
     "sweep:game": "node scripts/game-viewport-sweep.mjs",
     "sweep:hall": "node scripts/hall-sweep.mjs",
-    "play:hall": "node scripts/hall-play.mjs"
+    "play:hall": "node scripts/hall-play.mjs",
+    "keeper": "node scripts/keeper.mjs"
   },
   "dependencies": {
     "viem": "2.56.6"

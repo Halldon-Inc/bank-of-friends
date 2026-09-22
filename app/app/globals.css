@@ -536,3 +536,316 @@ a { color: var(--ink); text-underline-offset: 3px; }
 .hall-docs:hover { color: var(--ink); border-color: var(--ink); }
 .masthead-back { margin: 0.5rem 0 0; font-size: 0.72rem; }
 .masthead-back a { color: var(--dim); }
+
+/* ======================================================= the working bank */
+/* One stamp, one style, everywhere something is simulated. It replaces the
+   paragraphs that used to explain "not deployed" under every number. */
+.sim-stamp {
+  display: inline-block; vertical-align: 1px; margin-left: 6px;
+  border: 1px solid var(--ink); padding: 0 4px;
+  font-size: 0.5rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink);
+  transform: rotate(-2deg);
+}
+.acct-intro { font-size: 0.76rem; line-height: 1.6; margin: 0 0 10px; }
+.acct-steps { margin: 0 0 4px; padding-left: 18px; font-size: 0.68rem; line-height: 1.5; }
+.acct-steps li { margin-bottom: 3px; }
+.acct-steps b { font-weight: 400; border-bottom: 1px solid var(--ink); }
+.acct-steps span { color: var(--dim); }
+.acct-cap span:first-child { min-width: 5ch; }
+.acct-cap input { width: 11ch; }
+.acct-center { display: block; margin: 8px auto 0; }
+.hall-lever + .acct-close { margin-top: 8px; }
+.hall-lever.is-quiet { background: var(--paper); color: var(--ink); }
+.hall-lever.is-quiet:hover { background: var(--ink); color: var(--paper); }
+.acct .hall-lever, .vault .hall-lever, .floor .hall-lever, .acct-welcome .hall-lever, .close .hall-lever { width: 100%; }
+
+/* The Friend in the HUD, big enough to recognise. */
+.hall-portrait {
+  width: 26px; height: 26px; border: 1px solid var(--ink); background: var(--paper);
+  image-rendering: pixelated; object-fit: cover; display: block;
+}
+.hall-portrait.world { object-fit: none; object-position: center 46%; transform: none; }
+
+/* The ticker runs in the marquee's lit screen, which hall-art draws into the
+   facade under the bank's name. This box sits exactly on that screen. */
+.hall-ticker {
+  position: absolute; overflow: hidden; pointer-events: none;
+  background: var(--ink); color: var(--paper);
+  display: flex; align-items: center;
+  letter-spacing: 0.08em; text-transform: uppercase; line-height: 1;
+}
+.hall-ticker-run { display: flex; white-space: nowrap; animation: tick 40s linear infinite; }
+.hall-ticker-run > span { display: inline-flex; flex: none; }
+.hall-ticker b { display: inline-block; font-weight: 400; padding: 0 1.4em; position: relative; }
+.hall-ticker b::after { content: "|"; position: absolute; right: 0; color: #ccff00; }
+.hall-ticker-run.is-still { animation: none; }
+@keyframes tick { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.art-marquee .bulb { animation: bulb 1.6s steps(1, end) infinite; }
+.art-marquee .bulb:nth-of-type(odd) { animation-delay: 0.8s; }
+@keyframes bulb { 0%, 49% { fill: #ccff00; } 50%, 100% { fill: #eee; } }
+
+/* A soft shadow under anyone standing on the marble. */
+.hall-shadow {
+  position: absolute; left: 50%; bottom: -6%; width: 78%; height: 16%;
+  transform: translateX(-50%); border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0,0,0,0.32), rgba(0,0,0,0.12) 60%, transparent);
+  pointer-events: none;
+}
+.hall-char .hall-shadow { z-index: -1; }
+
+/* The keeper: a teller carrying a strongbox from the counter to the vault door and
+   back, forever. The path comes from hall-world as custom properties, so it is
+   solved, not typed. On arrival a "+ harvested" tick rises off the box. */
+.hall-keeper {
+  position: absolute; width: var(--ksize); height: calc(var(--ksize) * 19 / 16);
+  left: var(--kx0); top: var(--ky0);
+  transform: translate(-50%, -92%);
+  pointer-events: none; line-height: 0;
+  animation: keeperRound var(--kround) ease-in-out infinite;
+}
+.hall-keeper svg { position: relative; width: 100%; height: 100%; display: block;
+  animation: keeperStep 360ms steps(2, end) infinite; }
+@keyframes keeperStep { from { transform: translateY(0); } to { transform: translateY(-5%); } }
+@keyframes keeperRound {
+  0%, 6% { left: var(--kx0); top: var(--ky0); }
+  44%, 56% { left: var(--kx1); top: var(--ky1); }
+  94%, 100% { left: var(--kx0); top: var(--ky0); }
+}
+.keeper-tick {
+  position: absolute; left: 50%; top: -30%; transform: translateX(-50%);
+  white-space: nowrap; line-height: 1;
+  font-size: 10px; letter-spacing: 0.06em; color: var(--ink);
+  background: #ccff00; border: 1px solid var(--ink); padding: 1px 4px;
+  opacity: 0; animation: keeperTick var(--kround) ease-out infinite;
+}
+@keyframes keeperTick {
+  0%, 44% { opacity: 0; transform: translate(-50%, 6px); }
+  47% { opacity: 1; transform: translate(-50%, 0); }
+  56% { opacity: 1; transform: translate(-50%, -8px); }
+  60%, 100% { opacity: 0; transform: translate(-50%, -12px); }
+}
+.hall-keeper.is-still, .hall-keeper.is-still svg { animation: none; }
+.hall-keeper.is-still .keeper-tick { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .art-marquee .bulb { animation: none; }
+}
+
+/* A sign that hangs BELOW the thing it names (the vault's, off the door frame). */
+.hall-prompt.is-below { transform: translate(-50%, 0); }
+.hall-prompt.is-below.is-near { animation: promptPopBelow 220ms cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes promptPopBelow { from { transform: translate(-50%, 0) scale(0.9); } to { transform: translate(-50%, 0) scale(1); } }
+
+/* The quote board's lamp is the desk's live state. */
+.hall-scene[data-armed="true"] .board-lamp { fill: #ccff00; }
+
+/* ==================================================== the trading floor */
+.floor { text-align: left; }
+.floor-board {
+  border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+  background: var(--paper); color: var(--ink);
+  padding: 12px; margin: 0 0 10px; text-align: center;
+}
+.floor-board.armed { background: #ccff00; }
+.floor-mode { margin: 0; font-size: 0.56rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); }
+.floor-word { margin: 6px 0 8px; font-size: clamp(1.5rem, 7vw, 2.2rem); letter-spacing: 0.08em; line-height: 1; }
+.floor-word.is-loading { font-size: 0.8rem; color: var(--dim); }
+.floor-sim { border: 1px dashed var(--ink); padding: 10px; margin: 10px 0 0; text-align: center; }
+.floor-sim-word { margin: 4px 0 6px; font-size: 1.1rem; letter-spacing: 0.06em; }
+.floor-sim.armed .floor-sim-word { background: #ccff00; display: inline-block; padding: 0 8px; }
+.floor .hall-gates { margin: 8px 0; }
+.hall-gates li.pending { color: var(--dimmer); font-style: italic; }
+
+/* ============================================================ the boxes */
+/* The pooled book: one ruled bar per asset, made of each box's segment. */
+.pool { margin: 8px 0 12px; }
+.pool-row { display: grid; grid-template-columns: 4.6ch 1fr auto; gap: 8px; align-items: center; margin: 4px 0; font-size: 0.64rem; }
+.pool-name { color: var(--dim); }
+.pool-num { text-align: right; min-width: 7ch; }
+.pool-bar {
+  position: relative; display: flex; height: 16px; border: 1px solid var(--ink); background: var(--paper); overflow: hidden;
+}
+/* Ruled every tenth, like a gauge, so even one box never reads as a flat slab. */
+.pool-bar::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(238,238,238,0.85) calc(10% - 1px) 10%);
+}
+.pool-seg {
+  position: relative; display: flex; align-items: center; justify-content: flex-start;
+  height: 100%; background: var(--ink); border-right: 2px solid var(--paper); min-width: 0;
+}
+.pool-seg:last-child { border-right: 0; }
+.pool-seg.is-mine { background: repeating-linear-gradient(0deg, var(--ink) 0 3px, #333 3px 4px); }
+.pool-seg b {
+  position: relative; z-index: 1; font-weight: 400; font-size: 0.5rem; letter-spacing: 0.08em;
+  color: var(--ink); background: #ccff00; padding: 0 3px; margin-left: 3px; line-height: 1.3;
+}
+.pool-seg.is-pending { background: repeating-linear-gradient(45deg, var(--paper) 0 3px, var(--ink) 3px 4px); }
+.pool-key { display: flex; align-items: center; gap: 6px; font-size: 0.56rem; color: var(--dim); margin: 2px 0 0; }
+.pool-key .pool-seg { display: inline-block; width: 18px; height: 9px; border: 1px solid var(--ink); }
+
+/* The wall: numbered line-art doors, six across. */
+.door-wall {
+  list-style: none; margin: 0 0 12px; padding: 8px;
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px;
+  border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+  background: repeating-linear-gradient(0deg, var(--paper) 0 3px, #e2e2e2 3px 4px);
+}
+.door {
+  position: relative; aspect-ratio: 1 / 1.08; min-width: 0;
+  border: 1.5px solid var(--ink); background: var(--paper);
+  box-shadow: inset 0 0 0 2px var(--paper), inset 0 0 0 3px #999;
+  display: grid; place-items: center; overflow: hidden;
+}
+.door button {
+  all: unset; box-sizing: border-box; cursor: pointer; position: absolute; inset: 0;
+  display: grid; place-items: center;
+}
+.door button:focus-visible { outline: 2px solid var(--ink); outline-offset: -4px; }
+.door-no {
+  position: absolute; top: 3px; left: 50%; transform: translateX(-50%);
+  font-size: 0.5rem; letter-spacing: 0.08em; line-height: 1;
+  border: 1px solid var(--ink); padding: 1px 3px; background: var(--paper); z-index: 2;
+}
+.door-lock {
+  width: 22%; aspect-ratio: 1; border-radius: 50%; border: 1.5px solid var(--ink);
+  background: radial-gradient(circle, var(--ink) 0 22%, transparent 23%);
+}
+.door-tag {
+  position: absolute; bottom: 2px; left: 2px; right: 2px; text-align: center;
+  font-size: 0.44rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2;
+}
+.door img, .door .door-noart {
+  width: 54%; aspect-ratio: 1; image-rendering: pixelated; object-fit: cover; display: block;
+  border: 1px solid var(--ink); background: var(--paper);
+}
+.door img.world { object-fit: none; object-position: center 46%; }
+.door.is-vacant { background: repeating-linear-gradient(45deg, var(--paper) 0 5px, #e6e6e6 5px 6px); }
+.door.is-pending { border-style: dashed; }
+.door.is-pending img { opacity: 0.45; filter: grayscale(1); }
+.door.is-box:not(.is-open) img { width: 42%; }
+/* The open door: lime frame, the leaf swung aside, the Friend's portrait inside. */
+.door.is-open { background: #ccff00; border-width: 2px; box-shadow: inset 0 0 0 2px #ccff00, inset 0 0 0 3px var(--ink); }
+.door.is-open::before {
+  content: ""; position: absolute; left: -1px; top: 8%; bottom: 8%; width: 14%;
+  background: var(--paper); border: 1.5px solid var(--ink); transform: skewY(-18deg); transform-origin: left;
+  z-index: 1;
+}
+.door.is-open .door-tag { color: var(--ink); }
+
+.box { border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); padding: 8px; background: var(--paper); margin: 0 0 8px; }
+.box-door { display: grid; grid-template-columns: 38px 1fr; gap: 0 8px; align-items: center; margin-bottom: 6px; }
+.box-door img, .box-door .door-noart {
+  grid-row: span 2; width: 38px; height: 38px; border: 1px solid var(--ink);
+  image-rendering: pixelated; background: var(--paper); object-fit: cover;
+}
+.box-door img.world { object-fit: none; object-position: center 46%; }
+.box-name { font-size: 0.72rem; letter-spacing: 0.04em; overflow-wrap: anywhere; }
+.box-meta { font-size: 0.58rem; color: var(--dim); }
+.box-asset { display: grid; grid-template-columns: 4.6ch 1fr auto; gap: 8px; align-items: center; font-size: 0.62rem; margin: 4px 0; }
+.box-asset-name { color: var(--dim); }
+.box-asset-num { text-align: right; min-width: 7ch; }
+.box-bar { display: flex; height: 10px; border: 1px solid var(--ink); background: var(--paper); min-width: 0; }
+.box-deposited { display: block; height: 100%; background: var(--ink); }
+.box-pnl { display: block; height: 100%; background: repeating-linear-gradient(45deg, #ccff00 0 2px, var(--ink) 2px 3px); }
+.box-loss { display: block; height: 100%; background: repeating-linear-gradient(45deg, var(--paper) 0 2px, var(--ink) 2px 3px); }
+.box-pnl-line { margin: 6px 0 0; font-size: 0.58rem; color: var(--dim); }
+.box-actions { display: flex; gap: 6px; margin-top: 8px; }
+.box-actions button {
+  flex: 1; font: inherit; font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--ink); padding: 6px 2px; cursor: pointer;
+}
+.box-actions button:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
+.box-actions button:disabled { opacity: 0.45; cursor: default; }
+.vault-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 0.56rem; color: var(--dim); margin: 8px 0 0; }
+.vault-legend span { display: inline-block; width: 14px; height: 8px; border: 1px solid var(--ink); margin-left: 6px; }
+.vault-legend span:first-child { margin-left: 0; }
+/* The vault needs the room for a wall. */
+.hall-panel:has(.vault) { width: min(540px, 100%); }
+
+/* On the narrowest phones the three signs are the same pixel size while the hall
+   is smaller, so they are set tighter there to stay clear of each other. */
+@media (max-width: 400px) {
+  .hall-prompt { padding: 3px 6px; font-size: 0.6rem; }
+  .hall-prompt small { font-size: 0.52rem; margin-top: 1px; }
+}
+
+/* The tests behind a line, and the optional sweep switch. */
+.acct-tests { display: block; margin-top: 1px; font-size: 0.5rem; color: var(--dimmer); letter-spacing: 0.02em; overflow-wrap: anywhere; }
+.acct-steps code { display: block; font-size: 0.52rem; color: var(--dimmer); overflow-wrap: anywhere; }
+.acct-switch { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0 10px; font-size: 0.68rem; line-height: 1.45; cursor: pointer; }
+.acct-switch input { margin-top: 2px; accent-color: var(--ink); }
+
+/* Today and on its way. The on-its-way part is hatched, never solid, because it
+   has not arrived. */
+.arrival { margin: 10px 0 12px; padding: 0; text-align: left; }
+.arrival > div { display: grid; grid-template-columns: 9.5em 1fr; gap: 8px; padding: 5px 0; border-bottom: 1px dotted var(--line); font-size: 0.68rem; line-height: 1.45; }
+.arrival dt { color: var(--dim); }
+.arrival dd { margin: 0; }
+.arrival dd i { font-style: normal; color: var(--dim); }
+.arrival .is-coming dd { color: var(--ink); }
+.box-owed { display: block; height: 100%; background: repeating-linear-gradient(135deg, var(--paper) 0 2px, #777 2px 3px); }
+.pool-seg.is-owed { background: repeating-linear-gradient(135deg, var(--paper) 0 3px, #555 3px 4px); }
+.pool-key .pool-seg { margin-left: 8px; }
+.pool-key .pool-seg:first-child { margin-left: 0; }
+@media (max-width: 400px) { .arrival > div { grid-template-columns: 1fr; gap: 1px; } }
+
+/* The HUD's idle figure shows both sides. The dollar total drops out on the
+   narrowest phones rather than pushing the bar onto a third line. */
+.hall-bar .hall-idle { color: var(--dim); white-space: nowrap; }
+.hall-bar .hall-idle b { font-weight: 400; color: var(--ink); }
+.hall-bar .hall-idle i { font-style: normal; }
+@media (max-width: 400px) { .hall-bar .hall-idle i { display: none; } }
+
+/* THE VAULT HOLDS: the brass plate in the pediment. Figures in ink, the head in
+   small caps; lime only on the live, on-chain total. */
+.hall-plaque {
+  position: absolute; pointer-events: none; container-type: size;
+  /* Air inside the inner rule: the head once sat on the plate's top rule. The
+     padding is set in px by the component from the rule's own inset, and the
+     container units below measure the padded box, so the type shrinks to fit. */
+  box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; line-height: 1; overflow: hidden;
+}
+/* A monospace character is about 0.6em wide, plus its letter-spacing, so a line of
+   n characters is n * (0.6 + spacing) em. Size each line to 90% of the plate. */
+.hall-plaque-head {
+  font-size: min(36cqh, calc(94cqw / (var(--n1) * 0.76)));
+  letter-spacing: 0.16em; color: var(--dim); white-space: nowrap;
+}
+.hall-plaque-figs {
+  font-size: min(50cqh, calc(94cqw / (var(--n2) * 0.66)));
+  letter-spacing: 0.06em; white-space: nowrap; color: var(--ink);
+}
+.hall-plaque-figs b { font-weight: 700; }
+.hall-plaque-figs i { font-style: normal; color: var(--dim); }
+.hall-plaque.is-bank .hall-plaque-figs b { background: #ccff00; padding: 0 0.2em; }
+
+/* The vault panel's headline. */
+.vault-holds { border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); padding: 10px 12px; margin: 0 0 14px; text-align: center; }
+.vault-holds.is-live { background: #ccff00; }
+.vault-holds-kicker { margin: 0 0 6px; font-size: 0.56rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim); }
+.vault-holds-total, .vault-holds-idle { margin: 0; font-size: clamp(1.05rem, 5vw, 1.5rem); line-height: 1.2; }
+.vault-holds-total b, .vault-holds-idle b { font-weight: 400; white-space: nowrap; }
+.vault-holds-idle i { font-style: normal; color: var(--dim); font-size: 0.7em; white-space: nowrap; }
+.vault-holds-waiting { margin: 0 0 4px; font-size: 0.7rem; }
+.vault-holds-sub { margin: 6px 0 0; font-size: 0.64rem; color: var(--dim); }
+.vault-holds-cta {
+  font: inherit; font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
+  background: var(--ink); color: var(--paper); border: 1px solid var(--ink); padding: 3px 8px; margin-left: 4px; cursor: pointer;
+}
+
+/* Close account, and the collapsed "what this signs". */
+.acct-plain { margin: 8px 0; padding: 6px 8px; border-left: 3px solid var(--ink); font-size: 0.7rem; line-height: 1.5; background: #e6e6e6; }
+.acct-signs { margin: 10px 0; border: 1px solid var(--line); padding: 6px 8px; }
+.acct-signs summary { cursor: pointer; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.acct-signs[open] summary { color: var(--ink); margin-bottom: 6px; }
+.close { text-align: left; }
+.close-home { width: 100%; border-collapse: collapse; font-size: 0.72rem; margin: 0 0 6px; }
+.close-home th, .close-home td { padding: 5px 4px; border-bottom: 1px dotted var(--line); text-align: right; font-weight: 400; }
+.close-home thead th { font-size: 0.56rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.close-home tbody th { text-align: left; color: var(--dim); }
+.close-home .close-total { font-weight: 700; }
+.box .close-open { margin-top: 10px; }
+.floor-back { margin-top: 14px; }

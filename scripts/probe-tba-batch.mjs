@@ -7,8 +7,10 @@
 import { parseAbi, getAddress, encodeFunctionData } from "viem";
 import { ADDR, ABI, client } from "../lib/protocol.mjs";
 const c = client();
-const TBA = "0x8da40cBA7a8Fbb67818d1eb64b20f7b19dbf96DE";   // Generations #87893
-const HUNT = getAddress("0x913105f2d2bfb8392f7845ef79e0c2c62f2755df");
+// Generations #5339, owned by 0x97f29031... (the largest holder). Never Hunt's own
+// Friend: simulating execute from its owner is impersonation in spirit.
+const TBA = "0x561A3979fb6ab58847bdC40B866a76c82005a8C8";
+const OWNER = getAddress("0x97f290319734D0ce22215079417F3fE6A6439932");
 const SPENDER = getAddress("0x000000000000000000000000000000000000ba5e");
 
 const approveData = encodeFunctionData({
@@ -21,7 +23,7 @@ for (const [op, name] of [[0, "CALL"], [1, "DELEGATECALL"], [2, "CREATE"], [3, "
   try {
     await c.simulateContract({
       address: TBA, abi: ABI.tba, functionName: "execute",
-      args: [ADDR.RF, 0n, approveData, op], account: HUNT,
+      args: [ADDR.RF, 0n, approveData, op], account: OWNER,
     });
     console.log(`  op ${op} ${name.padEnd(12)} ALLOWED`);
   } catch (e) {

@@ -1,5 +1,6 @@
 import DeskView from "@/components/Desk";
 import FriendPicker from "@/components/FriendPicker";
+import "./docs.css";
 
 /**
  * The shell renders instantly and never touches the chain. An earlier version did
@@ -10,10 +11,10 @@ import FriendPicker from "@/components/FriendPicker";
  */
 export default function Page() {
   return (
-    <main className="shell">
+    <main className="shell docs">
       <header className="masthead">
         <h1 className="wordmark">The First Bank of Friends</h1>
-        <p className="tagline">a desk that is flat until the market pays it</p>
+        <p className="tagline">rewards held in kind, and a desk that trades only when the market pays it</p>
         <p className="masthead-back"><a href="/">&larr; back to the hall</a></p>
       </header>
 
@@ -26,9 +27,10 @@ export default function Page() {
       <footer>
         <p>
           Nothing here is financial advice and nothing here is a forecast. The desk holds no
-          third-party funds and has never executed a trade. Backtests cover 8,777 swaps across
-          the pool&rsquo;s entire 5.6-day history; that is a short and unusual sample, presented as
-          evidence of what has happened, not a claim about what will.
+          third-party funds and has never executed a trade. Backtests replay all 8,826 swaps of
+          the pool&rsquo;s 6.1-day history (to 2026-09-22) and synthetic regimes that are labelled
+          as such; that is a short and unusual sample, presented as evidence of what has happened,
+          not a claim about what will.
         </p>
         <p>
           Built for the Rare Friends Vibeathon. Source, backtests and the verification harness:{" "}

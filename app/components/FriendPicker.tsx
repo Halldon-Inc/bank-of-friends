@@ -96,7 +96,7 @@ export default function FriendPicker() {
                 )}
                 <span className="picker-label">{f.label}</span>
                 <span className="picker-meta">
-                  {f.bankEligible ? `${n(f.idleRf)} RF idle` : "not activated"}
+                  {f.bankEligible ? `${n(f.idleRf)} RF + ${f.idleWeth.toFixed(4)} WETH idle` : "not activated"}
                 </span>
                 {!f.gameEligible && f.bankEligible && <span className="picker-tag">bank only</span>}
               </button>

@@ -1,218 +1,140 @@
-# Market-making economics for $RAREFRIENDS
+# Economics of the First Bank of Friends
 
-Every number here was read from Robinhood Chain (4663) on 2026-09-22 and is
-reproducible with `npm run verify`. Nothing is taken from rarefriends.com's API,
-which is unversioned and has changed both a route and a formula on us inside a week.
+Every number here was read from Robinhood Chain (4663) on 2026-09-22 unless it says
+otherwise, and each is labelled **MEASURED** (read on chain), **DERIVED** (algebra on
+measured inputs) or **CHOICE** (a preference, stated with its consequence). The live
+figures behind the dashboard come from `/api/desk`; these are the dated ones.
 
----
+## 1. The cost stack
 
-## 1. The cost stack, measured
-
-| Cost | Value | How it was measured |
+| Cost | Value | Label and source |
 |---|---|---|
-| **Taker fee** | **5% of the WETH leg, each direction** | `Hook.FEE_BPS() = 500`, applied in `beforeSwap`/`afterSwap` |
-| **Round trip** | **~10%** | buy pays 5%, sell pays 5% |
-| Where the fee goes | `ActivationManager` | `Hook.rewards() == 0xD4A3…83Ac`, address-for-address |
-| **LP fee** | **0%** | `slot0.lpFee = 0` on poolId `0x9116…2240` |
-| Protocol fee | 0% | `slot0.protocolFee = 0` |
-| **Gas, swap** | **~209k gas = $0.033** | 8 real `Swapped` txs, 0.057 gwei, ETH $2,735 |
-| Gas, claim | 102k–210k = $0.016–$0.033 | 5 real `Claimed` txs |
-| Pool depth | ~111.8 WETH and ~195.6M RF a side | `slot0` + `liquidity` via `extsload` |
-| Price impact | ~0.89% per 1 WETH | constant-product at current depth |
+| **Taker fee** | **5% of the WETH leg, each direction** | MEASURED: `Hook.FEE_BPS() = 500`; 5% of the input on a buy (`beforeSwap`), 5% of the gross output on a sell (`afterSwap`) |
+| Round trip for a taker | 9.75% | DERIVED: 0.05 + 0.05 x 0.95 |
+| Where the fee goes | `ActivationManager` | MEASURED: `Hook.rewards() == 0xD4A3...83Ac`; the desk API raises an alarm if that ever changes |
+| **LP fee** | **0%** | MEASURED: `slot0.lpFee = 0`, and the `fee` field of all 8,826 Swap events is 0 |
+| Liquidity hooks | none | MEASURED: hook FLAGS `0x20cc` has no `beforeAddLiquidity` / `beforeRemoveLiquidity` |
+| Gas, swap | ~209k gas = $0.033 | MEASURED: 8 real txs at 0.057 gwei |
+| Gas, range flip | ~$0.07 | CHOICE: remove + re-add in one unlock, about two swaps |
+| Pool depth | 112.7 WETH and 193.9M RF, full range | MEASURED: `slot0` + `liquidity` via `extsload` |
+| Third-party liquidity | **0** | MEASURED: the Market's seed position is 100% of pool liquidity |
 
-**Gas is a rounding error here. The 5% is the entire game.**
+**The 5% is paid by whoever SWAPS. Nobody who provides liquidity pays it.**
 
----
+## 2. Why the desk is maker-only
 
-## 2. Providing liquidity is strictly dominated
+Passive liquidity is dominated: with `lpFee = 0` a liquidity provider earns nothing
+and takes the full inventory swing. Replayed through the pool's whole history, a
+passive full-range position lost 42% to 55% against holding (`docs/BACKTEST.md`).
 
-This is the finding the whole project rests on.
+Active liquidity is different. A v4 **range order** (single-sided liquidity in a narrow
+band) is how an exchange limit order works on an AMM, and because the hook has no
+liquidity callbacks it **never pays the 5%**. A taker grid needed a 10.80% step just to
+break even; a maker grid breaks even at gas. So the desk would quote only as ranges inside
+the pool, and it would become the third-party liquidity the pool never had.
 
-```
-lpFee = 0          ->  liquidity providers earn NOTHING
-FEE_BPS = 500      ->  5% of every swap is taken
-Hook.rewards()     ->  ...and sent to ActivationManager, i.e. to Friend holders
-```
+That did not make the history profitable. Replayed endogenously, the maker grid still
+lost to holding in trending windows, because a trend fills one side only
+(`docs/STRATEGY.md`, `scripts/sweep-regimes.mjs`). **The toll was never the binding
+constraint. The trend is.** That is why the desk is off until the market has recently
+swung back and forth, and why every fill is loss-locked.
 
-So **the people who supply the liquidity and the people who collect the fees are
-different people.** A normal LP takes full impermanent loss for zero compensation.
-That is not a mispricing to exploit, it is a deliberate design: the fee is a
-transfer from traders to Friend holders, and LPs were never in the split.
+## 3. The volume truth
 
-The consequence is measurable and stark:
+Rewards ARE the 5%. More volume raises every Friend's rewards. It does not follow that
+the bank should make volume.
 
-```
-pool total liquidity        147,865,847,752,143,433,133,351
-Market's full-range position 147,865,847,752,143,433,133,351
-third-party liquidity                                     0
-```
-
-**100.00%** of the liquidity in a market doing ~$37.5k/day is the protocol's own
-seed position. In 7.8 days of life, not one outside party has ever provided
-liquidity. They were right not to.
-
-The hook makes no attempt to stop them, either. Its flags are `0x20cc`:
-`beforeInitialize, beforeSwap, afterSwap, beforeSwapReturnsDelta, afterSwapReturnsDelta`.
-There is no `beforeAddLiquidity` and no `beforeRemoveLiquidity`, so PoolManager can
-never even consult the hook on a liquidity change. **Liquidity is ungated by
-construction, not by permission.** Nobody has used that fact because doing so loses money.
-
-> **Do not LP into this pool.** Any design that adds passive liquidity is donating
-> impermanent loss to the protocol. We will not ship it.
-
----
-
-## 3. What RF is actually worth as a reward-weight input
-
-Fees flow to activated Friends pro rata by weight. So the honest benchmark for any
-use of RF is: *how much reward weight does this RF buy, forever?*
-
-Measured inputs:
+**Takers who cross the bank's ranges pay 5% to every activated Friend. The bank never
+pays the toll itself.** If the bank instead traded to add volume, a round trip of V WETH would
+pay `0.05V + 0.05 x 0.95V = 0.0975V` in fees, of which members get back only their
+share `s` of total reward weight, one stream later:
 
 ```
-totalWeight                987,281,200
-sustainable WETH fee inflow  4.81 WETH / week   ($13,145)
-  => yield per unit weight   4.87e-9 WETH / week  ($1.333e-5)
-rfUsd                      $0.0015636
+net to members = -0.0975 V (1 - s)            never positive
+break-even needs outside volume Vo >= 1.95 V (1 - s) / s
 ```
 
-| Use of RF | RF cost | Weight gained | Weight / RF | Annual $ | **APR** |
-|---|---:|---:|---:|---:|---:|
-| **Activate a Genesis** | 100,000 | 2,000,000 | **20.0** | $1,385 | **886%** |
-| Hardwire Gen-1 | 100,000 | 175,000 | 1.75 | $121 | **78%** |
-| Hardwire Gen-2 | 10,000 | 16,000 | 1.60 | $11.1 | **71%** |
-| Hardwire Gen-3 | 1,000 | 1,450 | 1.45 | $1.00 | **64%** |
-| Hardwire Gen-4 | 100 | 130 | 1.30 | $0.090 | **58%** |
-| Hardwire Gen-5 | 10 | 12 | 1.20 | $0.0083 | **53%** |
-| Hardwire Gen-6 | 1 | 1.1 | 1.10 | $0.00076 | **49%** |
+| member share s | cost per 1 WETH round trip | outside volume needed per 1 WETH |
+|---|---:|---:|
+| Hunt today, 0.202% (MEASURED 2,013,675 of 997.5M weight) | 0.0973 WETH | **964x** |
+| 1% | 0.0965 WETH | 193x |
+| 10% | 0.0878 WETH | 17.5x |
+| 50% | 0.0488 WETH | 1.9x |
 
-Notes that matter:
+Holding the chart at 25 WETH a day this way would cost about $3,400 a day at Hunt's
+share. It is also wash trading. **The bank never trades against itself.** The live
+figure for the founding member is `volumeLoop` in `/api/desk`.
 
-- These APRs use **sustainable fee inflow only**. The site's headline ~3,100% figure
-  is computed against a stream that is currently paying down a **29.19 WETH backlog**
-  of already-collected fees. That backlog is real money, but it is finite. Current
-  fees replace **75%** of the weekly WETH payout, leaving **5.8 weeks** of buffer at
-  the present rate. Any model that annualises the backlog rate is annualising a
-  one-off.
-- Activating a Genesis is **11.4x** better per RF than the best Generations path.
-  Genesis is capped at 1,024 and 469 are activated. It is the highest-value RF sink
-  in the protocol by a wide margin.
-- Hardwires and upgrades are **irreversible**. The RF is gone (50% burned, 50% to
-  rewards). You are buying a perpetuity and giving up the principal.
+## 4. The reward runway
 
-**So the hurdle rate for any market-making strategy is roughly 78% APR** — what the
-same RF would earn, risk-free and permanently, as a Gen-1 hardwire. That is a high bar
-and we should say so out loud rather than pretend a 2% spread is exciting.
+Fees are paid a week late. `fund()` adds to `streams(asset).pending`; `allocate()` is
+permissionless but reverts until the current stream finishes, then streams all of
+pending over `DURATION = 604,800 s` (MEASURED, confirmed by fork trace).
 
----
+| | WETH | RF | label |
+|---|---:|---:|---|
+| streaming this week | 39.03 | 10.62M | MEASURED `streams().rate` |
+| queued for next week (allocates 2026-09-23 15:09 UTC) | 29.27 | 83.16M | MEASURED `streams().pending` |
+| steady state at the last 72h of activity | ~4.0 | ~10.5M | DERIVED |
 
-## 4. Where a market maker's edge actually is
+Pool volume went 930, 157, 70, 29, 8.7, 14.3 WETH a day from Sep 16 to Sep 21. Next
+week's RF, 83M, is 43% of the pool's RF depth; if it were all sold the price would fall
+about 51% (DERIVED, constant product). About 43.3M RF and 6.48 WETH of past inflows came
+directly from the protocol owner's wallet (MEASURED transfers), so part of the stream is
+subsidy. **Any APR quoted off this week's stream is annualising a one-off.**
 
-The edge is not depth and it is not the curve. It is the **5% incumbent toll**.
+## 5. Reward weight: what RF buys
 
-Anyone who wants to move RF today pays 5%. A market maker quoting a 2% spread is
-**60% cheaper than the only other venue**, which is an enormous moat — the kind you
-almost never get. Winning the flow is trivial. Keeping the money is the hard part.
+| Use of RF | RF | Weight | Weight per RF | Capital kept? |
+|---|---:|---:|---:|---|
+| **Activate a Genesis** | 100,000 | 2,000,000 | **20.0** | the NFT, with a Reserve floor |
+| Hardwire Gen-1 | 100,000 | 175,000 | 1.75 | no, burned |
+| Gen-1 tier 3 to 4 | 168,750 | 345,938 | 2.05 | no |
+| Gen-3 tier 1 to 2 | 750 | 1,163 | 1.55 | no |
+| Promote Gen-3 t1 to Gen-2 t0 | 9,000 | 13,788 | 1.53 | no |
 
-Revenue per unit of internalised volume = the spread `s`. Costs:
+MEASURED from `weightMultiplierBps`, `cumulativeBps` and the docs. **A Genesis cannot be
+upgraded, promoted or hardwired.** Generations upgrades pay back their burned RF in 29 to
+168 weeks at steady-state rewards (DERIVED); they are not yield.
 
-1. **Adverse selection.** You are the counterparty to whoever wants immediacy. If flow
-   is one-directional you accumulate the losing side.
-2. **Inventory drift.** RF you are forced to hold while its price moves.
-3. **Restocking.** Anything you must rebuy from the pool costs 5%, which instantly
-   wipes out 2.5 round trips of a 2% spread.
-4. Gas, at $0.033/fill. Irrelevant above ~$50 trade size.
+## 6. The Reserve floor and the Genesis desk (research panel only)
 
-### The problem, stated honestly
+The Reserve pays `RF_PER_GENESIS - DEPOSIT_FEE = 900,000 RF` for any Genesis (MEASURED).
+Selling that through the pool returns about **0.49 WETH ($1,364)** today (DERIVED), a
+contract-enforced floor under every Genesis while conversion stays enabled. The desk API
+publishes two thresholds and no sale price (OpenSea's events API requires a key):
 
-Flow over the last 24h through the Market router:
+- **convert below** F x 0.97: buy, deposit, sell the RF (the 3% is a CHOICE for drift);
+- **max bid** = F, plus one queued stream's share at dump value, minus the 100k RF
+  activation, minus 2 sigma of a one-week RF move on F (CHOICE).
 
-```
-35 buys    0.278882 WETH in
- 7 sells   3.335976 WETH out
-net imbalance  -84.57%  ->  toward SELLING RF
-```
+It is not in the contract. It is shown so a member can see what a Genesis is worth to
+the bank, and it is idle whenever the market is above the max bid.
 
-Many small buys, a few large dumps. **Net, the market wants to sell RF.** Corroborated
-by the pool's own inventory: it was seeded with **64,000,000 RF** (`Market.RF_SEED_AMOUNT`)
-and now holds **~195,600,000 RF**. The pool has absorbed ~131.6M RF of net selling and
-paid out WETH to do it. Price fell accordingly.
+## 7. The ladder, safest rung first
 
-A market maker that posts a bid into that gets filled all day, accumulates RF, pays out
-WETH, and watches the mark fall. **That is the single most common way market makers
-lose other people's money, and it is exactly the condition present here.**
+**Rung 0, the default: harvest and hold in kind.** Each Friend has its own box. The
+keeper claims (permissionless, credited to the Friend's own wallet) and moves exactly
+the RF and WETH that Friend earned. No shares, no NAV, no strategy risk.
 
-This is why §6 exists.
+**Rung 1: the maker desk. Off until the arming rule holds.** Range orders inside the
+pool, loss-locked on chain, bids sized to a volatility-scaled inventory cap, a 15%
+drawdown breaker measured against holding, and exit that is never paused.
 
----
-
-## 5. Backtest
-
-See `docs/BACKTEST.md`, generated by `npm run backtest` against the complete swap
-history of the pool from deployment block 62,624,268. Strategies compared:
-
-| # | Strategy | Inventory risk |
-|---|---|---|
-| S1 | Passive full-range LP | full IL, zero fee income |
-| S2 | Inventory market maker, ±s around pool mid | yes, unbounded without caps |
-| S3 | **Crossing network** — match buyer to seller, never hold | **none, by construction** |
-| S4 | Auto-compound rewards into reward weight | none, but irreversible |
-| S5 | Do nothing: claim and hold | benchmark |
-
----
-
-## 6. The safety ladder: what "we cannot lose people's money" forces
-
-Market making means taking the other side of someone's trade. It is not possible to
-do that with zero risk. So the product is built as a ladder, safest rung first, and
-the safe rung is the **default and the headline**, not an afterthought.
-
-### Rung 0 — The crossing network. Cannot lose money.
-
-Match a Friend who wants to sell reward RF against anyone who wants to buy RF, at the
-pool's own mid price. Both sides skip the 5%. The Bank takes a small fee on the match.
-
-- **The Bank never holds inventory**, so there is no position to lose value.
-- If there is no match, nothing happens. No fill, no risk.
-- Worst case for a user is that their order does not fill and they use the pool as usual.
-
-This is the honest answer to the constraint, and it is also the most interesting thing
-in the submission: **everyone pays 5% to trade RF. Friends would not.**
-
-### Rung 1 — Bounded inventory market making. Opt-in, capped.
-
-Hard rules, enforced in the contract and not by policy:
+**Never:** self-volume, a separate low-fee venue (it diverts every Friend's fee and gets
+only arbitrage flow), passive LP, or Generations upgrades sold as yield.
 
 | Guarantee | Mechanism |
 |---|---|
-| Principal is never touched | The Bank's only power is an ERC-20 allowance on a Friend's TBA, and **the member sets the per-epoch cap themselves** at join time. Not `max`. |
-| Only reward flow is ever at risk | `collect()` can pull at most `min(memberCap, harvestedThisEpoch)` |
-| No leverage, ever | No borrow path exists in the contract |
-| Exit is never blocked | `withdraw()` has no timelock, no admin pause, no queue. Pausing quoting is allowed; pausing exit is not. |
-| No admin control of funds | Owner may pause quoting and adjust spread inside hard-coded bounds. Owner cannot move member funds, cannot upgrade, cannot alter the exit path. Non-upgradeable. |
-| Bounded loss | Max RF inventory, max WETH inventory, max fill per block, and a hard drawdown breaker that halts quoting |
-| No oracle games | Quotes anchored to pool `sqrtPriceX96`, clamped against a slow reference, with a per-block fill cap so a single-block price push cannot be monetised |
+| Money already in the Friend's wallet is never touched | the bank moves only what its own claim just delivered, capped per asset per day (sweep mode, if switched on, also takes anything above the signup balance) |
+| No sale below cost | the loss-lock, checked by `RangeDesk.sol` on every range. The contract allows a small 30-day loss budget below the lock; the strategy never uses it |
+| No leverage | no borrow path exists |
+| Exit is never blocked | `withdraw()` has no timelock, pause, queue or owner check |
+| No admin control of funds | the owner can halt quoting and tighten caps; it cannot move funds or loosen anything; it can change the keeper only with a two-day delay, and never to itself |
 
-### Rung 2 — Auto-compound into reward weight. Opt-in, irreversible, flagged as such.
+## 8. What we will not claim
 
-Highest measured return in the protocol (78%–886% APR depending on the sink) but the
-RF is consumed permanently. Presented with that tradeoff stated plainly, never as "yield".
-
-### For the Vibeathon itself
-
-**Member #1 is Hunt, and for the duration of the event he is the only member.** The
-only money at risk is his, it is reward money he had not claimed, and it is $84.21.
-Deposits from anyone else stay closed until the contracts have been audited by someone
-who is not us. That is not a limitation to apologise for — it is the correct order of
-operations, and it is stated in the submission.
-
----
-
-## 7. What we will not claim
-
-- We will not quote the ~3,100% headline APR as if it were sustainable. It is a
-  backlog being paid down.
-- We will not present a market-making spread as "yield" without the adverse-selection
-  cost next to it.
-- We will not describe a strategy as risk-free unless it is Rung 0, which genuinely is.
-- We will not publish a backtest return without the flow imbalance that produced it.
+- We will not quote the ~3,100% headline APR. It is a backlog being paid down.
+- We will not call a spread "yield" without the inventory risk beside it.
+- We will not say the desk adds volume. It adds depth; takers add volume.
+- We will not publish a backtest without the counterfactual beside it.

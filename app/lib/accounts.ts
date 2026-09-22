@@ -1,5 +1,5 @@
 /**
- * ACCOUNTS: who has actually opened one, and what they signed.
+ * ACCOUNTS: who has opened one, on what terms, and what is in their box.
  *
  * Joining the bank and the bank deciding to trade are TWO DIFFERENT THINGS, and
  * collapsing them was the worst bug in this build. The desk's only action used to
@@ -7,25 +7,25 @@
  * quiet, and reasonably read it as the bank refusing to let him in. Nothing about
  * opening an account depends on whether anyone is trading.
  *
+ * THE BOX IS IN KIND. Each Friend gets its own safe deposit box holding the exact
+ * RF and the exact WETH the keeper moved in for it. There are no shares and no
+ * pooled unit of account: adding RF and WETH into one number is how a share price
+ * ends up treating a wei of WETH like a wei of RF. The pooled book is only ever the
+ * SUM of the boxes, per asset.
+ *
  * WHAT IS REAL HERE AND WHAT IS NOT
  *
- * The mandate below is not invented for the demo. It is what `FriendBank.join`
- * actually does: it records consent and a per-day cap, takes no custody, and
- * cannot move anything until the owner separately approves the Bank FROM the
- * Friend's own ERC-6551 wallet. The three guarantees are each enforced by a test
- * in `contracts/test`.
- *
- * The signature is a real EIP-712 signature when a browser wallet is present. It
- * grants nothing: there is no allowance, no transaction, no gas, and the contract
- * is not deployed. It is a signed statement of intent, and the UI says so. With no
- * wallet you can still open an account, and it is labelled as unsigned rather than
- * dressed up as a signature.
+ * Every line of copy below is taken word for word from the contract's own
+ * guarantees (FriendBankV2 + RangeDesk), with the Foundry test that proves each
+ * one. Signing up is three calls from the Friend's own ERC-6551 wallet: approve
+ * RF, approve WETH, then join with a daily cap per asset. There is NO off-chain
+ * consent signature: the join IS the consent. One confirmation if the wallet can
+ * batch calls, otherwise three; nothing is gasless. Here all three are SIMULATED,
+ * because the contract is not deployed and is unaudited. Accounts, boxes and caps
+ * are kept in this browser.
  */
 
 export const STORAGE_KEY = "fbof.accounts.v1";
-
-/** Robinhood Chain. */
-export const CHAIN_ID = 4663;
 
 export type Account = {
   id: string;
@@ -33,103 +33,137 @@ export type Account = {
   collection: string;
   tokenId: string;
   imageUrl: string | null;
+  /** The Friend's claimable rewards when the account opened, read from chain. */
   idleRf: number;
   idleWeth: number;
-  /** The most the Bank may ever pull from this Friend per day. */
+  /** Per-asset daily caps. Each asset is capped on its own, never summed. */
   capPerDayRf: number;
-  /** Present only when a wallet actually signed. */
-  signature: string | null;
-  signer: string | null;
-  signedAt: string;
+  capPerDayWeth: number;
+  /** What the keeper moved into this Friend's box, in kind. */
+  boxRf: number;
+  boxWeth: number;
+  /** The desk's result attributed to this box, in kind, plus or minus. Zero until it trades. */
+  pnlRf: number;
+  pnlWeth: number;
+  /**
+   * ON ITS WAY: the idle rewards the day-one cap left behind. The contract moves at
+   * most the daily cap per asset, so the rest arrives over the following days. Kept
+   * as its own number (not idle minus box) so a withdrawal never inflates it.
+   */
+  owedRf: number;
+  owedWeth: number;
+  /** The optional switch: also move anything above what the wallet held at join. */
+  sweep: boolean;
+  openedAt: string;
 };
 
 export const accountId = (collection: string, tokenId: string) => `${collection}-${tokenId}`;
 
-/** What the member grants. Each line is something `join` + the approval really do. */
-export const GRANTS = [
-  "Harvest this Friend's rewards from the protocol into its own wallet. Anyone may already do this; it is permissionless and the money lands in your wallet, not the bank's.",
-  "Pull up to the daily cap you set below, and no more, to put behind quotes.",
-  "Return your share whenever you ask for it.",
+/** The three things signing up actually is, in order. Verbatim from the contract. */
+export const SIGNUP_STEPS = [
+  { what: "Approve the Bank for RF, from your Friend's wallet", call: "TBA.execute(RF.approve(bank, amount))" },
+  { what: "Approve the Bank for WETH, from your Friend's wallet", call: "TBA.execute(WETH.approve(bank, amount))" },
+  { what: "Open the account: join, with a daily cap per asset", call: "bank.join(collection, id, capRf, capWeth, sweep)" },
 ] as const;
 
-/** What it cannot do. One Foundry test each, in contracts/test. */
-export const GUARANTEES = [
-  "The bank never holds your NFT. It stays in your wallet the whole time.",
-  "Every collection is bounded by the smallest of your cap, the room left in today's epoch, your allowance and your balance, even if you approve an unlimited amount.",
-  "Withdrawal has no timelock, no queue, no pause and no owner check. It works even while the desk is halted.",
-] as const;
+type Line = { text: string; tests: readonly string[] };
 
-export const MANDATE_STATEMENT =
-  "I authorise The First Bank of Friends to harvest this Friend's rewards and to use up to the daily cap stated here for market making on my behalf. The bank takes no custody of the NFT and I may withdraw at any time.";
+/** What the member authorises. Each line names the test that proves it. */
+export const GRANTS: readonly Line[] = [
+  { text: "Claim this Friend's rewards into its own wallet and move what was claimed into your account, up to your daily cap per asset.",
+    tests: ["test_PullsOnlyWhatItJustClaimed", "test_PerAssetDailyCapInItsOwnUnits"] },
+  { text: "Retry a move that failed, until you next use your Friend's wallet.",
+    tests: ["test_FailedPullIsOwedAndRetried", "test_OwnerActionForfeitsOwed"] },
+  { text: "If the desk is on, rest maker orders with your account's RF or WETH, at prices the keeper chooses inside the contract's limits (about a 10% band around a time-weighted price), shared pro rata with everyone else whose money is in that order.",
+    tests: ["test_AskProceedsGoOnlyToTheHoldersWhoFundedIt", "test_BidProceedsGoOnlyToTheHoldersWhoFundedIt"] },
+];
 
-const TYPES = {
-  Mandate: [
-    { name: "friend", type: "string" },
-    { name: "capPerDayRf", type: "string" },
-    { name: "statement", type: "string" },
-    { name: "signedAt", type: "string" },
-  ],
-} as const;
-
-type Injected = { request: (a: { method: string; params?: unknown[] }) => Promise<unknown> };
-const injected = (): Injected | null => {
-  const e = (globalThis as { ethereum?: Injected }).ethereum;
-  return e && typeof e.request === "function" ? e : null;
+/** The optional switch, off by default. */
+export const SWEEP_GRANT: Line = {
+  text: "Also move anything above what the wallet holds today.",
+  tests: ["test_SweepModeCatchesRewardsSomeoneElseClaimed"],
 };
 
-export const hasWallet = () => injected() !== null;
+/**
+ * "The bank cannot..." Each line names its tests. The maker-only line was held
+ * back until its fork tests had actually run against the live pool; they have.
+ */
+export const GUARANTEES: readonly Line[] = [
+  { text: "touch your own wallet: not your ETH, not your tokens, not your NFTs, even if you approved it.",
+    tests: ["test_EveryEntryPointLeavesTheOwnersWalletAlone", "testFuzz_OwnersWalletNeverDecreases", "test_TheBankAndDeskRefuseEth"] },
+  { text: "hold your NFT.", tests: ["test_SignupEntirelyThroughTheFriendWallet", "test_StrangerCannotJoinSomeoneElsesFriend"] },
+  { text: "take anything your Friend's wallet held when you joined, or anything you add later unless you switch on 'also move extras'.", tests: ["test_PullsOnlyWhatItJustClaimed", "invariant_PrincipalInFriendWalletsUntouched"] },
+  { text: "move more than your daily cap.", tests: ["test_PerAssetDailyCapInItsOwnUnits"] },
+  { text: "touch your Friend's wallet after you sell it. What you deposited stays yours.",
+    tests: ["test_SaleSuspendsAndTheBuyerIsNeverTouched", "test_BoughtBackStaysSuspendedUntilRejoined", "invariant_NoWrongfulPull"] },
+  { text: "stop you withdrawing RF, WETH or both, any amount, at any time, even while the desk is halted.",
+    tests: ["test_WithdrawWorksHaltedAndAfterRenounce", "test_WithdrawRFAndWETHSeparately", "test_WethStillExitsIfRfTransfersBreak", "test_IdleWithdrawNeverTouchesThePool", "invariant_EveryoneCanExit"] },
+  { text: "keep your share of an open order: take it out yourself, any time, no keeper needed.",
+    tests: ["test_ExitMidRangeThenCloseNeverPaysTwice", "test_ExitAndCloseWorkWithoutKeeperOrRewardsContract", "test_WithdrawAllIncludesAnOpenRange"] },
+  { text: "let anyone else's deposits, withdrawals or sales change your account.", tests: ["testFuzz_Isolation", "test_DonationMovesNobody"] },
+  { text: "sell RF below what it paid plus 5%, except inside a loss budget of 5% of the book per 30 days, or, within 30 days of a sale, buy back above that sale's price minus 5%.",
+    tests: ["test_AskBelowCostPlusLockNeedsBudget", "test_H_CanCutALossWithinTheBudget", "test_BidMustSitBelowLastSaleMinusLock", "test_I_CostBasisIsSizeWeighted"] },
+  { text: "swap. It only rests maker orders, which pay no 5% toll.",
+    tests: ["test_fork_AskFillsAsMakerWithNoHookFee", "test_fork_BidFillsAsMaker"] },
+  { text: "let its owner touch accounts. The owner can pause the desk, tighten its limits and, with two days' notice, change the keeper; it can never be the keeper.",
+    tests: ["test_OwnerHasNoPathToHolderFunds", "test_KeeperChangeIsDelayedAndNeverTheOwner", "test_KeeperNeverTheOwnerAtDeploy"] },
+];
 
 /**
- * Sign the mandate with a browser wallet if there is one.
- * Returns nulls rather than throwing when there is no wallet, so opening an
- * account never depends on having one. Throws only if a wallet is present and
- * the person actively rejects, which the caller should surface as a rejection
- * rather than as a failure.
+ * CLOSE ACCOUNT AND TAKE EVERYTHING HOME: one action. `close` stops collecting,
+ * takes your share out of any open order and sends all your RF and WETH to you;
+ * the two revokes ride along in the same step, because the bank cannot revoke an
+ * approval for you. Verbatim from the contract.
  */
-export async function signMandate(
-  friend: string,
-  capPerDayRf: number,
-  signedAt: string,
-): Promise<{ signature: string | null; signer: string | null }> {
-  const eth = injected();
-  if (!eth) return { signature: null, signer: null };
+export const CLOSE_CALLS = [
+  "bank.close([collection], [id], you)",
+  "TBA.execute(RF.approve(bank, 0))",
+  "TBA.execute(WETH.approve(bank, 0))",
+] as const;
 
-  const accounts = (await eth.request({ method: "eth_requestAccounts" })) as string[];
-  const signer = accounts?.[0];
-  if (!signer) return { signature: null, signer: null };
+export const CLOSE_SUMMARY =
+  "Stop collecting, take your share out of any open order, send all your RF and WETH to you, and revoke both approvals from your Friend's wallet.";
 
-  const payload = JSON.stringify({
-    domain: { name: "The First Bank of Friends", version: "1", chainId: CHAIN_ID },
-    primaryType: "Mandate",
-    types: { EIP712Domain: [
-      { name: "name", type: "string" },
-      { name: "version", type: "string" },
-      { name: "chainId", type: "uint256" },
-    ], ...TYPES },
-    message: {
-      friend,
-      capPerDayRf: capPerDayRf.toLocaleString("en-US", { maximumFractionDigits: 0 }),
-      statement: MANDATE_STATEMENT,
-      signedAt,
-    },
-  });
+export const CLOSE_TESTS = [
+  "test_ClosePaysExactlyTheLinePlusTheRangeShare",
+  "test_AfterCloseNothingIsPulledEvenWithApprovalsLeft",
+] as const;
 
-  const signature = (await eth.request({
-    method: "eth_signTypedData_v4",
-    params: [signer, payload],
-  })) as string;
-
-  return { signature, signer };
-}
+/** What signing up can and cannot reach. */
+export const WALLET_SCOPE =
+  "Your own wallet approves nothing. The bank can only ever reach the RF and WETH inside your Friend's wallet, never your ETH or anything else in your personal wallet.";
 
 /* -------------------------------------------------------------------- store */
+
+/**
+ * Accounts opened before boxes existed carried one RF cap and no box. Read them
+ * forward rather than dropping them: their box is what the keeper would have moved
+ * in, which is the idle balance they were opened with.
+ */
+function normalise(a: Partial<Account> & { id: string }): Account {
+  const idleRf = Number(a.idleRf ?? 0), idleWeth = Number(a.idleWeth ?? 0);
+  return {
+    label: a.id, collection: "", tokenId: "", imageUrl: null, sweep: false,
+    ...a,
+    openedAt: String((a as { openedAt?: string; signedAt?: string }).openedAt ?? (a as { signedAt?: string }).signedAt ?? new Date(0).toISOString()),
+    idleRf, idleWeth,
+    capPerDayRf: Number(a.capPerDayRf ?? 0),
+    capPerDayWeth: Number(a.capPerDayWeth ?? 0),
+    boxRf: Number(a.boxRf ?? idleRf),
+    boxWeth: Number(a.boxWeth ?? idleWeth),
+    pnlRf: Number(a.pnlRf ?? 0),
+    pnlWeth: Number(a.pnlWeth ?? 0),
+    owedRf: Number(a.owedRf ?? 0),
+    owedWeth: Number(a.owedWeth ?? 0),
+  } as Account;
+}
 
 export function loadAccounts(): Account[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     const list = raw ? (JSON.parse(raw) as Account[]) : [];
-    return Array.isArray(list) ? list.filter((a) => a && typeof a.id === "string") : [];
+    return Array.isArray(list) ? list.filter((a) => a && typeof a.id === "string").map(normalise) : [];
   } catch {
     return [];
   }
@@ -152,29 +186,54 @@ export function removeAccount(id: string): Account[] {
 }
 
 /**
- * The minimum book that can quote BOTH sides, derived in scripts/derive-parameters.
- * A grid needs RF to sell and WETH to buy and both sides must clear the economic
- * minimum fill, which is why one Friend alone can buy and can never sell.
+ * Withdraw ONE asset from a box. The other asset stays exactly where it is, which
+ * is the property the contract gives withdraw: each asset leaves on its own.
  */
-export const MIN_VIABLE_BOOK_USD = 116;
+export function withdrawAsset(id: string, asset: "rf" | "weth"): Account[] {
+  const next = loadAccounts().map((a) => a.id !== id ? a
+    : asset === "rf" ? { ...a, boxRf: 0, pnlRf: 0 } : { ...a, boxWeth: 0, pnlWeth: 0 });
+  save(next);
+  return next;
+}
+
+/** A box's holdings, per asset: what was deposited plus the desk's in-kind result. */
+export const boxRf = (a: Account) => a.boxRf + a.pnlRf;
+export const boxWeth = (a: Account) => a.boxWeth + a.pnlWeth;
+
+/**
+ * The pooled book is the SUM OF THE BOXES, per asset, and nothing else. The dollar
+ * figure is for reading only; nothing is ever minted or redeemed against it.
+ */
+/**
+ * What is still on its way into a box, and how long it takes at the member's own
+ * caps: ceil(remaining / cap) per asset, and the larger of the two, because the
+ * two assets arrive in parallel and the slower one sets the date.
+ */
+export function onItsWay(a: Account, rfUsd: number, ethUsd: number) {
+  const days = (left: number, cap: number) => (left > 0 && cap > 0 ? Math.ceil(left / cap) : 0);
+  return {
+    rf: a.owedRf, weth: a.owedWeth,
+    usd: a.owedRf * rfUsd + a.owedWeth * ethUsd,
+    days: Math.max(days(a.owedRf, a.capPerDayRf), days(a.owedWeth, a.capPerDayWeth)),
+  };
+}
 
 export function totals(list: Account[], rfUsd: number, ethUsd: number) {
-  const rf = list.reduce((a, x) => a + x.idleRf, 0);
-  const weth = list.reduce((a, x) => a + x.idleWeth, 0);
-  const rfSideUsd = rf * rfUsd;
-  const wethSideUsd = weth * ethUsd;
-  const usd = rfSideUsd + wethSideUsd;
+  const rf = list.reduce((a, x) => a + boxRf(x), 0);
+  const weth = list.reduce((a, x) => a + boxWeth(x), 0);
+  const pnlRf = list.reduce((a, x) => a + x.pnlRf, 0);
+  const pnlWeth = list.reduce((a, x) => a + x.pnlWeth, 0);
+  const usdOf = (x: Account) => boxRf(x) * rfUsd + boxWeth(x) * ethUsd;
+  const usd = list.reduce((a, x) => a + usdOf(x), 0);
   return {
     depositors: list.length,
-    rf, weth, usd, rfSideUsd, wethSideUsd,
-    /**
-     * A book is only viable if the SMALLER side can still clear a fill, so both the
-     * bar and the verdict measure the BALANCED total. An earlier `progress` here ran
-     * off the unbalanced total, which would have filled the bar at $116 of pure WETH
-     * while the verdict beneath it still read "not yet". One number, one definition.
-     */
-    balancedUsd: Math.min(rfSideUsd, wethSideUsd) * 2,
-    progress: Math.min(1, (Math.min(rfSideUsd, wethSideUsd) * 2) / MIN_VIABLE_BOOK_USD),
-    viable: Math.min(rfSideUsd, wethSideUsd) * 2 >= MIN_VIABLE_BOOK_USD,
+    rf, weth, pnlRf, pnlWeth, usd,
+    owedRf: list.reduce((a, x) => a + x.owedRf, 0),
+    owedWeth: list.reduce((a, x) => a + x.owedWeth, 0),
+    owedUsd: list.reduce((a, x) => a + x.owedRf * rfUsd + x.owedWeth * ethUsd, 0),
+    rfSideUsd: rf * rfUsd,
+    wethSideUsd: weth * ethUsd,
+    /** Each box's slice of the book, for drawing the pooled bar as its segments. */
+    slices: list.map((x) => ({ id: x.id, label: x.label, usd: usdOf(x), share: usd > 0 ? usdOf(x) / usd : 0 })),
   };
 }

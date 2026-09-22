@@ -41,9 +41,9 @@ console.log("-".repeat(100));
 console.log(`\nBEST GENUINELY FILLABLE BID: ${bestReal ? bestReal.toFixed(2)+" "+sym : "none in the top 14"}`);
 
 // Reserve payout in USD for comparison
-import { readPool } from "../lib/protocol.mjs";
+import { readPool, ethUsd } from "../lib/protocol.mjs";
 const pool = await readPool(c);
-const rfUsd = pool.wethPerRf * 2734.86;
+const rfUsd = pool.wethPerRf * ((await ethUsd())?.usd ?? NaN);   // live; NaN rather than a stale constant
 console.log(`Reserve pays 900,000 RF = $${(900000*rfUsd).toFixed(2)}`);
 console.log(`OpenSea floor (ask)      = 1693.99 ${sym}`);
 if (bestReal) {

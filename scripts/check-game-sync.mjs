@@ -2,8 +2,7 @@
 /**
  * game/ is the canonical source for the SDK game; sdk/games/first-bank is a working
  * copy the SDK CLI builds from. A second copy is a second source of truth, so assert
- * they match. Also asserts the game's strategy.mjs is byte-identical to lib/, because
- * the whole claim of the trading desk is that it runs the REAL strategy.
+ * they match. game/ itself is frozen (see below).
  */
 import fs from "node:fs";
 import crypto from "node:crypto";
@@ -15,9 +14,9 @@ for (const f of ["index.tsx", "game.json", "style.css", "world.ts", "host.css", 
   console.log(`${ok ? "  ok  " : " FAIL "} game/${f} ${a}  vs  sdk/games/first-bank/${f} ${b}`);
   if (!ok) bad++;
 }
-const s1 = h("lib/strategy.mjs"), s2 = h("game/strategy.mjs");
-const ok = s1 === s2;
-console.log(`${ok ? "  ok  " : " FAIL "} lib/strategy.mjs ${s1}  vs  game/strategy.mjs ${s2}   <- the desk must run the real strategy`);
-if (!ok) bad++;
-if (bad) { console.error(`\n${bad} out of sync. Run: cp game/* sdk/games/first-bank/ && cp lib/strategy.mjs game/`); process.exit(1); }
+// game/ is the ABANDONED FriendSDK build, frozen for reference: it is the version that cannot
+// admit a Genesis. It keeps the taker-grid strategy it shipped with and is NOT held equal to
+// lib/strategy.mjs any more, because the live desk moved to maker-only range orders and the
+// frozen game must keep running the code it was built against. The hall at / runs lib/.
+if (bad) { console.error(`\n${bad} out of sync. Run: cp game/* sdk/games/first-bank/`); process.exit(1); }
 console.log("\ngame copies are identical.");

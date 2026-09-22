@@ -6,7 +6,7 @@ export default function Sparkline({ points }: { points: number[] }) {
   if (!points || points.length < 2) {
     return (
       <div className="spark" style={{ display: "grid", placeItems: "center", color: "var(--dimmer)", fontSize: "0.72rem" }}>
-        not enough trades to draw a line
+        not enough history to draw a line
       </div>
     );
   }
@@ -22,7 +22,7 @@ export default function Sparkline({ points }: { points: number[] }) {
     .join(" ");
   return (
     <svg className="spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
-         aria-label={`Recent $RAREFRIENDS price, ${points.length} trades, low ${lo.toExponential(3)} high ${hi.toExponential(3)} WETH`}>
+         aria-label={`$RAREFRIENDS price, ${points.length} hourly closes, low ${lo.toExponential(3)} high ${hi.toExponential(3)} WETH`}>
       <line className="axis" x1="0" y1={H - PAD} x2={W} y2={H - PAD} />
       <path d={d} />
     </svg>

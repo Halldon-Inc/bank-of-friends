@@ -52,7 +52,7 @@ export default function HallShell({ showcase, rfUsd, ethUsd }: { showcase: HallF
 
   return (
     <>
-      <Hall friend={friend} onLeave={() => setPicking(true)} rfUsd={rfUsd} ethUsd={ethUsd} />
+      <Hall friend={friend} onLeave={() => setPicking(true)} rfUsd={rfUsd} ethUsd={ethUsd} walletFriends={friends ?? []} />
 
       {picking && (
         <div className="hall-modal" role="dialog" aria-modal="true" aria-label="Choose a Friend">
@@ -93,7 +93,7 @@ export default function HallShell({ showcase, rfUsd, ethUsd }: { showcase: HallF
                       <img src={f.imageUrl} alt="" className={f.collection === "Generations" && f.generation >= 1 ? "world" : "portrait"} />
                     ) : <span className="picker-noart" aria-hidden="true" />}
                     <span className="picker-label">{f.label}</span>
-                    <span className="picker-meta">{f.activated ? `${n(f.idleRf)} RF idle` : "not activated"}</span>
+                    <span className="picker-meta">{f.activated ? `${n(f.idleRf, 0)} RF + ${f.idleWeth.toFixed(4)} WETH idle` : "not activated"}</span>
                     {!f.gameEligible && f.activated && <span className="picker-tag">SDK hides this</span>}
                   </button>
                 ))}

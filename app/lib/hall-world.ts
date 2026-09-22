@@ -51,6 +51,7 @@ const PAD = 24;
 /** Room for a sign above whatever it names. */
 const PROMPT_ROOM = 36;
 
+
 /** Screen position of an offset from the aisle, and of a depth. */
 export const sx = (offset: number) => CX + S * A * offset;
 export const sy = (depth: number) => CY + S * B * (depth - 480);
@@ -111,19 +112,33 @@ type Spec = {
    * on the door like a plaque instead.
    */
   vaultFrom: number;
+  /**
+   * The Trading Floor: the quote board stands BEHIND the teller line on the right,
+   * the way a bank's dealing room sits behind its counter. You reach it through the
+   * opening in the counter. Depth and offset are placed so it is out of reach of
+   * both the desk and the vault in every room; the guards below prove that at load.
+   */
+  floorAt: number; floorOffset: number;
+  /**
+   * How much of the pediment's height the vault plaque takes. The tympanum is a
+   * triangle, so a shorter plaque is a wider one; the corridor needs the width.
+   */
+  plaqueH: number;
+  /** The pediment's share of the facade. The corridor's is taller, for the plaque. */
+  pedF: number;
 };
 
 /**
  * Each room was solved rather than chosen: maximise floor depth, keep the facade a
  * sane fraction of the hall's width, subject to the 576x384 plane, at the target
- * proportion. The plane is why the wide hall is 1.99 and not wider - a hall's depth
+ * proportion. The plane is why the wide hall is 1.99 and not wider: a hall's depth
  * is capped at `768 - 2 * half`, so one both very wide and deep enough to walk down
  * does not exist.
  */
 const SPECS: Spec[] = [
-  { key: "wide", half: 212, near: 320, far: 640, chamfer: 46, facadeH: 95,  counterH: 34, aisle: 40, reach: 64, vaultFrom: 52 },
-  { key: "mid",  half: 192, near: 310, far: 650, chamfer: 44, facadeH: 130, counterH: 38, aisle: 38, reach: 66, vaultFrom: 74 },
-  { key: "tall", half: 66,  near: 174, far: 764, chamfer: 26, facadeH: 110, counterH: 34, aisle: 30, reach: 78, vaultFrom: 150 },
+  { key: "wide", half: 212, near: 320, far: 640, chamfer: 46, facadeH: 95,  counterH: 34, aisle: 40, reach: 64, vaultFrom: 52,  floorAt: 418, floorOffset: 132, plaqueH: 0.6, pedF: 0.27 },
+  { key: "mid",  half: 192, near: 310, far: 650, chamfer: 44, facadeH: 130, counterH: 38, aisle: 38, reach: 66, vaultFrom: 74,  floorAt: 432, floorOffset: 120, plaqueH: 0.6, pedF: 0.27 },
+  { key: "tall", half: 66,  near: 174, far: 764, chamfer: 26, facadeH: 130, counterH: 34, aisle: 30, reach: 78, vaultFrom: 150, floorAt: 430, floorOffset: 44, plaqueH: 0.44, pedF: 0.38 },
 ];
 
 /**
@@ -135,8 +150,15 @@ function facadeOf(spec: Spec) {
   const left = sx(-spec.half), right = sx(spec.half);
   const base = sy(spec.near), F = spec.facadeH;
   const top = base - F;
-  const pedH = F * 0.2, entabH = F * 0.1, plinthH = F * 0.09;
-  const colTop = top + pedH + entabH;
+  // The pediment is tall enough to carry THE VAULT HOLDS plaque in its tympanum.
+  const pedH = F * spec.pedF, entabH = F * 0.1, plinthH = F * 0.09;
+  /**
+   * The marquee: a lit frieze under the name, the full width of the entablature.
+   * The ticker used to be a separate black strip floating above the roof; it is
+   * part of the building now, so the colonnade gives up a tenth of its height.
+   */
+  const marqueeH = F * 0.14;
+  const colTop = top + pedH + entabH + marqueeH;
   const colBot = base - plinthH;
   const width = right - left;
   const colH = colBot - colTop;
@@ -146,7 +168,28 @@ function facadeOf(spec: Spec) {
   return {
     left, right, width, base, top, F, colH,
     pedBottom: top + pedH,
-    entabTop: top + pedH, entabBottom: colTop,
+    entabTop: top + pedH, entabBottom: top + pedH + entabH,
+    /**
+     * THE VAULT HOLDS: a brass plaque in the pediment, the most visible place on
+     * the building. The tympanum is a triangle, so the plaque is sized to the
+     * width the triangle actually has at the plaque's top edge, never wider.
+     */
+    plaque: (() => {
+      const pedBottom = top + pedH;
+      const bottom = pedBottom - pedH * 0.04;
+      const h = pedH * spec.plaqueH;
+      const topY = bottom - h;
+      const widthAtTop = width * (1 - (pedBottom - topY) / pedH);
+      const half = Math.max(8, widthAtTop * 0.5 * 0.96);
+      return { left: CX - half, right: CX + half, top: topY, bottom };
+    })(),
+    marquee: (() => {
+      const mTop = top + pedH + entabH, inset = Math.max(1.5, marqueeH * 0.15);
+      return {
+        frame: { left, right, top: mTop, bottom: colTop },
+        screen: { left: left + inset * 3, right: right - inset * 3, top: mTop + inset, bottom: colTop - inset },
+      };
+    })(),
     colTop, colBot, plinthH,
     bay,
     door: { cx: CX, cy: colBot - r * 1.04, r },
@@ -193,7 +236,6 @@ function room(spec: Spec) {
   const counterAt = deskAt - 30;
   const counter = counterOf(spec, counterAt);
   const [runL, runR] = counter.runs[0];
-  const deskLabelOffset = Math.round(((runL + runR) / 2 - CX) / (S * A));
 
   /**
    * Collision only. The counter is DRAWN by lib/hall-art; these stop you strolling
@@ -233,44 +275,96 @@ function room(spec: Spec) {
     label: "The Desk",
     hint: "open an account",
     position: at(deskAt) as readonly [number, number],
-    // The LABEL sits over the left run of the counter, which is the thing it
-    // names. Centred in the aisle it stacked on top of the vault's sign and the
-    // pair of them covered the vault door.
-    anchor: at(counterAt, deskLabelOffset) as readonly [number, number],
     reach: spec.reach,
-    lift: Math.round(spec.counterH + 4),
+    /**
+     * EVERY SIGN IS PINNED TO THE THING IT NAMES, in screen space, from the same
+     * numbers the art is drawn with. They used to be projected from a floor point
+     * plus a lift, which on the phone left the vault's sign floating mid-hall and
+     * the floor's sign on the frieze. The desk's hangs over the left counter run.
+     */
+    sign: { x: (runL + runR) / 2, y: counter.top + 1, hang: "above" as "above" | "below" },
+    art: "desk",
   };
   const vault = {
     id: "vault" as const,
     label: "The Vault",
     hint: "see the book",
     position: at(vaultAt) as readonly [number, number],
-    anchor: at(vaultAt) as readonly [number, number],
-    // Just off the floor in front of the door. Lifting it clear of the door put it
-    // straight through the pediment and across the bank's own name.
-    lift: 14,
     reach: spec.reach,
+    // Hangs from the foot of the door frame, like a plaque on the plinth.
+    sign: { x: CX, y: facade.door.cy + facade.door.r * 1.22 + 1, hang: "below" as "above" | "below" },
+    art: "vault",
   };
+  /*
+   * The Trading Floor: a quote board standing behind the right run of the counter.
+   * You stand in front of the board; the board itself sits a little further back.
+   * It is kept LOW: the strip of floor behind the counter is shallow, and a tall
+   * board rose straight up over the colonnade.
+   */
+  const boardAt = spec.floorAt - 12;
+  const boardHalf = Math.min(sx(spec.half) - CX, 150) * 0.2;
+  const board = {
+    cx: sx(spec.floorOffset),
+    base: sy(boardAt),
+    top: sy(boardAt) - spec.counterH * 1.25,
+    legs: spec.counterH * 0.35,
+    left: sx(spec.floorOffset) - boardHalf,
+    right: sx(spec.floorOffset) + boardHalf,
+  };
+  const floor = {
+    id: "floor" as const,
+    label: "The Trading Floor",
+    hint: "is the desk on?",
+    position: at(spec.floorAt, spec.floorOffset) as readonly [number, number],
+    reach: spec.reach,
+    // Sits on top of the quote board it names.
+    sign: { x: board.cx, y: board.top + 1, hang: "above" as "above" | "below" },
+    art: "floor",
+  };
+
   const spawn = at(spawnAt) as readonly [number, number];
+  const stations = [desk, floor, vault] as const;
 
   /**
    * You must have to WALK somewhere, and arriving at one destination must not arm
-   * the other. In an earlier room the vault sat within reach of the door, so its
-   * sign was lit before you had moved a pixel.
+   * another. In an earlier room the vault sat within reach of the door, so its
+   * sign was lit before you had moved a pixel. Checked for EVERY pair, because a
+   * third station is exactly how a pairwise guard written for two quietly stops
+   * covering the room.
    */
   const apart = (a: readonly [number, number], b: readonly [number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-  for (const t of [desk, vault]) {
+  for (const t of stations) {
     if (apart(spawn, t.position) <= t.reach * 1.25) {
       throw new Error(`hall/${spec.key}: you spawn ${apart(spawn, t.position).toFixed(0)} from ${t.label}, inside its reach of ${t.reach}.`);
     }
   }
-  const gap = apart(desk.position, vault.position);
-  if (gap <= Math.max(desk.reach, vault.reach)) {
-    throw new Error(`hall/${spec.key}: desk and vault are ${gap.toFixed(0)} apart, inside a reach of ${Math.max(desk.reach, vault.reach)}.`);
+  for (let i = 0; i < stations.length; i++) {
+    for (let j = i + 1; j < stations.length; j++) {
+      const a = stations[i], b = stations[j];
+      const gap = apart(a.position, b.position);
+      if (gap <= Math.max(a.reach, b.reach)) {
+        throw new Error(`hall/${spec.key}: ${a.label} and ${b.label} are ${gap.toFixed(0)} apart, inside a reach of ${Math.max(a.reach, b.reach)}.`);
+      }
+    }
   }
 
+  /**
+   * The keeper's round: from the opening in the counter, up the aisle, to the foot
+   * of the vault door. The far end is the door itself, not the vault's standing
+   * spot, so in the corridor it visibly walks all the way up to the vault.
+   */
+  const keeper = {
+    from: projectXY(...at(counterAt)),
+    // Just beside the door, never under the vault's sign, which hangs from the frame.
+    to: projectXY(...at(spec.near + 16, -Math.min(28, spec.half * 0.45))),
+  };
+
+  /** The ticker runs in the marquee's lit screen. */
+  const ticker = facade.marquee.screen;
+  const plaque = facade.plaque;
+
   /* Camera: the floor's own corners, the skirt below it, the building above it,
-     and room for both signs. Solved, never typed in. */
+     and room for every sign. Solved, never typed in. */
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   const see = (px: number, py: number) => {
     minX = Math.min(minX, px); maxX = Math.max(maxX, px);
@@ -281,9 +375,8 @@ function room(spec: Spec) {
     see(px, py); see(px, py + S * DEPTH_SKIRT);
   }
   see(facade.left, facade.top); see(facade.right, facade.base);
-  for (const t of [desk, vault]) {
-    const [px, py] = projectXY(t.anchor[0], t.anchor[1]);
-    see(px, py - t.lift - PROMPT_ROOM);
+  for (const t of stations) {
+    see(t.sign.x, t.sign.hang === "above" ? t.sign.y - PROMPT_ROOM : t.sign.y + PROMPT_ROOM);
   }
   const width = Math.round(maxX - minX + PAD * 2);
   const height = Math.round(maxY - minY + PAD * 2);
@@ -295,7 +388,7 @@ function room(spec: Spec) {
 
   return {
     key: spec.key,
-    world, spawn, desk, vault, facade, counter,
+    world, spawn, desk, vault, floor, stations, facade, counter, board, keeper, ticker, plaque,
     viewBox,
     /** MUST match the viewBox or preserveAspectRatio letterboxes the scene. */
     ratio: viewBox.width / viewBox.height,

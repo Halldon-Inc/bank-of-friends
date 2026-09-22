@@ -1,203 +1,125 @@
 #!/usr/bin/env node
 /**
- * Backtest the REGIME-GATED market maker.
+ * Backtest the MAKER-ONLY, regime-gated range-order desk.
  *
- *   node scripts/backtest-gated.mjs
+ *   node scripts/backtest-gated.mjs            (writes docs/STRATEGY.md's code block)
  *
- * Two runs, one strategy module (lib/strategy.mjs), so the code that decides in
- * simulation is exactly the code that will decide with real money.
+ * One strategy module (lib/strategy.mjs), one engine (scripts/backtest-engine.mjs),
+ * endogenous price path. Three runs:
  *
- *  RUN 1  the real history of the RF/WETH pool, 5.6 days.
- *         EXPECTED RESULT: the desk refuses to trade. If it trades here, the gates
- *         are wrong, because every strategy tested on this window lost money.
+ *  RUN 1  the real history of the RF/WETH pool, gated as it would be live.
+ *         Plus the COUNTERFACTUAL: the same grid with the arming rule off.
+ *         PASS = the gated desk loses nothing on the real tape.
  *
- *  RUN 2  a SYNTHETIC ranging market with volume restored. Clearly labelled as
- *         synthetic. This does not predict anything. It answers one question only:
- *         if the conditions the desk is waiting for actually arrive, does it act,
- *         and does the grid clear the 10% toll?
+ *  RUN 2  a SYNTHETIC ranging tape, 14 days, long enough for every gate including
+ *         the 7-day replay to become measurable. Labelled as synthetic: it answers
+ *         only "when the conditions arrive, does the desk act, and does it keep it?"
+ *
+ *  RUN 3  the gates as of the LAST SWAP in data/swaps.json, computed, not typed in.
+ *         The live figure is /api/desk; this is the tape's figure, dated.
+ *
+ *   node scripts/backtest-gated.mjs --export-hourly
+ *     also writes app/lib/price-hourly.json, the hourly closes the live desk uses for
+ *     anything older than its own 72h scan. Refresh data/swaps.json first
+ *     (node scripts/fetch-history.mjs), then run this before every deploy.
  */
 import fs from "node:fs";
-import { DEFAULT_GATES, COSTS, evaluateRegime, nextOrder, realisedVol, drift, explain } from "../lib/strategy.mjs";
-import { fmt } from "../lib/protocol.mjs";
+import { DEFAULT_GATES, evaluateRegime, measurePath, makerEdgePerRoundTrip, BREAKEVEN_STEP } from "../lib/strategy.mjs";
+import { loadTape, simulateDesk, syntheticTape, hourlyCloses } from "./backtest-engine.mjs";
 
-const ETH_USD = 2734.86;
-const FEE = 0.05;
+const ETH_USD = 2736;   // SNAPSHOT (CoinGecko 2026-09-22), fixed so reruns are comparable; the live figure is /api/desk
+const out = [];
+const log = (s = "") => { out.push(s); console.log(s); };
+const pct = (v, d = 2) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(d)}%`;
+const line = "=".repeat(86);
 
-/* ------------------------------------------------------------------- execution */
-function buyRf(wethIn, mid, poolWeth, poolRf) {
-  const net = wethIn * (1 - FEE);
-  return poolRf - (poolRf * poolWeth) / (poolWeth + net);
-}
-function sellRf(rfIn, mid, poolWeth, poolRf) {
-  const gross = poolWeth - (poolRf * poolWeth) / (poolRf + rfIn);
-  return gross * (1 - FEE);
-}
-
-/**
- * Drive the strategy over a price/volume tape. `tape` entries:
- *   { t, mid, tradeWeth, poolWeth, poolRf }
- */
-function run(tape, book0, gates = DEFAULT_GATES, label = "") {
-  const book = { rf: book0.rf, weth: book0.weth, halted: false, hwmWeth: 0, valueWeth: 0 };
-  const state = { gridRef: null, fillsThisHour: 0, hourBucket: null };
-  let fills = 0, gasUsd = 0, armedTicks = 0, standDownTicks = 0;
-  const reasons = new Map();
-  // Price history must be windowed by TIME, not by trade count. An earlier version
-  // kept "the last 240 mids", which on launch day was about an hour and on a quiet
-  // day was a day and a half. The desk armed mid-crash because its "24h drift" was
-  // really a 1h drift. Units matter.
-  const hist = [];              // { t, mid }
-  const week = [];              // 7 days, for the slow-bleed gate
-  let vol24 = 0, trades24 = 0;
-  const day = [];
-  // Warm-up must be measured from the FIRST tick ever seen, not from the pruned
-  // window's head: hist is trimmed to 24h, so `now - hist[0].t >= 86400` can never
-  // be true and the desk would sit out forever while appearing to pass.
-  const firstT = tape[0].t;
-  let warmedUp = false;
-
-  for (const q of tape) {
-    hist.push({ t: q.t, mid: q.mid });
-    while (hist.length && q.t - hist[0].t > 86400) hist.shift();
-    week.push({ t: q.t, mid: q.mid });
-    while (week.length && q.t - week[0].t > 7 * 86400) week.shift();
-    day.push({ t: q.t, w: q.tradeWeth }); while (day.length && q.t - day[0].t > 86400) day.shift();
-    // Refuse to act on a partial window: a rolling stat needs its full lookback.
-    if (!warmedUp && q.t - firstT >= 86400) warmedUp = true;
-    vol24 = day.reduce((a, b) => a + b.w, 0);
-    trades24 = day.length;
-
-    const hour = Math.floor(q.t / 3600);
-    if (state.hourBucket !== hour) { state.hourBucket = hour; state.fillsThisHour = 0; }
-
-    book.valueWeth = book.weth + book.rf * q.mid;
-    book.hwmWeth = Math.max(book.hwmWeth, book.valueWeth);
-
-    const since = (sec) => hist.filter((h) => q.t - h.t <= sec).map((h) => h.mid);
-    const lastHour = since(3600);
-    const market = {
-      mid: q.mid, ethUsd: ETH_USD,
-      volume24hWeth: vol24, trades24h: trades24,
-      drift24h: drift(hist.map((h) => h.mid)),
-      drift1h: drift(lastHour),
-      drift7d: (q.t - week[0].t) >= 6 * 86400 ? drift(week.map((w) => w.mid)) : null,
-      // Scale per-observation vol to an hourly figure using the real sample spacing.
-      hourlyVol: (() => {
-        if (lastHour.length < 5) return 0;
-        const span = Math.max(q.t - (hist.find((h) => q.t - h.t <= 3600)?.t ?? q.t), 1);
-        return realisedVol(lastHour) * Math.sqrt(Math.max(lastHour.length - 1, 1) * (3600 / span));
-      })(),
-    };
-
-    const order = warmedUp ? nextOrder(market, book, state, gates)
-                           : { action: "stand-down", regime: { armed: false, checks: [{ gate: "warmup", ok: false, detail: "less than 24h of price history" }] } };
-    if (order.action === "stand-down") {
-      standDownTicks++;
-      for (const c of order.regime.checks) if (!c.ok) reasons.set(c.gate, (reasons.get(c.gate) || 0) + 1);
-      continue;
-    }
-    armedTicks++;
-    if (state.gridRef === null) state.gridRef = q.mid;
-
-    if (order.action === "buy") {
-      const got = buyRf(order.weth, q.mid, q.poolWeth, q.poolRf);
-      book.rf += got; book.weth -= order.weth;
-      fills++; gasUsd += COSTS.gasUsdPerFill; state.fillsThisHour++; state.gridRef = q.mid;
-    } else if (order.action === "sell") {
-      const got = sellRf(order.rf, q.mid, q.poolWeth, q.poolRf);
-      book.weth += got; book.rf -= order.rf;
-      fills++; gasUsd += COSTS.gasUsdPerFill; state.fillsThisHour++; state.gridRef = q.mid;
-    }
-  }
-
-  const last = tape[tape.length - 1];
-  const realisable = book.weth - gasUsd / ETH_USD + (book.rf > 0 ? sellRf(book.rf, last.mid, last.poolWeth, last.poolRf) : 0);
-  const holdRf = book0.rf, holdWeth = book0.weth;
-  const holdValue = holdWeth + (holdRf > 0 ? sellRf(holdRf, last.mid, last.poolWeth, last.poolRf) : 0);
-  return { label, fills, gasUsd, armedTicks, standDownTicks, reasons, book, realisable, holdValue, ticks: tape.length };
+function report(title, r, book) {
+  log(`  ${title}`);
+  log(`    book            ${book}`);
+  log(`    hours           ${r.hours}   armed ${r.armedHours} (${(r.armedHours / Math.max(r.hours, 1) * 100).toFixed(1)}%)`);
+  log(`    range flips     ${r.flips}   refused by contract rules ${r.refused}   deferred by daily limits ${r.deferred}   gas $${r.gasUsd.toFixed(2)}${r.halted ? "   HALTED by drawdown" : ""}`);
+  log(`    realisable      ${r.realisable.toFixed(6)} WETH ($${(r.realisable * ETH_USD).toFixed(2)})`);
+  log(`    hold            ${r.hold.toFixed(6)} WETH ($${(r.hold * ETH_USD).toFixed(2)})`);
+  log(`    vs hold         ${pct(r.vsHold)}`);
+  const b = Object.entries(r.blockers).sort((a, c) => c[1] - a[1]).map(([g, n]) => `${g} ${n}h`).join(", ");
+  if (b) log(`    hours off, by gate (a gate is counted when blocking OR not yet measurable): ${b}`);
 }
 
-function report(r) {
-  console.log(`\n  ticks            ${r.ticks}`);
-  console.log(`  armed on         ${r.armedTicks} ticks (${(r.armedTicks / r.ticks * 100).toFixed(1)}%)`);
-  console.log(`  stood down on    ${r.standDownTicks} ticks (${(r.standDownTicks / r.ticks * 100).toFixed(1)}%)`);
-  console.log(`  FILLS            ${r.fills}`);
-  console.log(`  gas spent        $${r.gasUsd.toFixed(2)}`);
-  if (r.reasons.size) {
-    console.log(`  why it stood down (ticks blocked by each gate):`);
-    for (const [g, n] of [...r.reasons.entries()].sort((a, b) => b[1] - a[1])) {
-      console.log(`      ${g.padEnd(12)} ${n}`);
-    }
-  }
-  console.log(`  end book         ${fmt.n(r.book.rf)} RF + ${r.book.weth.toFixed(6)} WETH`);
-  console.log(`  realisable       ${r.realisable.toFixed(6)} WETH ($${(r.realisable * ETH_USD).toFixed(2)})`);
-  console.log(`  hold benchmark   ${r.holdValue.toFixed(6)} WETH ($${(r.holdValue * ETH_USD).toFixed(2)})`);
-  const d = r.holdValue > 0 ? ((r.realisable / r.holdValue) - 1) * 100 : 0;
-  console.log(`  vs hold          ${d >= 0 ? "+" : ""}${d.toFixed(2)}%`);
+const { tape, meta } = loadTape();
+const last = tape.at(-1);
+const days = (last.t - tape[0].t) / 86400;
+
+log(line);
+log("RUN 1  -  REAL HISTORY of the RF/WETH pool, maker-only grid, endogenous replay");
+log(line);
+log(`tape: ${meta.swaps} swaps, blocks ${meta.firstBlock} -> ${meta.lastBlock}, ${days.toFixed(2)} days`);
+log(`price ${tape[0].pxBefore.toExponential(4)} -> ${last.px.toExponential(4)} WETH (${pct(last.px / tape[0].pxBefore - 1, 1)})`);
+log(`grid: step ${DEFAULT_GATES.gridStep * 100}%, ${DEFAULT_GATES.rungs} rungs, loss-lock ${DEFAULT_GATES.lockBps / 100}%`);
+log(`maker edge per round trip ${pct(makerEdgePerRoundTrip(DEFAULT_GATES.gridStep, DEFAULT_GATES.lockBps / 1e4))} before gas; a TAKER grid needs a ${(BREAKEVEN_STEP * 100).toFixed(2)}% step to break even\n`);
+const hunt = { rf0: 3159, weth0: 0.028987 };   // MEASURED: Hunt's idle rewards when the study began
+const bal = { rf0: (10000 / ETH_USD) / 2 / tape[0].pxBefore, weth0: (10000 / ETH_USD) / 2 };
+const r1h = simulateDesk(tape, { ...hunt, ethUsd: ETH_USD });
+const r1b = simulateDesk(tape, { ...bal, ethUsd: ETH_USD });
+const c1b = simulateDesk(tape, { ...bal, ethUsd: ETH_USD, alwaysArmed: true });
+report("GATED, Hunt's book", r1h, "3,159 RF + 0.028987 WETH");
+log("");
+report("GATED, $10k balanced", r1b, "$5,000 RF + $5,000 WETH at the opening price");
+log("");
+report("COUNTERFACTUAL: same grid, arming rule OFF (risk gates still on)", c1b, "$10k balanced");
+log("");
+// PASS means the live desk lost nothing on the real tape. The counterfactual is shown
+// beside it and not hidden when it is better: the arming rule costs something in some
+// markets, and scripts/sweep-regimes.mjs shows what it buys in the others.
+log(r1b.vsHold >= -1e-9 && r1h.vsHold >= -1e-9
+  ? `  VERDICT: PASS. The gated desk lost nothing (${pct(r1b.vsHold)}). Ungated it would have been ${pct(c1b.vsHold)}` +
+    (c1b.vsHold < r1b.vsHold ? `:\n  the arming rule saved ${((r1b.vsHold - c1b.vsHold) * 100).toFixed(2)}% of the book.` : `:\n  on this tape the arming rule cost ${((c1b.vsHold - r1b.vsHold) * 100).toFixed(2)}%.`)
+  : `  VERDICT: FAIL. The gated desk lost money on the real tape: ${pct(r1b.vsHold)}.`);
+log(`  Friends' fee stream in the replay: ${r1b.feesToFriendsWeth.toFixed(2)} WETH gated, ${c1b.feesToFriendsWeth.toFixed(2)} WETH ungated (takers pay 5% whoever fills them).`);
+
+log("\n" + line);
+log("RUN 2  -  SYNTHETIC ranging tape, 14 days. NOT A PREDICTION.");
+log("         mean-reverting taker flow around a flat anchor; it answers only whether the");
+log("         desk arms when the market swings, and whether it keeps what it earns");
+log(line);
+const synth = syntheticTape({ days: 14, sigma: 0.012, pull: 0.03, seed: 7 });   // CHOICE: 5-min steps
+const sp = synth.map((x) => x.px);
+log(`tape: ${synth.length} taker trades, price range ${Math.min(...sp).toExponential(3)} to ${Math.max(...sp).toExponential(3)}, net ${pct(synth.at(-1).px / synth[0].pxBefore - 1, 1)}`);
+const sbal = { rf0: (10000 / ETH_USD) / 2 / synth[0].pxBefore, weth0: (10000 / ETH_USD) / 2 };
+const r2 = simulateDesk(synth, { ...sbal, ethUsd: ETH_USD });
+const c2 = simulateDesk(synth, { ...sbal, ethUsd: ETH_USD, alwaysArmed: true });
+report("GATED, $10k balanced", r2, "$5,000 RF + $5,000 WETH");
+log("");
+report("COUNTERFACTUAL: arming rule OFF", c2, "$10k balanced");
+log("");
+log(r2.armedHours > 0 && r2.flips > 0
+  ? `  VERDICT: the desk armed after its warm-up and worked the grid (${r2.flips} flips, ${pct(r2.vsHold)} vs hold).`
+  : "  VERDICT: the desk never traded even here. The gates are too tight for the market they wait for.");
+
+log("\n" + line);
+log(`RUN 3  -  THE GATES AS OF THE TAPE'S LAST SWAP (block ${meta.lastBlock}, ${new Date(last.t * 1000).toISOString().slice(0, 16)}Z)`);
+log("         computed from data/swaps.json, not typed in. The live figure is /api/desk.");
+log(line);
+const hourly = [];
+{ let i = 0, p = tape[0].pxBefore; for (let h = Math.ceil(tape[0].t / 3600) * 3600; h <= last.t + 3600; h += 3600) { while (i < tape.length && tape[i].t <= h) p = tape[i++].px; hourly.push(p); } }
+const t72 = last.t - 72 * 3600;
+const ticks = [tape.filter((e) => e.t <= t72).at(-1)?.px ?? tape[0].pxBefore, ...tape.filter((e) => e.t > t72).map((e) => e.px)];
+const m = measurePath(hourly, DEFAULT_GATES, ticks);
+const v = hunt.weth0 + hunt.rf0 * last.px;
+const reg = evaluateRegime({ ...m, ethUsd: ETH_USD }, { rf: hunt.rf0, weth: hunt.weth0, valueWeth: v, hwmWeth: v, halted: false });
+log(`status: ${reg.armed ? "ARMED" : "OFF"}\n`);
+log(`${"gate".padEnd(16)}${"state".padEnd(12)}detail`);
+log("=".repeat(86));
+for (const c of reg.checks) log(`${c.gate.padEnd(16)}${(c.status === "unmeasured" ? "not yet" : c.status).padEnd(12)}${c.detail}`);
+
+if (process.argv.includes("--export-hourly")) {
+  const h = hourlyCloses(tape);
+  fs.writeFileSync("app/lib/price-hourly.json", JSON.stringify({ generatedAt: new Date().toISOString(), source: "data/swaps.json", ...h }) + "\n");
+  console.log(`\nwrote app/lib/price-hourly.json: ${h.closes.length} hourly closes to block ${h.lastBlock} (${new Date(h.lastTs * 1000).toISOString()})`);
 }
 
-/* ================================================== RUN 1: the real tape */
-console.log("=".repeat(86));
-console.log("RUN 1  -  REAL HISTORY of the RF/WETH pool");
-console.log("         every strategy tested on this window lost money, so a correct");
-console.log("         desk should refuse to trade. That is the pass condition.");
-console.log("=".repeat(86));
-
-const raw = JSON.parse(fs.readFileSync("data/swaps.json", "utf8"));
-const S = raw.swaps.map((s) => ({ t: s.t, sq: BigInt(s.sq), liq: BigInt(s.liq), a1: BigInt(s.a1) })).sort((a, b) => a.t - b.t);
-const realTape = S.map((s) => {
-  const sp = Number(s.sq) / 2 ** 96, mid = sp * sp, L = Number(s.liq) / 1e18;
-  return { t: s.t, mid, tradeWeth: Math.abs(Number(s.a1)) / 1e18, poolWeth: L * sp, poolRf: L / sp };
-});
-const BOOK = { rf: 3159.22, weth: 0.028987 };   // Hunt's actual idle rewards
-console.log(`\nbook: ${fmt.n(BOOK.rf)} RF + ${BOOK.weth} WETH  ($${((BOOK.weth + BOOK.rf * realTape[0].mid) * ETH_USD).toFixed(2)} at open)`);
-const r1 = run(realTape, BOOK, DEFAULT_GATES, "real");
-report(r1);
-console.log(`\n  VERDICT: ${r1.fills === 0 ? "PASS - the desk correctly stayed flat through a -89% slide." : `${r1.fills} fills. Review the gates.`}`);
-
-/* ================================================== RUN 2: synthetic ranging market */
-console.log(`\n${"=".repeat(86)}`);
-console.log("RUN 2  -  SYNTHETIC ranging market, volume restored");
-console.log("         THIS IS NOT A PREDICTION. It is generated data, and it answers one");
-console.log("         question: if the conditions the desk waits for arrive, does it act?");
-console.log("=".repeat(86));
-
-function syntheticRange({ ticks = 6000, mid0 = 5.7e-7, halfLife = 400, sigma = 0.012, band = 0.28, tradeWeth = 0.02, seed = 42 }) {
-  // Ornstein-Uhlenbeck around a flat mean: chop, no trend. Exactly the regime the gates want.
-  let s = seed, mid = mid0;
-  const rnd = () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; };
-  const gauss = () => { const u = Math.max(rnd(), 1e-9), v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-  const kappa = Math.log(2) / halfLife;
-  const out = [];
-  const L = 147865.85, t0 = 1790000000;
-  for (let i = 0; i < ticks; i++) {
-    const logDev = Math.log(mid / mid0);
-    mid = mid * Math.exp(-kappa * logDev + sigma * gauss());
-    mid = Math.min(mid0 * (1 + band), Math.max(mid0 * (1 - band), mid));
-    const sp = Math.sqrt(mid);
-    out.push({ t: t0 + i * 60, mid, tradeWeth: tradeWeth * (0.5 + rnd()), poolWeth: L * sp, poolRf: L / sp });
-  }
-  return out;
+if (process.argv.includes("--write")) {
+  const md = fs.readFileSync("docs/STRATEGY.md", "utf8");
+  const a = md.indexOf("```\n"), b = md.indexOf("```", a + 4);
+  if (a >= 0 && b > a) fs.writeFileSync("docs/STRATEGY.md", md.slice(0, a + 4) + out.join("\n") + "\n" + md.slice(b));
+  console.log("\nwrote docs/STRATEGY.md");
 }
-
-const synth = syntheticRange({});
-const sVol24 = synth.slice(0, 1440).reduce((a, b) => a + b.tradeWeth, 0);
-console.log(`\nsynthetic tape: ${synth.length} one-minute ticks (${(synth.length / 1440).toFixed(1)} days)`);
-console.log(`  mean-reverting, no trend, +/-28% band, ~${sVol24.toFixed(0)} WETH/day volume, ${1440} trades/day`);
-console.log(`  (for scale: the real market did 13.7 WETH/day and ~40 router trades/day)`);
-const r2 = run(synth, BOOK, DEFAULT_GATES, "synthetic");
-report(r2);
-console.log(`\n  VERDICT: ${r2.fills > 0 ? `the desk armed and worked the grid (${r2.fills} fills).` : "the desk stayed flat even here. Gates are too tight."}`);
-
-/* ================================================== what has to change */
-console.log(`\n${"=".repeat(86)}`);
-console.log("WHAT HAS TO CHANGE BEFORE THIS DESK TURNS ON, measured against today");
-console.log("=".repeat(86));
-const today = { volume24hWeth: 13.73, trades24h: 41, drift24h: -0.187, drift1h: 0, hourlyVol: 0.1266, mid: 5.7175e-7, ethUsd: ETH_USD };
-const reg = evaluateRegime(today, { rf: BOOK.rf, weth: BOOK.weth, valueWeth: BOOK.weth + BOOK.rf * today.mid, hwmWeth: BOOK.weth + BOOK.rf * today.mid, halted: false });
-console.log(`\nstatus right now: ${reg.armed ? "ARMED" : "FLAT"}\n`);
-console.log(`${"gate".padEnd(14)}${"ok".padEnd(6)}detail`);
-console.log("-".repeat(80));
-for (const c of reg.checks) console.log(`${c.gate.padEnd(14)}${(c.ok ? "yes" : "NO").padEnd(6)}${c.detail}`);
-console.log("-".repeat(80));
-console.log(`\n${explain(reg)}`);
