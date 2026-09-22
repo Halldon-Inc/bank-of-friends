@@ -143,13 +143,13 @@ export default function DeskView() {
         </section>
 
         <section className="panel">
-          <h2>The book &mdash; idle rewards, founding member</h2>
+          <h2>The candidate book &mdash; idle rewards, founding member</h2>
           <span className="big"><Count value={d.book.usd} decimals={2} prefix="$" /></span>
           <dl style={{ marginTop: "0.9rem" }}>
             <div className="stat"><dt>unclaimed RF</dt><dd><Count value={d.book.rf} decimals={2} /></dd></div>
             <div className="stat"><dt>unclaimed WETH</dt><dd>{d.book.weth.toFixed(8)}</dd></div>
-            <div className="stat"><dt>Friends enrolled</dt><dd>{d.friends.filter((f) => f.activated).length}</dd></div>
-            <div className="stat"><dt>deposits from others</dt><dd>closed</dd></div>
+            <div className="stat"><dt>Friends that could deposit</dt><dd>{d.friends.filter((f) => f.activated).length} of {d.friends.length}</dd></div>
+            <div className="stat"><dt>deposited so far</dt><dd>nothing, contract not deployed</dd></div>
           </dl>
           <p className="note">
             This is reward money that had not been claimed. It sits in each Friend&rsquo;s own ERC-6551
@@ -185,9 +185,16 @@ export default function DeskView() {
       </section>
 
       <section className="panel">
-        <h2>Founding depositors</h2>
+        <h2>The Friends behind that number</h2>
+        <p className="note" style={{ marginTop: 0 }}>
+          These are the founding member&rsquo;s <strong>activated</strong> Friends, which are the ones
+          holding idle rewards and so the ones that could fund a book. They are
+          <strong> not depositors</strong>: nothing has been deposited, because the contract is written,
+          tested and not deployed. An earlier version of this page listed every Friend in the wallet
+          under &ldquo;founding depositors&rdquo;, unactivated ones included, and that was simply untrue.
+        </p>
         <div className="friends">
-          {d.friends.map((f, i) => (
+          {d.friends.filter((f) => f.activated).map((f, i) => (
             <figure className="friend" key={`${f.collection}-${f.id}`} style={{ animationDelay: `${i * 60}ms` }}>
               {f.image ? (
                 <div className={`friend-art ${f.collection === "Generations" && f.generation >= 1 ? "world" : "portrait"}`}>
@@ -201,8 +208,8 @@ export default function DeskView() {
                 <div className="friend-id">
                   {f.collection === "Genesis" ? "GENESIS" : `GEN-${f.generation}`} #{f.id}
                 </div>
-                <div className="friend-meta">{f.activated ? `tier ${f.tier} / 4` : "not activated"}</div>
-                <div className="friend-meta">{f.activated ? `${n(f.earnings, 2)} RF idle` : "—"}</div>
+                <div className="friend-meta">tier {f.tier} / 4</div>
+                <div className="friend-meta">{n(f.earnings, 2)} RF idle</div>
               </figcaption>
             </figure>
           ))}

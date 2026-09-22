@@ -41,6 +41,20 @@ let checks = 0, failures = 0;
 const ok = (m) => { checks++; console.log(`  ok   ${m}`); };
 const bad = (m) => { checks++; failures++; console.log(`  FAIL ${m}`); };
 
+/** Click the destination's own standing spot, published on .hall-scene. */
+async function walkTo(page, which) {
+  const at = await page.evaluate((w) => {
+    const el = document.querySelector(".hall-scene");
+    const v = el?.dataset?.[w];
+    if (!v) return null;
+    const [px, py] = v.split(",").map(Number);
+    const r = el.getBoundingClientRect();
+    return { x: r.left + (px / 100) * r.width, y: r.top + (py / 100) * r.height };
+  }, which);
+  if (!at) throw new Error(`no published spot for ${which}`);
+  await page.mouse.click(at.x, at.y);
+}
+
 const charBox = (page) => page.evaluate(() => {
   const el = document.querySelector(".hall-char");
   if (!el) return null;
@@ -73,16 +87,14 @@ for (const vp of [
     const start = await charBox(page);
     if (!start) { bad(`${label}: no character`); throw new Error("no character"); }
 
-    // Tap the floor just in front of the desk itself. Aiming a fixed distance
-    // below the SIGN does not work: the sign floats a different height above the
-    // desk in each room, so the same offset landed on the floor in one and off the
-    // reachable area in another.
-    const desk = await page.locator('.world-prop[data-prop="terminal"]').boundingBox();
-    if (!desk) { bad(`${label}: no desk prop`); throw new Error("no desk"); }
-    await page.mouse.click(desk.x + desk.width / 2, desk.y + desk.height + 16);
+    // Walk to the published standing spot. Earlier versions aimed at the SDK prop
+    // or a fixed offset below the sign; both broke as soon as the furniture moved,
+    // and the sign now sits over the counter rather than over the spot you stand on.
+    await walkTo(page, "desk");
 
-    // Give the walk time, then confirm arrival rather than assuming it.
-    await page.waitForSelector(".hall-prompt.is-near", { timeout: 15_000 });
+    // Wait for THE DESK's own sign. Waiting for any lit sign returned instantly
+    // whenever you were already standing at one.
+    await page.waitForSelector('.hall-prompt.is-near:has-text("The Desk")', { timeout: 15_000 });
     ok(`${label}: walked to the desk and it armed`);
 
     const arrived = await charBox(page);
@@ -95,11 +107,26 @@ for (const vp of [
     if (backAtStart) bad(`${label}: respawned at the door on arrival`);
     else ok(`${label}: did not respawn on arrival`);
 
-    await page.click(".hall-prompt");
+    await page.click('.hall-prompt.is-near:has-text("The Desk")');
     await page.waitForSelector(".hall-panel", { timeout: 10_000 });
     ok(`${label}: the desk opened`);
 
-    await page.click(".hall-lever");
+    // OPENING AN ACCOUNT MUST NOT DEPEND ON THE MARKET. This is the bug Hunt hit:
+    // the desk's only action was the lever, so a quiet market read as the bank
+    // refusing to let him in.
+    await page.waitForSelector(".acct-cap input", { timeout: 10_000 });
+    await page.click(".acct .hall-lever");
+    await page.waitForSelector(".acct-welcome h3", { timeout: 15_000 });
+    const welcome = (await page.textContent(".acct-welcome h3"))?.trim();
+    if (!/welcome to the first bank of friends/i.test(welcome ?? "")) bad(`${label}: no welcome, got "${welcome}"`);
+    else ok(`${label}: account opened -> "${welcome}"`);
+
+    // The lever is a SEPARATE action further down the same panel.
+    await page.click(".acct-welcome .hall-lever");
+    await page.waitForSelector(".acct-stats", { timeout: 10_000 });
+    ok(`${label}: account summary shown`);
+
+    await page.click(".hall-panel > .hall-lever");
     await page.waitForSelector(".hall-verdict:not(.spinning) .hall-word", { timeout: 20_000 });
     const word = (await page.textContent(".hall-word"))?.trim();
     if (word !== "TRADED" && word !== "SAT OUT") bad(`${label}: lever gave "${word}"`);
@@ -109,11 +136,26 @@ for (const vp of [
     if (because.length < 12) bad(`${label}: no reason given`);
     else ok(`${label}: reason "${because.slice(0, 44)}..."`);
 
-    // The nine checks must be real, not decoration.
+    // The checks must be real, not decoration.
     await page.click(".hall-why");
     const gates = await page.locator(".hall-gates li").count();
     if (gates < 8) bad(`${label}: only ${gates} gates shown`);
     else ok(`${label}: ${gates} gates listed`);
+
+    // Now the vault: the book must show the depositor we just created.
+    await page.click(".hall-panel header button");
+    await walkTo(page, "vault");
+    await page.waitForSelector('.hall-prompt.is-near:has-text("The Vault")', { timeout: 20_000 });
+    ok(`${label}: walked on to the vault`);
+    await page.click('.hall-prompt.is-near:has-text("The Vault")');
+    await page.waitForSelector(".vault-big", { timeout: 10_000 });
+    const book = (await page.textContent(".vault-big"))?.trim() ?? "";
+    const depositors = (await page.textContent(".vault-sub"))?.trim() ?? "";
+    if (!/^\$[\d,]+\.\d\d$/.test(book)) bad(`${label}: book reads "${book}"`);
+    else ok(`${label}: vault book ${book}, ${depositors.replace(/\s+/g, " ")}`);
+    const rows = await page.locator(".vault-list li").count();
+    if (rows !== 1) bad(`${label}: ${rows} depositor rows for 1 account`);
+    else ok(`${label}: exactly 1 depositor listed`);
 
     if (errors.length) bad(`${label}: console: ${errors[0].slice(0, 70)}`);
     else ok(`${label}: no console errors`);

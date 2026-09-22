@@ -14,7 +14,8 @@ export const revalidate = 300;
 
 const SHOWCASE = "0x913105f2d2bfb8392f7845ef79e0c2c62f2755df";
 
-async function showcaseFriend() {
+/** The showcase Friend AND the prices, from one read. */
+async function showcase() {
   try {
     const r = await fetch(`https://rarefriends.com/api/protocol/state?address=${SHOWCASE}`, {
       next: { revalidate: 300 },
@@ -22,12 +23,16 @@ async function showcaseFriend() {
     });
     if (!r.ok) return null;
     const j = await r.json();
+    const prices = {
+      rfUsd: Number(j?.protocol?.prices?.rfUsd ?? 0),
+      ethUsd: Number(j?.protocol?.prices?.ethUsd ?? 0),
+    };
     // The Genesis: the Friend FriendSDK will not admit, and the one holding
     // essentially all of the idle rewards. Exactly the right host for the hall.
     const f = (j.account?.friends ?? []).find((x: any) => x.collection === "Genesis" && x.activated)
       ?? (j.account?.friends ?? []).find((x: any) => x.activated);
     if (!f) return null;
-    return {
+    return { prices, friend: {
       id: String(f.id),
       label: f.collection === "Genesis" ? `Genesis #${f.id}` : `Gen-${f.generation} #${f.id}`,
       collection: String(f.collection),
@@ -35,12 +40,17 @@ async function showcaseFriend() {
       imageUrl: typeof f.imageUrl === "string" && f.imageUrl.startsWith("data:image/") ? f.imageUrl : null,
       idleRf: Number(f.earnings ?? 0),
       idleWeth: Number(f.earningsWeth ?? 0),
-    };
+    } };
   } catch {
     return null;
   }
 }
 
+/** Measured 2026-09-22; only used if the price read fails. */
+const FALLBACK_PRICES = { rfUsd: 0.00156, ethUsd: 2734.86 };
+
 export default async function Page() {
-  return <HallShell showcase={await showcaseFriend()} />;
+  const s = await showcase();
+  const prices = s?.prices?.ethUsd ? s.prices : FALLBACK_PRICES;
+  return <HallShell showcase={s?.friend ?? null} rfUsd={prices.rfUsd} ethUsd={prices.ethUsd} />;
 }

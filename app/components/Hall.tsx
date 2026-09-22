@@ -22,7 +22,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { renderWorld, project, unproject, validateWorld } from "@rarefriends/friendsdk/world";
 import { createWorldMovement } from "@rarefriends/friendsdk/movement";
 import { HALLS, hallFor, fit, type Hall as HallShape } from "@/lib/hall-world";
+import { renderBank } from "@/lib/hall-art";
 import { DEFAULT_GATES, evaluateRegime, realisedVol, drift, edgePerRoundTrip, BREAKEVEN_STEP } from "@/lib/strategy.mjs";
+import { loadAccounts, addAccount, removeAccount, accountId, type Account } from "@/lib/accounts";
+import AccountPanel from "./AccountPanel";
+import VaultPanel from "./VaultPanel";
 
 /** Validated once each, at module load, so switching rooms costs nothing. */
 const WORLDS = {
@@ -187,11 +191,11 @@ export type HallFriend = {
   imageUrl: string | null; idleRf: number; idleWeth: number;
 };
 
-export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave: () => void }) {
+export default function Hall({ friend, onLeave, rfUsd, ethUsd }: { friend: HallFriend; onLeave: () => void; rfUsd: number; ethUsd: number }) {
   const [rows, setRows] = useState<string[] | null>(null);
-  const [near, setNear] = useState(false);
+  const [near, setNear] = useState<null | "desk" | "vault">(null);
   const charRef = useRef<HTMLDivElement | null>(null);
-  const nearRef = useRef(false);
+  const nearRef = useRef<null | "desk" | "vault">(null);
 
   /*
    * THE ROOM IS CHOSEN FROM THE BOX IT GETS, NOT FROM THE WINDOW.
@@ -231,7 +235,14 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
    * while the hall grew on a large display.
    */
   const charPx = frame ? Math.max(24, Math.round((CHAR_UNITS * frame.width) / hall.viewBox.width)) : 44;
-  const [open, setOpen] = useState(false);
+  /** Which destination is open: the desk, the vault, or neither. */
+  const [open, setOpen] = useState<null | "desk" | "vault">(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  useEffect(() => { setAccounts(loadAccounts()); }, []);
+  const account = useMemo(
+    () => accounts.find((a) => a.id === accountId(friend.collection, friend.id)) ?? null,
+    [accounts, friend.collection, friend.id],
+  );
   const [week, setWeek] = useState<ReturnType<typeof rollWeek> | null>(null);
   const [rolling, setRolling] = useState(false);
   const [showGates, setShowGates] = useState(false);
@@ -287,8 +298,8 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
     mover.current = createWorldMovement(world as never, hall.spawn as never, { speed: 108, radius: 9 });
     const down = (e: KeyboardEvent) => {
       const k = e.key;
-      if (k.toLowerCase() === "e" && nearRef.current) { setOpen(true); return; }
-      if (k === "Escape") { setOpen(false); return; }
+      if (k.toLowerCase() === "e" && nearRef.current) { setOpen(nearRef.current); return; }
+      if (k === "Escape") { setOpen(null); return; }
       if (mover.current?.setKey(k, true)) e.preventDefault();
     };
     const up = (e: KeyboardEvent) => { mover.current?.setKey(e.key, false); };
@@ -317,7 +328,7 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
       if (m) {
         if (openRef.current) m.stop();
         const next = m.update(delta);
-        const { viewBox, desk } = hallRef.current;
+        const { viewBox, desk, vault } = hallRef.current;
 
         // Write the position straight to the node. No setState here: the only React
         // update in the loop is the `near` flag, and only when it flips.
@@ -329,9 +340,14 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
           el.dataset.walking = next.walking ? "true" : "false";
         }
 
-        const d = Math.hypot(next.position[0] - desk.position[0], next.position[1] - desk.position[1]);
-        const isNear = d <= desk.reach;
-        if (isNear !== nearRef.current) { nearRef.current = isNear; setNear(isNear); }
+        // Nearest destination within reach, so standing between the two never
+        // lights up both signs at once.
+        let hit: null | "desk" | "vault" = null, best = Infinity;
+        for (const t of [desk, vault] as const) {
+          const d = Math.hypot(next.position[0] - t.position[0], next.position[1] - t.position[1]);
+          if (d <= t.reach && d < best) { best = d; hit = t.id; }
+        }
+        if (hit !== nearRef.current) { nearRef.current = hit; setNear(hit); }
       }
       raf.current = requestAnimationFrame(tick);
     };
@@ -339,11 +355,32 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
     return () => { if (raf.current) cancelAnimationFrame(raf.current); };
   }, []);
 
-  /* The scene is STATIC. The player is drawn as a separate layer above it. */
+  /* The scene is STATIC. The player is drawn as a separate layer above it.
+     The SDK renders the floor; the building on top of it is ours, because the
+     SDK's props are 45-degree boxes and this room is seen head on. */
   const svg = useMemo(() => renderWorld(world as never, {} as never), [world]);
+  const bank = useMemo(() => renderBank(hall), [hall]);
 
-  const deskScreen = useMemo(
-    () => project(hall.desk.position[0], hall.desk.position[1], hall.promptLift),
+  /** Where each destination's STANDING spot is, as a percentage of the frame.
+   *  Published on the scene so a harness can walk there without knowing the
+   *  room's geometry; the signs sit over the furniture, not on these spots. */
+  const spots = useMemo(() => {
+    const p = (xy: readonly [number, number]) => {
+      const [px, py] = project(xy[0], xy[1], 0);
+      return `${(((px - hall.viewBox.x) / hall.viewBox.width) * 100).toFixed(3)},${(((py - hall.viewBox.y) / hall.viewBox.height) * 100).toFixed(3)}`;
+    };
+    return { desk: p(hall.desk.position), vault: p(hall.vault.position) };
+  }, [hall]);
+
+  const signs = useMemo(
+    () => [hall.desk, hall.vault].map((t) => {
+      const [px, py] = project(t.anchor[0], t.anchor[1], t.lift);
+      return {
+        id: t.id, label: t.label, hint: t.hint,
+        left: ((px - hall.viewBox.x) / hall.viewBox.width) * 100,
+        top: ((py - hall.viewBox.y) / hall.viewBox.height) * 100,
+      };
+    }),
     [hall],
   );
 
@@ -370,7 +407,7 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
     return evaluateRegime(week.market, { rf: bookRf, weth: bookWeth, valueWeth, hwmWeth: valueWeth, halted: false }, DEFAULT_GATES);
   }, [week, friend.idleRf, friend.idleWeth]);
 
-  useEffect(() => { openRef.current = open; }, [open]);
+  useEffect(() => { openRef.current = open !== null; }, [open]);
 
   function pull() {
     if (rolling) return;
@@ -399,6 +436,9 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
       <div className="hall-stage" ref={stageRef}>
         <div
           className="hall-scene"
+          data-room={hall.key}
+          data-desk={spots.desk}
+          data-vault={spots.vault}
           onPointerDown={onPointer}
           style={frame ? { width: `${frame.width}px`, height: `${frame.height}px` } : { visibility: "hidden" }}
         >
@@ -413,6 +453,12 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
             }}
           />
 
+          <svg
+            className="hall-bank" viewBox={`${hall.viewBox.x} ${hall.viewBox.y} ${hall.viewBox.width} ${hall.viewBox.height}`}
+            preserveAspectRatio="xMidYMid meet" aria-hidden="true"
+            dangerouslySetInnerHTML={{ __html: bank }}
+          />
+
           {/* The player, a layer above the static scene. Moved by writing left/top
               in the rAF loop, never by re-rendering the world. */}
           {rows && (
@@ -424,73 +470,98 @@ export default function Hall({ friend, onLeave }: { friend: HallFriend; onLeave:
             </div>
           )}
 
-          <button
-            type="button"
-            className={`hall-prompt${near ? " is-near" : ""}`}
-            style={{
-              left: `${((deskScreen[0] - hall.viewBox.x) / hall.viewBox.width) * 100}%`,
-              top: `${((deskScreen[1] - hall.viewBox.y) / hall.viewBox.height) * 100}%`,
-            }}
-            onClick={() => near && setOpen(true)}
-            disabled={!near}
-          >
-            <span>The Desk</span>
-            <small>{near ? "E / tap to open" : "walk over"}</small>
-          </button>
+          {signs.map((sg) => (
+            <button
+              key={sg.id}
+              type="button"
+              className={`hall-prompt${near === sg.id ? " is-near" : ""}`}
+              style={{ left: `${sg.left}%`, top: `${sg.top}%` }}
+              onClick={() => near === sg.id && setOpen(sg.id)}
+              disabled={near !== sg.id}
+            >
+              <span>{sg.label}</span>
+              <small>{near === sg.id ? "E / tap to open" : sg.hint}</small>
+            </button>
+          ))}
         </div>
       </div>
 
       <p className="hall-hint">{touch ? "Tap where you want to go." : "Walk with WASD or the arrows, or tap where you want to go."}</p>
 
       {open && (
-        <div className="hall-modal" role="dialog" aria-modal="true" aria-label="The Desk">
+        <div className="hall-modal" role="dialog" aria-modal="true"
+             aria-label={open === "desk" ? "The Desk" : "The Vault"}>
           <div className="hall-panel">
             <header>
-              <h2>The Desk</h2>
-              <button type="button" onClick={() => setOpen(false)} aria-label="Close">&times;</button>
+              <h2>{open === "desk" ? "The Desk" : "The Vault"}</h2>
+              <button type="button" onClick={() => setOpen(null)} aria-label="Close">&times;</button>
             </header>
 
-            <p className="hall-lede">
-              Your Friend&rsquo;s idle rewards are the book. Pull the lever: a week of market
-              rolls and the bank decides whether to trade it. <strong>Most weeks it will not.</strong>
-            </p>
-
-            <button type="button" className="hall-lever" onClick={pull} disabled={rolling}>
-              {rolling ? "rolling the week…" : week ? "Pull again" : "Pull the lever"}
-            </button>
-
-            {week && verdict && (
-              <div className={`hall-verdict${verdict.armed ? " armed" : ""}${rolling ? " spinning" : ""}`}>
-                <p className="hall-regime">{week.regime.name}</p>
-                <p className="hall-word">{verdict.armed ? "TRADED" : "SAT OUT"}</p>
-                {!rolling && (
-                  <p className="hall-because">
-                    {verdict.armed ? "Choppy and busy enough to be worth it." : plainReason(verdict.checks, week.market)}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {week && !rolling && (
+            {open === "vault" ? (
+              <VaultPanel
+                accounts={accounts} rfUsd={rfUsd} ethUsd={ethUsd}
+                onGoToDesk={() => setOpen("desk")}
+              />
+            ) : (
               <>
-                <button type="button" className="hall-why" onClick={() => setShowGates((v) => !v)} aria-expanded={showGates}>
-                  {showGates ? "hide the nine checks" : "why? show the nine checks"}
-                </button>
-                {showGates && (
-                  <ul className="hall-gates">
-                    {verdict!.checks.map((c: { gate: string; ok: boolean; detail: string }) => (
-                      <li key={c.gate} className={c.ok ? "" : "blocked"}>
-                        <span aria-hidden="true">{c.ok ? "□" : "■"}</span><b>{c.gate}</b><i>{c.detail}</i>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <p className="hall-small">
-                  The pool takes 5% each way, so a round trip only clears above{" "}
-                  {(BREAKEVEN_STEP * 100).toFixed(2)}%. At a 15% step it nets{" "}
-                  {(edgePerRoundTrip(0.15) * 100).toFixed(2)}%. These are the real checks, not a mock.
-                  Every balance here is simulated.
+                <AccountPanel
+                  friend={friend}
+                  account={account}
+                  onOpened={(a) => setAccounts(addAccount(a))}
+                  onClosed={(id) => setAccounts(removeAccount(id))}
+                />
+
+                {/* The lever is the BANK'S trading decision and has nothing to do
+                    with whether you may open an account. Keeping them in one place
+                    without saying so is what made "SAT OUT" read as a rejection. */}
+                <hr className="acct-rule" />
+                <p className="acct-kicker">this week, for the bank</p>
+                <p className="hall-lede" style={{ margin: "0 0 10px" }}>
+                  Separate question: given the market, should the desk quote at all?
+                  Pull the lever. <strong>Most weeks it should not, and that is the finding.</strong>
                 </p>
+
+                <button type="button" className="hall-lever" onClick={pull} disabled={rolling}>
+                  {rolling ? "rolling the week…" : week ? "Pull again" : "Pull the lever"}
+                </button>
+
+                {week && verdict && (
+                  <div className={`hall-verdict${verdict.armed ? " armed" : ""}${rolling ? " spinning" : ""}`}>
+                    <p className="hall-regime">{week.regime.name}</p>
+                    <p className="hall-word">{verdict.armed ? "TRADED" : "SAT OUT"}</p>
+                    {!rolling && (
+                      <p className="hall-because">
+                        {verdict.armed ? "Choppy and busy enough to be worth it." : plainReason(verdict.checks, week.market)}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {week && !rolling && (
+                  <>
+                    <p className="hall-small" style={{ marginTop: 0 }}>
+                      This is about the market, not about you. Your account stays open either way.
+                    </p>
+                    <button type="button" className="hall-why" onClick={() => setShowGates((v) => !v)} aria-expanded={showGates}>
+                      {showGates ? "hide the checks" : "why? show the checks"}
+                    </button>
+                    {showGates && (
+                      <ul className="hall-gates">
+                        {verdict!.checks.map((c: { gate: string; ok: boolean; detail: string }) => (
+                          <li key={c.gate} className={c.ok ? "" : "blocked"}>
+                            <span aria-hidden="true">{c.ok ? "□" : "■"}</span><b>{c.gate}</b><i>{c.detail}</i>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <p className="hall-small">
+                      The pool takes 5% each way, so a round trip only clears above{" "}
+                      {(BREAKEVEN_STEP * 100).toFixed(2)}%. At a 15% step it nets{" "}
+                      {(edgePerRoundTrip(0.15) * 100).toFixed(2)}%. These are the real checks, not a mock.
+                      Every balance here is simulated.
+                    </p>
+                  </>
+                )}
               </>
             )}
           </div>

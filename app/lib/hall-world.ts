@@ -1,31 +1,40 @@
 /**
- * THE FIRST BANK OF FRIENDS - the hall, in two shapes.
+ * THE FIRST BANK OF FRIENDS - the hall.
  *
- * WHY THERE ARE TWO
+ * WHY IT IS DRAWN HEAD ON AND NOT IN 45-DEGREE ISOMETRIC
  *
- * The isometric projection is fixed:
+ * The projection is fixed by the SDK:
  *
  *     screenX = 800 + 1.5 * 0.8660254 * (x - y - 96)
  *     screenY = 690 + 1.5 * 0.28      * (x + y - 480) - lift
  *
- * Across the screen a unit is worth 1.299 px; into the screen it is worth 0.42. So
- * ANY room built as a rectangle on the plane projects 3.09 : 1, and no amount of
- * framing makes a 3.09 : 1 picture fill a phone held upright. The first version of
- * this hall was 390 x 197 inside an 844 tall page: a letterbox slot with the HUD
- * sitting on top of the desk sign and the hint running across the floor.
+ * Read it as two axes: OFFSET (x - y - 96) moves you across the screen only, and
+ * DEPTH (x + y) moves you down the screen only. A room bounded by constant offsets
+ * and constant depths therefore projects to a plain RECTANGLE, seen head on - and a
+ * wall of constant offset is edge on, so side walls are invisible by construction.
  *
- * The fix is not a smaller camera, it is a different ROOM. Depth is worth a third of
- * width, so a hall that is long into the screen and narrow across it projects TALL.
- * `wide` is a banking floor you look across; `tall` is the same hall as a corridor
- * you look down. Both are generated from one spec by `room()` below, so the desk,
- * the vault and the walk always mean the same thing.
+ * That matters because the first version put the SDK's own props into such a room.
+ * Those props are drawn as 45-degree isometric boxes, so the picture held two
+ * incompatible perspectives at once: a flat rectangular floor with boxes standing
+ * on it at an angle that cannot exist. The report was "the desk is sitting on
+ * something but at an awkward angle", which was a real error being read correctly,
+ * not a matter of taste. The props were also a generic kiosk and a WATER TANK, so
+ * there was no bank anywhere in the bank.
  *
- * Everything else here is derived rather than chosen. Placement is by DEPTH and
- * mirrored OFFSET, not raw coordinates, because `x - y = 96` is the screen centre
- * line and `x + y` is depth: two props at a similar depth overlap however far apart
- * they look on the plane. And the camera is solved from the room's own corners, the
- * depth skirt below them and each prop's lift above them, so the frame ratio can
- * never drift from the viewBox and letterbox the scene.
+ * The room is now committed to the head-on reading and its furniture is drawn to
+ * match: one straight aisle up the middle, a teller counter across the hall with an
+ * opening in it, and a columned facade at the end with the vault door in it.
+ * `lib/hall-art.ts` draws between the numbers computed here and invents no geometry
+ * of its own, because two modules deriving the same proportions separately is how a
+ * sign ends up floating through a pediment.
+ *
+ * WHY THERE ARE THREE ROOMS
+ *
+ * Across the screen a unit is worth 1.299 px and into it only 0.42, so one room
+ * cannot fill both an ultrawide monitor and a phone held upright: the first hall
+ * was 390x197 inside an 844 tall page, 23% of the screen. Each room below is the
+ * same bank at a different proportion, and the component measures the box it
+ * actually has and picks whichever wastes least.
  */
 
 const A = 0.8660254038, B = 0.28, S = 1.5, CX = 800, CY = 690;
@@ -36,49 +45,48 @@ const CENTRE = 96;
 /** The SDK's plane. Nothing may be placed outside it. */
 const PLANE = { width: 576, height: 384 };
 
-/**
- * How far each prop actually reaches from its ground anchor, in canvas units.
- *
- * MEASURED, not assumed. The first version of this read PROP_CANVAS (240x240,
- * anchored at 120,180) and reserved 120 either side and 180 above. The artwork uses
- * a fraction of that canvas: `getBBox()` on the rendered `.world-prop` groups gives
- * the numbers below, and renderWorld then multiplies `prop.scale` by 1.4 of its own
- * accord. Reserving the canvas instead of the art padded the wide frame with 132
- * units of empty paper above the room and shrank the hall to pay for it.
- *
- * If the SDK's artwork ever changes these go stale, so `scripts/hall-sweep.mjs`
- * asserts every rendered prop is inside the frame rather than trusting them.
- */
-const PROP_BASE_SCALE = 1.4;
-const PROP_ART: Record<string, { half: number; up: number; down: number }> = {
-  terminal: { half: 27, up: 65, down: 8 },
-  tank: { half: 26, up: 81, down: 2 },
-};
-
-/** How far in front of the desk prop you stand to use it. */
-const DESK_STAND = 40;
-
-const DEPTH_SKIRT = 26;
+const DEPTH_SKIRT = 16;
 const PAD = 24;
-/**
- * Room for the sign itself above its anchor. It is an HTML box of a fixed pixel
- * height, so in canvas units it varies with the screen: ~26 units on a phone, ~31
- * on a desktop. 36 covers both.
- */
+
+/** Room for a sign above whatever it names. */
 const PROMPT_ROOM = 36;
+
+/** Screen position of an offset from the aisle, and of a depth. */
+export const sx = (offset: number) => CX + S * A * offset;
+export const sy = (depth: number) => CY + S * B * (depth - 480);
 
 const projectXY = (x: number, y: number, lift = 0): [number, number] =>
   [CX + S * A * (x - y - CENTRE), CY + S * B * (x + y - 480) - lift];
 
-/** Plane point from depth (x + y) and mirrored offset from the centre line. */
+/** Plane point from depth and mirrored offset. */
 const plane = (depth: number, offset: number): [number, number] =>
   [Math.round((depth + CENTRE + offset) / 2), Math.round((depth - CENTRE - offset) / 2)];
 
+type Pt = readonly [number, number];
+
 /**
- * Even-odd point in polygon. A bounding box is not enough: both rooms are diamonds
- * in one space or the other, so most of any box drawn around them is off the floor.
+ * A chamfered hall: `half` either side of the aisle, `near` to `far` in depth.
+ * GENERATED, never typed out. Hand-written vertices once put a corner 100 units
+ * off the centre line, which drew a skewed room with the desk stranded to one side.
  */
-function inside(poly: readonly (readonly [number, number])[], x: number, y: number) {
+function corridor(half: number, near: number, far: number, c: number): Pt[] {
+  const d = Math.round(c * Math.SQRT1_2);
+  const [nl, nr, fr, fl] = [
+    plane(near, -half), plane(near, half), plane(far, half), plane(far, -half),
+  ];
+  // ONLY the near corners are chamfered. Cutting the back ones too made the floor's
+  // back edge narrower than the hall, so the building at the end of it was a small
+  // box floating between two diagonal slivers of floor.
+  return [
+    nl, nr,
+    [fr[0] - d, fr[1] - d], [fr[0] - d, fr[1] + d],
+    [fl[0] + d, fl[1] - d], [fl[0] - d, fl[1] - d],
+  ];
+}
+
+/** Even-odd point in polygon. The rooms are diamonds on the plane, so a bounding
+ *  box drawn around one is mostly off the floor. */
+function inside(poly: readonly Pt[], x: number, y: number) {
   let hit = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const [xi, yi] = poly[i], [xj, yj] = poly[j];
@@ -87,270 +95,227 @@ function inside(poly: readonly (readonly [number, number])[], x: number, y: numb
   return hit;
 }
 
-type Prop = { type: string; depth: number; offset: number; scale: number };
-type Pt = readonly [number, number];
-
-/**
- * OUTLINES ARE GENERATED, NEVER TYPED OUT.
- *
- * Both of these were hand-written once and both were wrong in ways no test caught:
- * a single corner of the corridor sat 100 units off the centre line, which drew a
- * skewed room with the desk stranded to one side of it. The vertices are a pure
- * function of four numbers, so they should be computed from those four numbers.
- */
-
-/** A chamfered rectangle on the plane. Projects to a wide floor. */
-function planeRect(x0: number, y0: number, x1: number, y1: number, c: number): Pt[] {
-  return [
-    [x0 + c, y0], [x1 - c, y0], [x1, y0 + c], [x1, y1 - c],
-    [x1 - c, y1], [x0 + c, y1], [x0, y1 - c], [x0, y0 + c],
-  ];
-}
-
-/**
- * A chamfered corridor: `half` either side of the centre line, running from `near`
- * to `far` in depth. Projects to an upright floor. The chamfer is applied along
- * each edge, which in this space means 1/sqrt(2) of it on each axis.
- */
-function corridor(half: number, near: number, far: number, c: number): Pt[] {
-  const d = Math.round(c * Math.SQRT1_2);
-  const [nl, nr, fr, fl] = [
-    plane(near, -half), plane(near, half), plane(far, half), plane(far, -half),
-  ];
-  return [
-    [nl[0] + d, nl[1] - d], [nr[0] - d, nr[1] + d],
-    [nr[0] + d, nr[1] + d], [fr[0] - d, fr[1] - d],
-    [fr[0] - d, fr[1] + d], [fl[0] + d, fl[1] - d],
-    [fl[0] - d, fl[1] - d], [nl[0] + d, nl[1] + d],
-  ];
-}
-
 type Spec = {
   key: "wide" | "mid" | "tall";
-  /** Floor outline on the plane, already chamfered. */
-  poly: readonly (readonly [number, number])[];
-  /** desk is the destination, door is the spawn. */
-  depth: { desk: number; door: number };
-  props: readonly Prop[];
-  /** An optional dither rectangle on the plane, which projects to a diamond. */
-  patch: { x: number; y: number; w: number; h: number } | null;
-  /** How close you must be to the desk for it to open. */
-  reach: number;
-  pathWidth: number;
-  /** How high above the desk its sign floats, in canvas units. */
-  promptLift: number;
-  /** How far past the door the runner carries on toward the back wall. */
-  runOn: number;
+  half: number; near: number; far: number; chamfer: number;
+  /** Height of the facade above the floor's far edge, in canvas units. */
+  facadeH: number;
+  /** How tall the teller counter is. Where it stands is derived. */
+  counterH: number;
+  /** Aisle width, and how close you must be for a sign to arm. */
+  aisle: number; reach: number;
+  /**
+   * How far in front of the facade you stand to use the vault. Where the hall is
+   * deep enough this is set so the vault's SIGN clears the building; the wide hall
+   * has only 248 units of aisle for three separated points, so there its sign sits
+   * on the door like a plaque instead.
+   */
+  vaultFrom: number;
 };
 
 /**
- * WIDE: a banking floor, 935 px of floor across the screen. Desk and vault are 60
- * apart in depth so neither hides the other.
+ * Each room was solved rather than chosen: maximise floor depth, keep the facade a
+ * sane fraction of the hall's width, subject to the 576x384 plane, at the target
+ * proportion. The plane is why the wide hall is 1.99 and not wider - a hall's depth
+ * is capped at `768 - 2 * half`, so one both very wide and deep enough to walk down
+ * does not exist.
  */
-const WIDE: Spec = {
-  key: "wide",
-  poly: planeRect(48, 32, 528, 352, 40),
-  depth: { desk: 400, door: 700 },
-  props: [
-    { type: "terminal", depth: 400, offset: 0, scale: 1.25 },
-    { type: "tank", depth: 340, offset: -190, scale: 1.0 },
-  ],
-  patch: { x: 198, y: 102, w: 180, h: 180 },
-  reach: 92,
-  pathWidth: 34,
-  promptLift: 110,
-  runOn: 90,
-};
+const SPECS: Spec[] = [
+  { key: "wide", half: 212, near: 320, far: 640, chamfer: 46, facadeH: 95,  counterH: 34, aisle: 40, reach: 64, vaultFrom: 52 },
+  { key: "mid",  half: 192, near: 310, far: 650, chamfer: 44, facadeH: 130, counterH: 38, aisle: 38, reach: 66, vaultFrom: 74 },
+  { key: "tall", half: 66,  near: 174, far: 764, chamfer: 26, facadeH: 110, counterH: 34, aisle: 30, reach: 78, vaultFrom: 150 },
+];
 
 /**
- * TALL: the same hall as a corridor. Offsets run +/-85 and depth runs 210 to 760,
- * which is as long as the 576 x 384 plane allows - the binding corner is the left
- * wall at the near end, where `y = (depth - 96 - offset) / 2` hits 384. It projects
- * 269 x 404, upright, and a phone fills with it.
- *
- * Two constraints shaped the props, and both were found by drawing it.
- *
- * A prop reaches 180*scale ABOVE its anchor, so in a narrow room the desk's head
- * and the vault's head collide long before their feet do: clearing them takes ~320
- * units of depth, which is most of the corridor. Hence the vault back by the door.
- *
- * And a prop wider than the wall it stands against widens the whole CAMERA, which
- * is what first made this room 0.80 rather than 0.67 and left a phone two thirds
- * empty. The vault's offset is set so its 60 px half-width stays inside the wall.
+ * The facade, in SCREEN coordinates, as the lines the art module draws between.
+ * It spans the floor's back edge exactly, which is the full width of the hall
+ * because only the near corners are chamfered.
  */
-const TALL: Spec = {
-  key: "tall",
-  poly: corridor(62, 200, 780, 34),
-  depth: { desk: 260, door: 700 },
-  props: [
-    { type: "terminal", depth: 260, offset: 0, scale: 0.62 },
-    { type: "tank", depth: 560, offset: -40, scale: 0.5 },
-  ],
-  // No rug. The runner already crosses this floor and two dither shapes in a
-  // corridor this narrow read as clutter.
-  patch: null,
-  reach: 78,
-  pathWidth: 26,
-  promptLift: 70,
-  runOn: 40,
-};
-
-/**
- * MID: the same hall again, for the shapes in between - 4:3 tablets in landscape
- * and 16:10 laptops, which are most desktops. Those boxes fit neither of the other
- * two well: at 1024x768 the wide hall filled the width and left 46% of the screen
- * as paper above and below it.
- *
- * It is the corridor generator with a much wider half-width, which is what a room
- * at 1.53 : 1 has to be. A plane rectangle cannot make this shape at all: for any
- * rectangle the k and depth ranges are both w + h, so every one of them projects
- * 3.09 : 1 no matter its proportions.
- */
-const MID: Spec = {
-  key: "mid",
-  poly: corridor(184, 310, 665, 50),
-  depth: { desk: 360, door: 620 },
-  props: [
-    { type: "terminal", depth: 360, offset: 0, scale: 1.0 },
-    // Kept well inboard: a tall prop parked against the wall has its FEET on
-    // the floor and its body over blank paper, because nothing draws the wall it
-    // would be occluding.
-    { type: "tank", depth: 480, offset: -110, scale: 0.85 },
-  ],
-  patch: { x: 223, y: 127, w: 150, h: 150 },
-  reach: 88,
-  pathWidth: 30,
-  promptLift: 110,
-  runOn: 40,
-};
-
-/**
- * Solve the camera from the room itself: corners, the skirt below them, the lift
- * above each prop, framed at the content's own aspect ratio.
- */
-function camera(spec: Spec) {
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  const see = (px: number, py: number) => {
-    minX = Math.min(minX, px); maxX = Math.max(maxX, px);
-    minY = Math.min(minY, py); maxY = Math.max(maxY, py);
-  };
-  for (const [x, y] of spec.poly) {
-    const [px, py] = projectXY(x, y);
-    see(px, py); see(px, py + S * DEPTH_SKIRT);
-  }
-  // The desk's SIGN is content too, and it floats above the tallest prop in the
-  // room. Leaving it out of the solve put it above the top edge of the frame.
-  {
-    // Anchored where the COMPONENT anchors it - at the desk's standing position,
-    // 40 units in front of the prop - not at the prop. Solving against the prop
-    // reserved 76 units of sky that nothing was ever drawn into.
-    const [dx, dy] = plane(spec.depth.desk + DESK_STAND, 0);
-    const [px, py] = projectXY(dx, dy);
-    see(px, py - spec.promptLift - PROMPT_ROOM);
-  }
-  for (const p of spec.props) {
-    const art = PROP_ART[p.type];
-    if (!art) throw new Error(`hall: no measured extents for prop "${p.type}"`);
-    const k = p.scale * PROP_BASE_SCALE;
-    const [x, y] = plane(p.depth, p.offset);
-    const [px, py] = projectXY(x, y);
-    see(px - art.half * k, py - art.up * k);
-    see(px + art.half * k, py + art.down * k);
-  }
-  const width = Math.round(maxX - minX + PAD * 2);
-  const height = Math.round(maxY - minY + PAD * 2);
+function facadeOf(spec: Spec) {
+  const left = sx(-spec.half), right = sx(spec.half);
+  const base = sy(spec.near), F = spec.facadeH;
+  const top = base - F;
+  const pedH = F * 0.2, entabH = F * 0.1, plinthH = F * 0.09;
+  const colTop = top + pedH + entabH;
+  const colBot = base - plinthH;
+  const width = right - left;
+  const colH = colBot - colTop;
+  // The central bay holds the vault door, and the aisle runs into it.
+  const bay = Math.min(width * 0.44, colH * 1.5);
+  const r = Math.min(colH * 0.42, bay * 0.4);
   return {
-    x: Math.round((minX + maxX) / 2 - width / 2),
-    y: Math.round((minY + maxY) / 2 - height / 2),
-    width, height,
+    left, right, width, base, top, F, colH,
+    pedBottom: top + pedH,
+    entabTop: top + pedH, entabBottom: colTop,
+    colTop, colBot, plinthH,
+    bay,
+    door: { cx: CX, cy: colBot - r * 1.04, r },
   };
 }
 
+/** The teller counter, in SCREEN coordinates: two runs with the aisle between. */
+function counterOf(spec: Spec, depth: number) {
+  const y = sy(depth);
+  const gap = sx(spec.aisle * 0.7) - CX;
+  const inset = (sx(spec.half) - CX) * 0.07;
+  return {
+    y, top: y - spec.counterH, height: spec.counterH,
+    runs: [
+      [sx(-spec.half) + inset, CX - gap],
+      [CX + gap, sx(spec.half) - inset],
+    ] as [number, number][],
+  };
+}
+
+export type Hall = ReturnType<typeof room>;
+
 function room(spec: Spec) {
-  /**
-   * Place by depth and offset, refusing anything off the floor. The room narrows
-   * toward its chamfers, so an offset that is fine at one depth is outside at
-   * another, and validateWorld would otherwise reject the whole scene with only a
-   * bare coordinate to go on.
-   */
+  const poly = corridor(spec.half, spec.near, spec.far, spec.chamfer);
+
+  /** Place by depth and offset, refusing anything off the floor. */
   const at = (depth: number, offset = 0): [number, number] => {
     const [x, y] = plane(depth, offset);
-    if (x < 0 || x > PLANE.width || y < 0 || y > PLANE.height || !inside(spec.poly, x, y)) {
-      throw new RangeError(
-        `hall/${spec.key}: depth ${depth} offset ${offset} lands at (${x}, ${y}), off the floor.`,
-      );
+    if (x < 0 || x > PLANE.width || y < 0 || y > PLANE.height || !inside(poly, x, y)) {
+      throw new RangeError(`hall/${spec.key}: depth ${depth} offset ${offset} lands at (${x}, ${y}), off the floor.`);
     }
     return [x, y];
   };
 
-  const signal = at(spec.depth.desk + 46);
+  const facade = facadeOf(spec);
+
+  /* Three points on ONE straight line: in at the bottom, past the counter, and up
+     to the vault door. The counter sits exactly HALFWAY between the door you come
+     in by and the vault, rather than at a number someone picked, which is what
+     kept putting it inside the spawn's own reach. */
+  const spawnAt = spec.far - 20;
+  const vaultAt = spec.near + spec.vaultFrom;
+  const deskAt = Math.round((spawnAt + vaultAt) / 2);
+  const counterAt = deskAt - 30;
+  const counter = counterOf(spec, counterAt);
+  const [runL, runR] = counter.runs[0];
+  const deskLabelOffset = Math.round(((runL + runR) / 2 - CX) / (S * A));
+
+  /**
+   * Collision only. The counter is DRAWN by lib/hall-art; these stop you strolling
+   * through it, so the opening in the middle is the way past. They are hidden in
+   * CSS, which is also why their type does not matter.
+   */
+  const blockers = counter.runs.flatMap(([x0, x1]) => {
+    const o0 = (x0 - CX) / (S * A), o1 = (x1 - CX) / (S * A);
+    const n = Math.max(2, Math.round(Math.abs(o1 - o0) / 46));
+    return Array.from({ length: n }, (_, i) => {
+      const o = o0 + ((o1 - o0) * (i + 0.5)) / n;
+      const [px, py] = at(counterAt, Math.round(o));
+      return { type: "crate", x: px, y: py, scale: 0.5 };
+    });
+  });
 
   const world = {
     id: `first-bank-hall-${spec.key}`,
     family: "bank-hall",
     name: "The First Bank of Friends",
     setting: "Banking hall",
-    shape: spec.key === "wide" ? "Chamfered hall" : "Chamfered corridor",
-    summary: "A marble hall with a single desk.",
+    shape: "Chamfered hall",
+    summary: "A marble hall with a teller counter and a vault.",
     variant: "complete",
     missingChunks: [] as number[],
-    geometry: { polygons: [spec.poly.map(([x, y]) => [x, y])], holes: [], depth: DEPTH_SKIRT },
-    patches: spec.patch ? [{ ...spec.patch, pattern: "dither" }] : [],
-    paths: [{
-      points: [
-        // Runs PAST the door to the back wall. Starting it at the spawn left the
-        // runner stopping in open floor, which read as unfinished.
-        at(spec.depth.door + spec.runOn),
-        at(Math.round((spec.depth.door + spec.depth.desk) / 2)),
-        at(spec.depth.desk + 34),
-      ],
-      width: spec.pathWidth,
-    }],
-    props: spec.props.map((p) => {
-      const [x, y] = at(p.depth, p.offset);
-      return { type: p.type, x, y, scale: p.scale };
-    }),
-    // renderWorld paints props and signals from the world, but NOT world.actors:
-    // only live actors handed to it at render time. An entry here would validate
-    // and then draw nothing.
+    geometry: { polygons: [poly.map(([x, y]) => [x, y])], holes: [], depth: DEPTH_SKIRT },
+    patches: [],
+    paths: [{ points: [at(spawnAt), at(vaultAt)], width: spec.aisle }],
+    props: blockers,
+    // renderWorld paints only the live actors handed to it, never world.actors.
     actors: [],
-    signals: [{ x: signal[0], y: signal[1], kind: "currency" }],
+    signals: [],
   };
 
-  const viewBox = camera(spec);
+  const desk = {
+    id: "desk" as const,
+    label: "The Desk",
+    hint: "open an account",
+    position: at(deskAt) as readonly [number, number],
+    // The LABEL sits over the left run of the counter, which is the thing it
+    // names. Centred in the aisle it stacked on top of the vault's sign and the
+    // pair of them covered the vault door.
+    anchor: at(counterAt, deskLabelOffset) as readonly [number, number],
+    reach: spec.reach,
+    lift: Math.round(spec.counterH + 4),
+  };
+  const vault = {
+    id: "vault" as const,
+    label: "The Vault",
+    hint: "see the book",
+    position: at(vaultAt) as readonly [number, number],
+    anchor: at(vaultAt) as readonly [number, number],
+    // Just off the floor in front of the door. Lifting it clear of the door put it
+    // straight through the pediment and across the bank's own name.
+    lift: 14,
+    reach: spec.reach,
+  };
+  const spawn = at(spawnAt) as readonly [number, number];
+
+  /**
+   * You must have to WALK somewhere, and arriving at one destination must not arm
+   * the other. In an earlier room the vault sat within reach of the door, so its
+   * sign was lit before you had moved a pixel.
+   */
+  const apart = (a: readonly [number, number], b: readonly [number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  for (const t of [desk, vault]) {
+    if (apart(spawn, t.position) <= t.reach * 1.25) {
+      throw new Error(`hall/${spec.key}: you spawn ${apart(spawn, t.position).toFixed(0)} from ${t.label}, inside its reach of ${t.reach}.`);
+    }
+  }
+  const gap = apart(desk.position, vault.position);
+  if (gap <= Math.max(desk.reach, vault.reach)) {
+    throw new Error(`hall/${spec.key}: desk and vault are ${gap.toFixed(0)} apart, inside a reach of ${Math.max(desk.reach, vault.reach)}.`);
+  }
+
+  /* Camera: the floor's own corners, the skirt below it, the building above it,
+     and room for both signs. Solved, never typed in. */
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const see = (px: number, py: number) => {
+    minX = Math.min(minX, px); maxX = Math.max(maxX, px);
+    minY = Math.min(minY, py); maxY = Math.max(maxY, py);
+  };
+  for (const [x, y] of poly) {
+    const [px, py] = projectXY(x, y);
+    see(px, py); see(px, py + S * DEPTH_SKIRT);
+  }
+  see(facade.left, facade.top); see(facade.right, facade.base);
+  for (const t of [desk, vault]) {
+    const [px, py] = projectXY(t.anchor[0], t.anchor[1]);
+    see(px, py - t.lift - PROMPT_ROOM);
+  }
+  const width = Math.round(maxX - minX + PAD * 2);
+  const height = Math.round(maxY - minY + PAD * 2);
+  const viewBox = {
+    x: Math.round((minX + maxX) / 2 - width / 2),
+    y: Math.round((minY + maxY) / 2 - height / 2),
+    width, height,
+  };
 
   return {
     key: spec.key,
-    world,
-    /** The door, on the centre line. */
-    spawn: at(spec.depth.door) as readonly [number, number],
-    /** The one thing you can walk up to. */
-    desk: {
-      label: "The Desk",
-      position: at(spec.depth.desk + DESK_STAND) as readonly [number, number],
-      reach: spec.reach,
-    },
-    promptLift: spec.promptLift,
+    world, spawn, desk, vault, facade, counter,
     viewBox,
     /** MUST match the viewBox or preserveAspectRatio letterboxes the scene. */
     ratio: viewBox.width / viewBox.height,
-    frameRatio: `${viewBox.width} / ${viewBox.height}`,
   };
 }
 
-export type Hall = ReturnType<typeof room>;
-
-export const HALLS = { wide: room(WIDE), mid: room(MID), tall: room(TALL) } as const;
+export const HALLS = {
+  wide: room(SPECS[0]),
+  mid: room(SPECS[1]),
+  tall: room(SPECS[2]),
+} as const;
 
 /**
- * Pick the room that wastes the least of the box it has to live in. This is a
- * function of the AVAILABLE BOX, not of the window: a short landscape phone and a
- * tall tablet want different halls at the same width, and a media query cannot see
- * the difference once the chrome above and below has been taken out.
+ * Pick the room that wastes the least of the box it has to live in. A function of
+ * the AVAILABLE BOX, not the window: the right room depends on the space left once
+ * the chrome is out, and a media query cannot see that.
  */
 export function hallFor(boxRatio: number): Hall {
   const used = (h: Hall) => (boxRatio > h.ratio ? h.ratio / boxRatio : boxRatio / h.ratio);
-  let best = HALLS.wide;
+  let best: Hall = HALLS.wide;
   for (const h of [HALLS.mid, HALLS.tall]) if (used(h) > used(best)) best = h;
   return best;
 }

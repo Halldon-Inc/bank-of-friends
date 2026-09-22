@@ -309,6 +309,12 @@ a { color: var(--ink); text-underline-offset: 3px; }
   cursor: crosshair;
 }
 .hall-svg, .hall-svg svg { display: block; width: 100%; height: 100%; }
+/* The building, drawn by lib/hall-art over the SDK's floor. */
+.hall-bank { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.bank-name { font-family: var(--mono, ui-monospace, monospace); }
+/* The SDK props are collision only: the counter they stand in for is drawn by us,
+   and their 45-degree artwork cannot coexist with a head-on room. */
+.hall-svg .world-prop { display: none; }
 
 /* The one destination. Crisp in both states: an out-of-reach marker should not
    look like a broken half-transparent box. */
@@ -403,6 +409,87 @@ a { color: var(--ink); text-underline-offset: 3px; }
 .hall-gates b { font-weight: 400; }
 .hall-gates i { font-style: normal; }
 .hall-small { font-size: 0.62rem; color: var(--dim); line-height: 1.55; }
+
+/* ------------------------------------------------- the account and the vault */
+.acct, .vault { text-align: left; }
+.acct-kicker {
+  margin: 0 0 6px; font-size: 0.56rem; letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--dim);
+}
+.acct-head {
+  margin: 12px 0 5px; font-size: 0.58rem; letter-spacing: 0.14em; text-transform: uppercase;
+}
+.acct-list { list-style: none; margin: 0; padding: 0; }
+.acct-list li {
+  position: relative; padding-left: 16px; margin-bottom: 6px;
+  font-size: 0.72rem; line-height: 1.5;
+}
+.acct-list li::before { content: "+"; position: absolute; left: 0; color: var(--ink); }
+.acct-list.is-cannot li::before { content: "3"; color: var(--dim); }
+
+.acct-stats { margin: 0 0 10px; padding: 0; }
+.acct-stats > div {
+  display: flex; justify-content: space-between; gap: 10px;
+  padding: 5px 0; border-bottom: 1px dotted var(--line); font-size: 0.72rem;
+}
+.acct-stats dt { color: var(--dim); }
+.acct-stats dd { margin: 0; text-align: right; }
+.acct-stats dd i { font-style: normal; color: var(--dim); }
+
+.acct-cap {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 10px 0 6px; font-size: 0.7rem;
+}
+.acct-cap span:first-child { flex: 1 1 auto; color: var(--dim); }
+.acct-cap input {
+  font: inherit; font-size: 0.78rem; width: 8.5ch; text-align: right;
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--ink); padding: 4px 6px;
+}
+.acct-close {
+  font: inherit; font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase;
+  background: transparent; color: var(--dim); border: 1px solid var(--line);
+  padding: 5px 9px; cursor: pointer; margin-top: 4px;
+}
+.acct-close:hover { color: var(--ink); border-color: var(--ink); }
+.acct-rule { border: 0; border-top: 1px solid var(--line); margin: 16px 0 12px; }
+
+.acct-welcome { text-align: center; padding: 6px 0 2px; }
+.acct-welcome h3 {
+  margin: 0 0 10px; font-size: clamp(1.05rem, 5vw, 1.45rem); font-weight: 400;
+  line-height: 1.2; letter-spacing: 0.02em;
+  animation: land 320ms cubic-bezier(.2,1.4,.4,1) both;
+}
+.acct-line { margin: 0; font-size: 0.76rem; line-height: 1.55; }
+
+.vault-big {
+  margin: 0; font-size: clamp(1.7rem, 9vw, 2.6rem); line-height: 1;
+  letter-spacing: 0.02em;
+  animation: land 320ms cubic-bezier(.2,1.4,.4,1) both;
+}
+.vault-sub { margin: 5px 0 12px; font-size: 0.72rem; color: var(--dim); }
+.vault-bar {
+  display: block; height: 14px; border: 1px solid var(--ink);
+  background: var(--paper); margin: 0 0 6px;
+}
+.vault-bar span { display: block; height: 100%; background: var(--ink); transition: width 420ms ease; }
+.vault-verdict { margin: 0 0 8px; font-size: 0.74rem; }
+.vault-verdict.is-viable { background: #ccff00; display: inline-block; padding: 2px 7px; }
+
+.vault-list { list-style: none; margin: 0 0 12px; padding: 0; }
+.vault-list li {
+  display: grid; grid-template-columns: 34px 1fr auto; gap: 4px 9px; align-items: center;
+  padding: 7px 0; border-bottom: 1px dotted var(--line); font-size: 0.68rem;
+}
+.vault-list img {
+  grid-row: span 3; width: 34px; height: 34px; border: 1px solid var(--line);
+  image-rendering: pixelated; background: var(--paper);
+}
+.vault-list img.world { object-fit: cover; object-position: center; transform: scale(1.9); }
+.vault-list .picker-noart { grid-row: span 3; width: 34px; height: 34px; border: 1px dotted var(--line); }
+.vault-name { letter-spacing: 0.05em; }
+.vault-meta { color: var(--dim); grid-column: 2 / -1; }
+.vault-list li .vault-meta:last-child { grid-column: 3; grid-row: 1; text-align: right; }
 
 @media (max-width: 560px) {
   .hall { padding: 7px 8px 6px; gap: 6px; }

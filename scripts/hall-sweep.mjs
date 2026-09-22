@@ -108,7 +108,11 @@ for (const vp of VIEWPORTS) {
     // 3. Nothing may sit on top of anything else.
     const collisions = await page.evaluate(() => {
       const pick = (s) => document.querySelector(s)?.getBoundingClientRect() ?? null;
-      const parts = { bar: pick(".hall-bar"), prompt: pick(".hall-prompt"), hint: pick(".hall-hint"), char: pick(".hall-char") };
+      const signs = [...document.querySelectorAll(".hall-prompt")].map((e) => e.getBoundingClientRect());
+      const parts = { bar: pick(".hall-bar"), hint: pick(".hall-hint"), char: pick(".hall-char") };
+      // Signs must not stack on each other either. The pair of them landed on top
+      // of the vault door once and nothing here noticed.
+      signs.forEach((r, i) => { parts[`sign${i}`] = r; });
       const hits = [];
       const names = Object.keys(parts);
       for (let i = 0; i < names.length; i++) {
@@ -152,17 +156,14 @@ for (const vp of VIEWPORTS) {
       else ok(label, `content fills ${(fill.w * 100).toFixed(0)}% width, ${(fill.h * 100).toFixed(0)}% height`);
     }
 
-    // 5. the desk prompt must be on screen
-    const prompt = await page.evaluate(() => {
-      const el = document.querySelector(".hall-prompt");
-      if (!el) return null;
+    // 5. BOTH destination signs must be fully on screen.
+    const prompts = await page.evaluate(() => [...document.querySelectorAll(".hall-prompt")].map((el) => {
       const r = el.getBoundingClientRect();
-      return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width, vw: innerWidth, vh: innerHeight };
-    });
-    if (!prompt) bad(label, "no desk prompt");
-    else if (prompt.l < -1 || prompt.r > prompt.vw + 1 || prompt.t < -1 || prompt.b > prompt.vh + 1)
-      bad(label, `desk prompt off screen (${prompt.l.toFixed(0)},${prompt.t.toFixed(0)})`);
-    else ok(label, "desk prompt on screen");
+      return { name: el.textContent.trim().slice(0, 12), off: r.left < -1 || r.right > innerWidth + 1 || r.top < -1 || r.bottom > innerHeight + 1 };
+    }));
+    if (prompts.length !== 2) bad(label, `expected 2 signs, found ${prompts.length}`);
+    else if (prompts.some((p) => p.off)) bad(label, `sign off screen: ${prompts.filter((p) => p.off).map((p) => p.name).join(", ")}`);
+    else ok(label, "both signs on screen");
 
     // 6. the character must be inside the frame
     const chr = await page.evaluate(() => {

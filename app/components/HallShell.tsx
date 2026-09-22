@@ -22,7 +22,7 @@ const FALLBACK: HallFriend = {
   imageUrl: null, idleRf: 4493, idleWeth: 0.0337,
 };
 
-export default function HallShell({ showcase }: { showcase: HallFriend | null }) {
+export default function HallShell({ showcase, rfUsd, ethUsd }: { showcase: HallFriend | null; rfUsd: number; ethUsd: number }) {
   const [friend, setFriend] = useState<HallFriend>(showcase ?? FALLBACK);
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState("");
@@ -52,7 +52,7 @@ export default function HallShell({ showcase }: { showcase: HallFriend | null })
 
   return (
     <>
-      <Hall friend={friend} onLeave={() => setPicking(true)} />
+      <Hall friend={friend} onLeave={() => setPicking(true)} rfUsd={rfUsd} ethUsd={ethUsd} />
 
       {picking && (
         <div className="hall-modal" role="dialog" aria-modal="true" aria-label="Choose a Friend">
