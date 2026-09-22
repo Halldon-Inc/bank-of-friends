@@ -1,17 +1,25 @@
 /*
   Monochrome, to sit beside Rare Friends' own artwork.
   Their Friends render as stark black-and-white isometric worlds with 1-bit
-  dithering, so the desk uses the same vocabulary: pure black, pure white, one
-  accent of nothing. No colour anywhere. Texture comes from dither patterns and
-  rules, the way theirs does.
+  dithering, so the desk uses the same vocabulary: one ink, one paper, no colour
+  anywhere. Texture comes from dither patterns and rules, the way theirs does.
+
+  PAPER, NOT SCREEN. This was white-on-black while the hall next door was black
+  on paper, so the two halves of one product looked like two products. The
+  artwork was black ink on white the whole time; only the page behind it was
+  dark. These are the hall's own tokens, so there is one palette and not two.
 */
 
 :root {
-  --ink: #ffffff;
-  --paper: #000000;
-  --dim: #8a8a8a;
-  --dimmer: #4a4a4a;
-  --line: #2a2a2a;
+  --ink: #111111;
+  --paper: #eeeeee;
+  --dim: #666666;
+  --dimmer: #7f7f7f;
+  --line: #c9c5bb;
+  /* Texture that has to know which way round the page is. */
+  --scan: rgba(0, 0, 0, 0.04);
+  --scan-blend: multiply;
+  --flash: rgba(0, 0, 0, 0.22);
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
   --shell: min(1180px, 100% - 2rem);
 }
@@ -37,21 +45,22 @@ html, body {
   opacity: 0.16;
 }
 
-/* Faint scanlines. A trading desk, not a web page. */
-body::after {
+/* Faint scanlines, on the research page only: the hall is line art and a halftone
+   over it just muddies the strokes. */
+body:has(.shell)::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   background: repeating-linear-gradient(
     to bottom,
-    rgba(255, 255, 255, 0.035) 0px,
-    rgba(255, 255, 255, 0.035) 1px,
+    var(--scan) 0px,
+    var(--scan) 1px,
     transparent 1px,
     transparent 3px
   );
   z-index: 100;
-  mix-blend-mode: screen;
+  mix-blend-mode: var(--scan-blend);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -210,9 +219,9 @@ a { color: var(--ink); text-underline-offset: 3px; }
 
 .pulse { animation: pulse 700ms ease-out; }
 @keyframes pulse {
-  0% { box-shadow: inset 0 0 0 0 rgba(255,255,255,0.22); }
-  30% { box-shadow: inset 0 0 0 2px rgba(255,255,255,0.22); }
-  100% { box-shadow: inset 0 0 0 0 rgba(255,255,255,0); }
+  0% { box-shadow: inset 0 0 0 0 var(--flash); }
+  30% { box-shadow: inset 0 0 0 2px var(--flash); }
+  100% { box-shadow: inset 0 0 0 0 transparent; }
 }
 
 .friend { animation: friendIn 380ms ease-out both; }
@@ -252,7 +261,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
 .picker-friend.is-picked { border: 1px solid var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 .picker-friend.is-inert { opacity: 0.45; }
 .picker-friend img {
-  width: 100%; aspect-ratio: 1; display: block; background: #000;
+  width: 100%; aspect-ratio: 1; display: block; background: var(--paper);
   image-rendering: pixelated;
 }
 /* A hardwired Generations Friend is an isometric world in the middle of a 512px
@@ -425,7 +434,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
   font-size: 0.72rem; line-height: 1.5;
 }
 .acct-list li::before { content: "+"; position: absolute; left: 0; color: var(--ink); }
-.acct-list.is-cannot li::before { content: "3"; color: var(--dim); }
+.acct-list.is-cannot li::before { content: "x"; color: var(--dim); }
 
 .acct-stats { margin: 0 0 10px; padding: 0; }
 .acct-stats > div {

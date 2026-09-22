@@ -58,7 +58,7 @@ export default function VaultPanel({
       <p className="acct-head">Can this book quote both sides?</p>
       <div className="vault-bar" role="img"
         aria-label={`Balanced book ${usd(t.balancedUsd)} of the ${usd(MIN_VIABLE_BOOK_USD)} needed`}>
-        <span style={{ width: `${Math.min(100, (t.balancedUsd / MIN_VIABLE_BOOK_USD) * 100).toFixed(1)}%` }} />
+        <span style={{ width: `${(t.progress * 100).toFixed(1)}%` }} />
       </div>
       <p className={`vault-verdict${t.viable ? " is-viable" : ""}`}>
         {t.viable

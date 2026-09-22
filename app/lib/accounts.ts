@@ -167,9 +167,14 @@ export function totals(list: Account[], rfUsd: number, ethUsd: number) {
   return {
     depositors: list.length,
     rf, weth, usd, rfSideUsd, wethSideUsd,
-    /** A book is only viable if the SMALLER side can still clear a fill. */
+    /**
+     * A book is only viable if the SMALLER side can still clear a fill, so both the
+     * bar and the verdict measure the BALANCED total. An earlier `progress` here ran
+     * off the unbalanced total, which would have filled the bar at $116 of pure WETH
+     * while the verdict beneath it still read "not yet". One number, one definition.
+     */
     balancedUsd: Math.min(rfSideUsd, wethSideUsd) * 2,
-    progress: Math.min(1, usd / MIN_VIABLE_BOOK_USD),
+    progress: Math.min(1, (Math.min(rfSideUsd, wethSideUsd) * 2) / MIN_VIABLE_BOOK_USD),
     viable: Math.min(rfSideUsd, wethSideUsd) * 2 >= MIN_VIABLE_BOOK_USD,
   };
 }

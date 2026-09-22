@@ -17,7 +17,16 @@ import { createRequire } from "node:module";
 const req = createRequire("C:/Users/skadd/lotus/package.json");
 const { chromium } = req("playwright");
 
-const URL_BASE = process.argv[2] ?? "http://localhost:3188";
+/**
+ * This grades the RESEARCH PAGE, which lives at /docs.
+ *
+ * It used to grade the base URL, which was the dashboard. Then `/` became the
+ * hall and this kept pointing at it, so for days it asserted "no status word
+ * rendered" against a page that has never had one, and counted zero images on a
+ * page drawn entirely in SVG. Take a base URL and go to the page you mean.
+ */
+const URL_BASE = (process.argv[2] ?? "http://localhost:3188").replace(/\/+$/, "");
+const TARGET = `${URL_BASE}/docs`;
 const OUT = "audit/shots";
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -61,7 +70,7 @@ for (const vp of VIEWPORTS) {
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   page.on("pageerror", (e) => errors.push(String(e)));
 
-  await page.goto(URL_BASE, { waitUntil: "networkidle", timeout: 60_000 });
+  await page.goto(TARGET, { waitUntil: "networkidle", timeout: 60_000 });
   await page.waitForTimeout(900);
 
   // 1. horizontal overflow

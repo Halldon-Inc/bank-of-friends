@@ -116,7 +116,11 @@ async function main() {
   console.log("\n-- decode cross-check against rarefriends.com (their number, our math) --");
   let api = null;
   try {
-    const r = await fetch("https://rarefriends.com/api/protocol/state?address=0x0000000000000000000000000000000000000000", { signal: AbortSignal.timeout(12000) });
+    // NOT the zero address. Their endpoint resolves an account for whatever you pass
+    // and 502s on 0x0, so this check skipped on every run while still reporting
+    // "ALL CHECKS PASS": the one assertion tying our slot decode to their published
+    // number was never actually made. Ask about an address that exists.
+    const r = await fetch(`https://rarefriends.com/api/protocol/state?address=${ADDR.Market}`, { signal: AbortSignal.timeout(12000) });
     if (r.ok) api = await r.json();
   } catch { /* their API is unversioned and has 502'd before; never let it fail our run */ }
   if (!api?.protocol?.prices?.rfUsd) {
@@ -241,7 +245,11 @@ async function main() {
     console.error(`\nFAILED checks:\n${results.filter((r) => r.status === "FAIL").map((r) => `  - ${r.name}: ${r.detail}`).join("\n")}`);
     process.exit(1);
   }
-  console.log("ALL CHECKS PASS");
+  // A skip is not a pass. Saying "ALL CHECKS PASS" over a silent skip is how the
+  // rarefriends.com cross-check sat dead for a week while the README claimed 37/37.
+  console.log(skipped === 0
+    ? "ALL CHECKS PASS"
+    : `ALL ${pass} GRADED CHECKS PASS, ${skipped} SKIPPED (named above). Not the same as ${results.length}/${results.length}.`);
   console.log(`${"=".repeat(68)}`);
 }
 

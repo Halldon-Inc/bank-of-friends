@@ -10,8 +10,9 @@ const pct = (v: number, d = 2) => `${(v * 100).toFixed(d)}%`;
 
 const LABEL: Record<string, string> = {
   volume24h: "volume 24h", trades24h: "trades 24h", drift24h: "drift 24h",
-  drift1h: "drift 1h", volFloor: "vol floor", volCeiling: "vol ceiling",
-  inventory: "inventory", drawdown: "drawdown", breaker: "breaker",
+  drift1h: "drift 1h", drift7d: "drift 7d", volFloor: "vol floor",
+  volCeiling: "vol ceiling", inventory: "inventory", drawdown: "drawdown",
+  breaker: "breaker",
 };
 
 /** Counts a number up on first paint. The figure lands rather than just being there. */
@@ -110,7 +111,7 @@ export default function DeskView() {
       </section>
 
       <section className="panel" style={{ marginBottom: "1.25rem" }}>
-        <h2>Arming conditions &mdash; live</h2>
+        <h2>Arming conditions: live</h2>
         {d.gates.map((g, i) => (
           <div
             key={g.gate}
@@ -143,7 +144,7 @@ export default function DeskView() {
         </section>
 
         <section className="panel">
-          <h2>The candidate book &mdash; idle rewards, founding member</h2>
+          <h2>The candidate book: idle rewards, founding member</h2>
           <span className="big"><Count value={d.book.usd} decimals={2} prefix="$" /></span>
           <dl style={{ marginTop: "0.9rem" }}>
             <div className="stat"><dt>unclaimed RF</dt><dd><Count value={d.book.rf} decimals={2} /></dd></div>

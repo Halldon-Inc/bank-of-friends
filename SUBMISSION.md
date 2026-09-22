@@ -1,4 +1,4 @@
-**Play it: <https://bank-of-friends-nu.vercel.app>** &mdash; no wallet, no signature, no install.
+**Play it: <https://bank-of-friends-nu.vercel.app>** with no wallet, no signature and no install.
 You land inside the hall with a Friend already on the marble.
 
 **Project name**
@@ -15,9 +15,9 @@ Economy Potential (also relevant: Character Spotlight)
 
 **One sentence**
 
-Walk any Rare Friend &mdash; **Genesis included** &mdash; into a banking hall built on pooled
-NFT-wallet rewards, and pull the lever at the desk to watch a real market-making strategy
-decide, week after week, that it should not trade.
+Walk any Rare Friend, **Genesis included**, into a banking hall built on pooled NFT-wallet
+rewards, open an account at the desk, and pull the lever to watch a real market-making
+strategy decide, week after week, that it should not trade.
 
 **Source code**
 
@@ -66,15 +66,34 @@ member cap.
 
 ## The hall
 
-You land inside it. One destination: **The Desk**. Walk with WASD, arrows, or tap.
+You land inside it, with a Friend already on the marble. Walk with WASD, arrows, or tap.
+Two destinations: **The Desk** and **The Vault**.
 
-Pull the lever and a week of market rolls. The **real strategy module** decides whether to
-trade &mdash; `lib/strategy.mjs`, the same file the backtests and the keeper use, guarded by
-`npm run check:lib-sync`. Most weeks it refuses, and it tells you which gate blocked it in one
-sentence: *"Too quiet. Barely anyone is trading today."* The nine checks are behind a
-disclosure, not the headline.
+**The desk opens an account, and it does not consult the market to do it.** Joining the
+bank and the bank deciding to quote are different questions, and an earlier build
+collapsed them: the desk's only action was the lever, so a Genesis holder walked up, got
+"SAT OUT" because the market was quiet, and reasonably read it as the bank refusing him.
 
-Measured arm rate across regimes: **21%** overall &mdash; 77% in live chop, **0%** in dead
+You see what you grant (harvest, a daily cap you set yourself, return on demand) and what
+the bank cannot do, each line of which has a Foundry test behind it. With a browser wallet
+present you sign a real **EIP-712** mandate. It grants nothing: no allowance, no
+transaction, no gas, and the contract is not deployed. Without a wallet the account still
+opens and is labelled **unsigned** rather than dressed up as a signature.
+
+**The vault holds the book**: depositors, pooled RF, pooled WETH, and a bar against the
+**$116 minimum viable balanced book**. The founding Genesis reads about **$103 in total but
+only about $15 balanced**, because rewards arrive roughly 94% WETH and 6% RF. Watching
+that bar fill as Friends join is the whole case for pooling, drawn. Accounts live in this browser
+and the panel says so: there is no backend, so a global depositor count would be a lie.
+
+Below a rule at the desk sits **the lever**, which is the bank's trading decision rather
+than yours. Pull it and a week of market rolls. The **real strategy module** decides
+whether to trade: `lib/strategy.mjs`, the same file the backtests and the keeper use,
+guarded by `npm run check:lib-sync`. Most weeks it refuses, and names the gate that
+blocked it in one sentence: *"Too quiet. Barely anyone is trading today."* The ten checks
+sit behind a disclosure, not in the headline.
+
+Measured arm rate across regimes: **21%** overall, 77% in live chop and **0%** in dead
 calm, a slow bleed, or a hard dump. `npm run check:lever` prints that table.
 
 ## Why the desk refuses: what the research found
@@ -169,11 +188,15 @@ RUN 2  synthetic ranging tape, volume restored (clearly labelled synthetic)
   vs hold      +5.76%      <- given chop and volume, it works the grid
 ```
 
-Live right now the desk is **FLAT**, blocked on three gates: 24h volume 13.7 WETH against a
-25 minimum, 145 trades against 200, and hourly realised vol 1.49% against the derived 3.27%
-floor. At today's volatility a single 15% rung takes about **101 hours** to traverse, i.e.
-0.83 round trips a week against a target of 4. That is the real reason the desk is flat,
-stated as a measurement rather than a threshold someone invented.
+Live the desk is **FLAT**. As of **2026-09-22 16:17Z** it was blocked on four of its ten
+conditions: 24h volume 9.99 WETH against a 25 minimum, 119 trades against 200, hourly
+realised vol 1.43% against the derived 3.27% floor, and a seven-day drift band with less
+than seven days of history behind it, which is a missing measurement rather than a market
+verdict and is labelled as one. At that volatility a single 15% rung takes about **101
+hours** to traverse, i.e. 0.83 round trips a week against a target of 4. Those figures are
+read live at <https://bank-of-friends-nu.vercel.app/docs>, so check them rather than trust
+them: that is the real reason the desk is flat, stated as a measurement rather than as a
+threshold someone invented.
 
 ## The parameters are derived, not invented
 
@@ -186,13 +209,13 @@ It caught three real errors:
 
 | | was | now |
 | --- | --- | --- |
-| minimum fill | $0.33 | **$8.71** — the old figure was "10x gas" and ignored that a round trip nets 3.79%, not 100%. **26x too low** |
+| minimum fill | $0.33 | **$8.71**: the old figure was "10x gas" and ignored that a round trip nets 3.79%, not 100%. **26x too low** |
 | volatility floor | 4.00%, picked | **3.27%**, derived from the grid step and a stated target of 4 round trips/week |
 | inventory cap | 60% fixed | **volatility-scaled**: 40% at today's 1.49%, 10% at 6% |
 
 Two numbers that should have been stated from the start: the **break-even grid step is
 10.80%** (`s > 1/(1-f)^2 - 1` at f=5%), and a round trip at a 15% step nets **3.79%, not 15%**
-— the fee takes 75% of the gross move.
+because the fee takes 75% of the gross move.
 
 And the finding that reframes the whole project: a grid is two-sided, so **both** sides must
 clear the minimum fill. One Friend's rewards are 94% WETH / 6% RF, which puts the RF side at
@@ -201,7 +224,9 @@ can never economically sell**, so it cannot make a market at all. Minimum viable
 is **$116**.
 
 That is not a hole in the argument. It *is* the argument, as a number rather than a slogan:
-one Friend cannot, pooled Friends can, and protocol-wide idle rewards are roughly $30,000.
+one Friend cannot, pooled Friends can. For scale, your own `weekRewardsUsd` puts roughly
+**$30,000 a week** of rewards into Friend wallets, with about **$228,000** left in
+`streamRemainingUsd` still to stream.
 
 ## Run the research yourself
 
@@ -217,12 +242,17 @@ npm run sweep            # 40 market regimes x 6 seeds
 npm run harvest -- --wallet 0xYOURWALLET    # dry run the auto-harvester
 ```
 
-To run the game locally, from a FriendSDK v0.1.2 checkout:
+Run the hall itself, which is a plain Next.js app and needs no SDK checkout:
 
 ```sh
-npm ci && npm run build
-npx friendsdk dev ./games/first-bank      # after copying game/ into games/first-bank
+cd app && npm install && npm run dev      # the hall at /, the research at /docs
+npm run sweep:hall <url>                  # 120 layout checks across twelve screen sizes
+npm run play:hall  <url>                  # walk in, open an account, pull the lever, read the book
 ```
+
+Both harnesses take a URL, so they can be run against the deployed site rather than only
+against localhost. `game/` holds the original FriendSDK build and is kept for reference:
+it is the version that cannot admit a Genesis, so it is not what runs at the link above.
 
 ## Economy and RF integration
 
@@ -244,7 +274,7 @@ Three properties enforced in `FriendBank.sol`, in code, not policy, with a Found
 1. **The Bank never holds your NFT.** Its only power is an ERC-20 allowance you set from
    your own Friend's wallet. Revoke it and the Bank is powerless instantly.
 2. **The Bank can never pull more than you allowed.** You set `capPerEpoch` at join.
-   `collect` takes `min(cap, epoch room, allowance, balance)` — proven in a test where the
+   `collect` takes `min(cap, epoch room, allowance, balance)`, proven in a test where the
    member grants an *unlimited* allowance and the Bank still only takes the cap.
 3. **Exit is never blocked.** `withdraw` has no timelock, no queue, no pause and no owner
    check. The owner may halt quoting; the owner may not halt leaving. Tested while halted.
@@ -256,15 +286,15 @@ member's cap, and can only ratchet risk caps tighter.
 
 | check | result |
 | --- | --- |
-| `npm run verify` | **37/37** assertions against live chain state |
-| `forge test` | **18/18**, asserting the safety properties above |
+| `npm run verify` | **37/37** assertions against live chain state, none skipped |
+| `forge test` | **20/20**, asserting the safety properties above, Genesis enrolment included |
 | `npm run backtest:gated` | RUN 1 takes 0 fills on the real tape; RUN 2 arms and trades |
-| `npx friendsdk check` | **valid**; expected reward 1.0354 RF, max 1.2 RF |
-| `npx friendsdk test` | **PASS** at 960px and at 360px |
-| `node scripts/visual-check.mjs <url>` | **70/70** across 320px → 2560px, against production |
-| `npm run check:game-sync` | game/ matches the SDK working copy, and its strategy matches lib/ |
+| `npm run sweep:hall <url>` | **120/120** across twelve sizes, 320px to 3440px, run against production |
+| `npm run play:hall <url>` | **41/41**: walk in, open an account, pull the lever, read the book, in all three rooms |
+| `node scripts/visual-check.mjs <url>` | **70/70** on /docs across 320px to 2560px, against production |
+| `npm run check:lib-sync` | app/lib is byte-identical to lib, and every gate has a label |
+| `npm run check:game-sync` | the reference SDK build in game/ still matches lib/ |
 | `npx tsc --noEmit`, `next build` | clean |
-| `npm run check:lib-sync` | app/lib is byte-identical to lib |
 
 ## Known issues and limitations
 
@@ -284,29 +314,45 @@ member's cap, and can only ratchet risk caps tighter.
   is read from chain; if their API is down, discovery degrades and the page says so rather
   than inventing numbers.
 
-## Known issues, game
+## Known issues, the hall
 
-- At 360px the SDK frame is only about 240px tall, so all four station prompts are visible at
-  once and overlap. Only the one in reach activates, but it is busy. Not yet solved.
-- The preview requires a wallet with an eligible Friend, as the SDK mandates, so it cannot be
-  tried by someone who holds none. The Vercel dashboard needs no wallet and shows the same
-  live data.
+- **Accounts are kept in your browser**, in localStorage, because there is no backend. So
+  the vault shows your own book and not a global one. A shared depositor count would be a
+  lie until the contract is deployed, and we would rather show a small true number.
+- The mandate signature is a statement of intent, not an approval. **Nothing on chain
+  changes when you sign it**, and the panel says so rather than implying otherwise.
 - The lever's market regimes are generated, clearly labelled, and shaped from the measured
   sweep. They are illustrations of the decision, not predictions.
+- `game/` still holds the original FriendSDK build and is kept for reference only. It is
+  the one that cannot admit a Genesis; at 360px its frame left all four station prompts
+  overlapping. The shipped hall has two destinations, three room shapes, and a sweep that
+  fails on any overlap.
 
 ## Credits
 
-The banking hall is a **custom world** in `game/world.ts`, authored in the SDK's own scene
-format from its supplied prop kit (`terminal` as teller windows, `tank` as the vault, `pipe`
-as columns, `bench` and `planter` for the lobby). Visual direction was matched against the
-SDK's own fishing example: `#eee` paper, `#111` ink, hard `2px 2px 0` offset shadows, 44px
-square icon buttons inset 18px, mono labels with `system-ui` display numbers.
+**FriendSDK is used as a library, under its Apache-2.0 licence**: `renderWorld` draws the
+scene, `createWorldMovement` handles walking, collision and pathing, `project`/`unproject`
+map world to screen. Thank you for shipping those as importable functions.
+
+**The building itself is ours.** `app/lib/hall-art.ts` draws the columned facade, the
+pediment, the carved name, the vault door and the teller counter. It had to: in this
+projection an offset moves you across the screen and depth moves you down it, so a room
+bounded by constant offsets and depths projects to a **plain rectangle seen head on**, while
+the SDK's props are drawn as 45-degree isometric boxes. Mixing them put two incompatible
+perspectives in one picture. The SDK props are still loaded, **hidden, and kept for
+collision only**, so the pathfinder still works and the counter still blocks. The original
+SDK-prop world is preserved in `game/world.ts` for reference.
+
+Visual direction was matched against the SDK's own fishing example: `#eee` paper, `#111`
+ink, hard `2px 2px 0` offset shadows, 44px square icon buttons inset 18px, mono labels with
+`system-ui` display numbers. **The hall and the research page share one palette**, so the
+two halves read as one product rather than two.
 
 Friend artwork is each NFT's own on-chain SVG, read unmodified from
 `rarefriends.com/api/protocol/state` and rendered at its native resolution. Hardwired
 Generations are zoom-cropped to centre the isometric world; Genesis and temp portraits are
-not. No third-party assets are used anywhere else: no fonts are bundled, no images are
-shipped, and the entire interface is CSS.
+not. No third-party assets are used anywhere else: no fonts are bundled (the interface
+uses the system mono stack), no images are shipped, and the rest is CSS.
 
 Protocol mechanics were read from the contracts themselves via
 `rarefriends.com/api/protocol/config`, which ships full ABIs.

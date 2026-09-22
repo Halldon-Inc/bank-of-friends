@@ -57,7 +57,7 @@ export default function FriendPicker() {
 
   return (
     <section className="panel" id="enrol">
-      <h2>Your Friends &mdash; enrol one</h2>
+      <h2>Your Friends: enrol one</h2>
 
       <form className="picker-form" onSubmit={look}>
         <input
@@ -108,7 +108,7 @@ export default function FriendPicker() {
               <h3>{chosen.label}</h3>
               <dl>
                 <div className="stat"><dt>idle rewards</dt><dd>{n(chosen.idleRf)} RF + {chosen.idleWeth.toFixed(8)} WETH</dd></div>
-                <div className="stat"><dt>Friend wallet</dt><dd>{chosen.wallet ? `${chosen.wallet.slice(0, 10)}…${chosen.wallet.slice(-6)}` : "—"}</dd></div>
+                <div className="stat"><dt>Friend wallet</dt><dd>{chosen.wallet ? `${chosen.wallet.slice(0, 10)}…${chosen.wallet.slice(-6)}` : "none"}</dd></div>
                 <div className="stat"><dt>can bank</dt><dd>{chosen.bankEligible ? "yes" : "no"}</dd></div>
                 <div className="stat"><dt>can walk into the hall</dt><dd>{chosen.gameEligible ? "yes" : "no"}</dd></div>
               </dl>

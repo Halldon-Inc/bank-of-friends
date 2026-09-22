@@ -26,7 +26,20 @@ const val = (f) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : nu
 
 const EXECUTE = has("--execute");
 const WALLET = val("--wallet");
-const MIN_USD = Number(val("--min-usd") ?? 0.05);   // do not spend $0.03 of gas to claim $0.01
+/**
+ * What a claim costs, measured: ~209k gas at 0.057 gwei = $0.033 a transaction, and
+ * a Friend needs one per asset. The threshold is DERIVED from that, not picked.
+ *
+ * It used to be a flat $0.05 with a comment about not spending $0.03 to claim $0.01,
+ * while the script's own model put a Friend's gas at $0.066. So it cleared Friends
+ * holding $0.06 and lost money on them. Same error the derive script caught in
+ * minFillUsd: a threshold that does not know its own costs. Two times cost, so a
+ * claim is worth making rather than merely break-even.
+ */
+const GAS_USD_PER_TX = 0.033;
+const TXS_PER_FRIEND = 2;
+const GAS_USD_PER_FRIEND = GAS_USD_PER_TX * TXS_PER_FRIEND;
+const MIN_USD = Number(val("--min-usd") ?? GAS_USD_PER_FRIEND * 2);
 
 const c = client();
 
@@ -90,14 +103,17 @@ for (const t of targets) {
 const worth = plan.filter((p) => p.usd >= MIN_USD);
 const totalUsd = (Number(totalRf) / 1e18) * rfUsd + (Number(totalWeth) / 1e18) * ETH_USD;
 console.log(`\n  claimable total: ${fmt.eth(totalRf, 4)} RF + ${fmt.eth(totalWeth, 8)} WETH = $${totalUsd.toFixed(2)}`);
-console.log(`  worth claiming:  ${worth.length} of ${plan.length} Friends (threshold $${MIN_USD})`);
+console.log(`  worth claiming:  ${worth.length} of ${plan.length} Friends (threshold $${MIN_USD.toFixed(3)} = 2x the $${GAS_USD_PER_FRIEND.toFixed(3)} a Friend costs to claim)`);
 
-// Two claims per Friend, one per asset.
-const txCount = worth.length * 2;
-const gasUsd = txCount * 0.033;
-console.log(`  estimated gas:   ${txCount} txs x ~$0.033 = $${gasUsd.toFixed(2)}`);
-if (gasUsd >= totalUsd) {
-  console.log(`\n  WARNING: gas would cost more than the rewards are worth. Not economic right now.`);
+// One claim per asset, so two transactions a Friend.
+const txCount = worth.length * TXS_PER_FRIEND;
+const gasUsd = txCount * GAS_USD_PER_TX;
+const worthUsd = worth.reduce((a, p) => a + p.usd, 0);
+console.log(`  estimated gas:   ${txCount} txs x ~$${GAS_USD_PER_TX} = $${gasUsd.toFixed(2)}`);
+// Compare gas against what is actually being claimed. Comparing it against the
+// whole plan let one large Friend hide a batch of losing ones behind it.
+if (gasUsd >= worthUsd) {
+  console.log(`\n  WARNING: gas ($${gasUsd.toFixed(2)}) costs more than the $${worthUsd.toFixed(2)} being claimed. Not economic right now.`);
 }
 
 if (!EXECUTE) {
