@@ -266,6 +266,45 @@ contract FriendBankTest is Test {
         bank.trade(true, 1e18, 0, block.timestamp + 1);
     }
 
+    /* ------------------------------------- GENESIS: the SDK excludes it, we do not */
+
+    /**
+     * FriendSDK games require a Generations NFT of generation >= 1, so Genesis holders
+     * cannot play any SDK game. That is an SDK rule for GAMES. The Bank is a tool, and
+     * the vibeathon's non-SDK path sets no such requirement, so Genesis must work here:
+     * it is where the money actually is. One Genesis holds 3,287 RF of idle rewards
+     * against ~3.7 RF in a Gen-3.
+     */
+    function test_GenesisCanJoinAndBeCollectedFrom() public {
+        MockCollection genesisCollection = new MockCollection();
+        address genesisTba = address(0xBA12);
+        genesisCollection.setFriend(259, alice, genesisTba);
+
+        vm.prank(alice);
+        bank.join(address(genesisCollection), 259, CAP);
+
+        rf.mint(genesisTba, 5_000e18);
+        rf.approveAs(genesisTba, address(bank), type(uint256).max);
+        weth.approveAs(genesisTba, address(bank), type(uint256).max);
+
+        (uint256 rfPulled,) = bank.collect(1);
+        assertEq(rfPulled, CAP, "a Genesis must be collectable exactly like a Generations Friend");
+        assertEq(genesisCollection.ownerOf(259), alice, "and its NFT stays with its owner");
+    }
+
+    function test_GenesisIsBoundedByTheSameCap() public {
+        MockCollection genesisCollection = new MockCollection();
+        address genesisTba = address(0xBA13);
+        genesisCollection.setFriend(1, alice, genesisTba);
+        vm.prank(alice);
+        bank.join(address(genesisCollection), 1, CAP);
+
+        rf.mint(genesisTba, 1_000_000e18);
+        rf.approveAs(genesisTba, address(bank), type(uint256).max);
+        (uint256 rfPulled,) = bank.collect(1);
+        assertEq(rfPulled, CAP, "no special case: the member cap binds a Genesis too");
+    }
+
     /* ----------------------------------------------------------------- views */
 
     function test_CollectableShowsRealExposure() public {

@@ -1,4 +1,5 @@
 import DeskView from "@/components/Desk";
+import FriendPicker from "@/components/FriendPicker";
 
 /**
  * The shell renders instantly and never touches the chain. An earlier version did
@@ -16,6 +17,8 @@ export default function Page() {
       </header>
 
       <DeskView />
+
+      <FriendPicker />
 
       <hr className="rule" />
 

@@ -221,3 +221,190 @@ a { color: var(--ink); text-underline-offset: 3px; }
 /* The wordmark now says THE FIRST BANK OF FRIENDS, which is longer: let it breathe
    and wrap on narrow screens rather than shrink to nothing. */
 .wordmark { font-size: clamp(1.15rem, 4.4vw, 2.4rem); letter-spacing: 0.18em; }
+
+/* ------------------------------------------------------------- friend picker */
+/* Pick by looking. The art is on chain and already a data: URI, so this is the
+   same approach the meme machine on rare-friends-cards uses. It lists every
+   Friend, including the Genesis that FriendSDK games hide. */
+.picker-form { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.picker-form input {
+  flex: 1 1 16rem; min-width: 0;
+  background: transparent; color: var(--ink);
+  border: 1px solid var(--line); padding: 0.55rem 0.7rem;
+  font: inherit; letter-spacing: 0.04em;
+}
+.picker-form input:focus-visible { outline: 1px solid var(--ink); outline-offset: -2px; border-color: var(--ink); }
+.picker-form button {
+  font: inherit; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.72rem;
+  background: var(--ink); color: var(--paper); border: 1px solid var(--ink);
+  padding: 0.55rem 1.1rem; cursor: pointer;
+}
+.picker-form button:disabled { opacity: 0.45; cursor: default; }
+.picker-error { color: var(--ink); border-left: 2px solid var(--ink); padding-left: 0.7rem; margin-top: 0.8rem; font-size: 0.8rem; }
+
+.picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+.picker-friend {
+  position: relative; display: block; text-align: left; min-width: 0;
+  background: transparent; color: var(--ink);
+  border: 1px solid var(--line); padding: 0.45rem; cursor: pointer; font: inherit;
+}
+.picker-friend:hover { border-color: var(--ink); }
+.picker-friend.is-picked { border: 1px solid var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.picker-friend.is-inert { opacity: 0.45; }
+.picker-friend img {
+  width: 100%; aspect-ratio: 1; display: block; background: #000;
+  image-rendering: pixelated;
+}
+/* A hardwired Generations Friend is an isometric world in the middle of a 512px
+   SVG and is an unreadable speck at tile size; a Genesis portrait is full-bleed. */
+.picker-friend img.world { object-fit: none; object-position: center; transform: scale(2.1); }
+.picker-friend > img.world { clip-path: inset(0); }
+.picker-friend { overflow: hidden; }
+.picker-label { display: block; font-size: 0.68rem; letter-spacing: 0.04em; margin-top: 0.4rem; overflow-wrap: anywhere; }
+.picker-meta { display: block; font-size: 0.64rem; color: var(--dim); overflow-wrap: anywhere; }
+.picker-tag {
+  position: absolute; top: 0.45rem; right: 0.45rem;
+  background: var(--ink); color: var(--paper);
+  font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.12rem 0.3rem;
+}
+
+.picker-detail { border: 1px solid var(--ink); padding: 1rem; margin-top: 1rem; }
+.picker-detail h3 { margin: 0 0 0.6rem; font-size: 0.9rem; letter-spacing: 0.08em; font-weight: 400; }
+
+/* ============================================================== THE HALL */
+/* Our own runtime, so our own frame. Sized from the viewport HEIGHT as well as
+   its width: the SDK frame was width-only and overflowed a laptop. */
+/* The hall is LIGHT MODE, overriding the dashboard's dark theme locally.
+   NO FILTER. renderWorld already emits BLACK-ON-WHITE artwork, exactly like the
+   canvas path. I added invert(1) here on the assumption it was white-on-dark, which
+   is the second time I have made that exact assumption on this project; both times
+   the art was already correct and only the PAGE behind it was dark. The green
+   signal turning blue was the tell, since invert() moves hue as well as value.
+   Give it a light background and leave the artwork alone. */
+.hall {
+  --paper: #eee;
+  --ink: #111;
+  --dim: #666;
+  --line: #cfccc4;
+  position: fixed; inset: 0;
+  display: grid; place-items: center;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 12px;
+}
+.hall-scene {
+  position: relative;
+  width: min(100%, calc((100svh - 24px) * 1.49));
+  aspect-ratio: 700 / 470;
+  max-height: calc(100svh - 24px);
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  overflow: hidden;
+  touch-action: none;
+  cursor: crosshair;
+}
+.hall-svg, .hall-svg svg { display: block; width: 100%; height: 100%; }
+
+/* The one destination. Crisp in both states: an out-of-reach marker should not
+   look like a broken half-transparent box. */
+.hall-prompt {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--ink); box-shadow: 2px 2px 0 var(--ink);
+  padding: 5px 9px; font: inherit; font-size: 0.66rem; letter-spacing: 0.06em;
+  white-space: nowrap; cursor: default; text-align: center;
+}
+.hall-prompt small { display: block; font-size: 0.56rem; color: var(--dim); margin-top: 2px; }
+.hall-prompt.is-near {
+  background: #ccff00; border-width: 2px; box-shadow: 3px 3px 0 var(--ink);
+  cursor: pointer; animation: promptPop 220ms cubic-bezier(.2,1.5,.4,1) both;
+}
+.hall-prompt.is-near small { color: var(--ink); }
+@keyframes promptPop { from { transform: translate(-50%, -100%) scale(0.9); } to { transform: translate(-50%, -100%) scale(1); } }
+
+.hall-hud {
+  position: absolute; top: 12px; left: 12px;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--paper); border: 1px solid var(--ink); box-shadow: 2px 2px 0 var(--ink);
+  padding: 7px 10px; font-size: 0.66rem;
+}
+.hall-hud strong { font-weight: 400; letter-spacing: 0.06em; }
+.hall-hud span { color: var(--dim); }
+.hall-hud button {
+  font: inherit; font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase;
+  background: transparent; color: var(--ink); border: 1px solid var(--ink);
+  padding: 3px 7px; cursor: pointer;
+}
+.hall-hud button:hover { background: var(--ink); color: var(--paper); }
+
+.hall-hint {
+  position: absolute; bottom: 10px; left: 0; right: 0; text-align: center;
+  margin: 0; font-size: 0.6rem; color: var(--dim); pointer-events: none;
+}
+
+/* ------------------------------------------------------------- desk panel */
+.hall-modal {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  background: rgba(0,0,0,0.55); padding: 14px; z-index: 5;
+}
+.hall-panel {
+  width: min(430px, 100%); max-height: 100%; overflow: auto;
+  background: var(--paper); color: var(--ink);
+  border: 2px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); padding: 0 0 14px;
+}
+.hall-panel header {
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--ink); padding: 9px 12px; margin-bottom: 12px;
+}
+.hall-panel h2 { margin: 0; font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; font-weight: 400; }
+.hall-panel header button {
+  font: inherit; font-size: 1.1rem; line-height: 1; background: transparent;
+  color: var(--ink); border: 0; cursor: pointer; padding: 0 4px;
+}
+.hall-panel > *:not(header) { margin-left: 14px; margin-right: 14px; }
+.hall-lede { font-size: 0.78rem; line-height: 1.6; margin: 0 14px 12px; }
+.hall-lever {
+  display: block; width: calc(100% - 28px);
+  font: inherit; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;
+  background: var(--ink); color: var(--paper); border: 1px solid var(--ink);
+  padding: 11px; cursor: pointer;
+}
+.hall-lever:disabled { opacity: 0.5; cursor: default; }
+
+.hall-verdict {
+  border: 1px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+  padding: 14px; margin: 14px; text-align: center;
+}
+.hall-regime { margin: 0; font-size: 0.58rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim); }
+.hall-word { margin: 5px 0 9px; font-size: clamp(1.6rem, 8vw, 2.4rem); letter-spacing: 0.06em; line-height: 1; }
+.hall-verdict.armed .hall-word { background: var(--ink); color: var(--paper); display: inline-block; padding: 2px 10px; }
+.hall-verdict.spinning .hall-word { opacity: 0.3; }
+.hall-verdict:not(.spinning) .hall-word { animation: land 300ms cubic-bezier(.2,1.4,.4,1) both; }
+.hall-because { margin: 0 auto; max-width: 30ch; font-size: 0.76rem; line-height: 1.5; color: var(--ink); }
+
+.hall-why {
+  font: inherit; font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
+  background: transparent; color: var(--dim); border: 0; border-bottom: 1px solid var(--line);
+  padding: 4px 0; cursor: pointer;
+}
+.hall-why:hover { color: var(--ink); }
+.hall-gates { list-style: none; margin: 8px 14px; padding: 0; }
+.hall-gates li {
+  display: grid; grid-template-columns: 14px 5.4rem 1fr; gap: 6px; align-items: baseline;
+  font-size: 0.62rem; padding: 3px 0; border-bottom: 1px dotted var(--line); color: var(--dim);
+}
+.hall-gates li.blocked { color: var(--ink); }
+.hall-gates b { font-weight: 400; }
+.hall-gates i { font-style: normal; }
+.hall-small { font-size: 0.62rem; color: var(--dim); line-height: 1.55; }
+
+@media (max-width: 560px) {
+  .hall { padding: 6px; }
+  .hall-hud { top: 6px; left: 6px; padding: 5px 7px; font-size: 0.58rem; gap: 7px; }
+  .hall-gates li { grid-template-columns: 14px 1fr; }
+  .hall-gates i { grid-column: 2; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hall-prompt.is-near, .hall-verdict:not(.spinning) .hall-word { animation: none; }
+}
