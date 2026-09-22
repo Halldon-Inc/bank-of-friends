@@ -11,7 +11,10 @@
     "backtest:chart": "node scripts/backtest-chart.mjs",
     "backtest:gated": "node scripts/backtest-gated.mjs",
     "reserve": "node scripts/probe-reserve.mjs",
-    "book": "node scripts/probe-genesis-book.mjs"
+    "book": "node scripts/probe-genesis-book.mjs",
+    "check:lib-sync": "node scripts/check-lib-sync.mjs",
+    "harvest": "node scripts/harvest.mjs",
+    "visual": "node scripts/visual-check.mjs"
   },
   "dependencies": {
     "viem": "2.56.6"
