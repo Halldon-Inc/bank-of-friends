@@ -6,3 +6,12 @@ contracts/cache/
 contracts/broadcast/
 .env
 .env.*
+app/.next/
+app/node_modules/
+app/bof.log
+app/desk.json
+audit/shots/
+*.log
+gen-offers.json
+gen-sales.json
+desk.json
