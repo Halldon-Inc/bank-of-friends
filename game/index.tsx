@@ -31,6 +31,7 @@ import "@rarefriends/friendsdk/world-view.css";
 import "./style.css";
 
 import { BANK_WORLD, SPAWN, STATIONS } from "./world";
+import FriendPortrait from "./FriendPortrait";
 // @ts-expect-error - plain ESM, byte-identical to lib/strategy.mjs in the repo root
 import { DEFAULT_GATES, evaluateRegime, realisedVol, drift, edgePerRoundTrip, BREAKEVEN_STEP } from "./strategy.mjs";
 
@@ -164,6 +165,7 @@ export default function FirstBankOfFriends({ friendId, client, paused }: GameCom
   const [week, setWeek] = useState<ReturnType<typeof rollWeek> | null>(null);
   const [rolling, setRolling] = useState(false);
   const [visits, setVisits] = useState<Record<string, boolean>>({});
+  const [family, setFamily] = useState<string | null>(null);
 
   const sound = useRef<FriendSoundKit | null>(null);
   const locked = useRef(false);
@@ -178,7 +180,7 @@ export default function FirstBankOfFriends({ friendId, client, paused }: GameCom
     const version = ++epoch.current;
     sound.current = createFriendSoundKit({ muted: true });
     setSnapshot(null); setMenu(null); setResult(null); setError(""); setMessage("");
-    setBusy(false); setMuted(true); setWeek(null); setVisits({}); locked.current = false;
+    setBusy(false); setMuted(true); setWeek(null); setVisits({}); setFamily(null); locked.current = false;
     void client.read()
       .then((v) => { if (version === epoch.current) setSnapshot(v); })
       .catch((c) => { if (version === epoch.current) setError(c instanceof Error ? c.message : "Could not open the bank."); });
@@ -283,10 +285,15 @@ export default function FirstBankOfFriends({ friendId, client, paused }: GameCom
         {/* Chrome matched to the fishing example: a bordered card with a hard
             offset shadow top-left, a 44px square icon button top-right at an 18px
             inset, and a small status line low-left. No full-width bar. */}
+        {/* Who you are playing as, from the Friend's own on-chain sprite. The SDK's
+            picker is text-only, so without this you never see your Friend at all. */}
         <div className="bank-card">
-          <small>Preview RF</small>
-          <strong>{formatGameAmount(snapshot.rfBalance, 18)}<span>RF</span></strong>
-          <em>{slips.toString()} slips</em>
+          <FriendPortrait friendId={friendId} size={46} onFamily={setFamily} />
+          <div className="bank-card-figures">
+            <small>{family ? `${family} #${friendId}` : `Friend #${friendId}`}</small>
+            <strong>{formatGameAmount(snapshot.rfBalance, 18)}<span>RF</span></strong>
+            <em>{slips.toString()} on the counter</em>
+          </div>
         </div>
 
         {/* No title overlay. The fishing example has none, and a centred wordmark

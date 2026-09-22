@@ -15,8 +15,21 @@
   --bank-paper: #eee;
   --bank-ink: #111;
   --bank-dim: #666;
-  --bank-font: ui-monospace, SFMono-Regular, Consolas, monospace;
+  --bank-font: "Sometype Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --bank-display: "Silkscreen", "Courier New", monospace;
+  --bank-body: "Archivo", system-ui, -apple-system, sans-serif;
 }
+
+/* Same three families the real site uses, bundled locally. The trusted page and the
+   sandbox must agree or the connect flow looks like a different product. */
+@font-face { font-family: "Silkscreen"; font-weight: 400; font-display: swap;
+  src: url("./fonts/silkscreen-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Silkscreen"; font-weight: 700; font-display: swap;
+  src: url("./fonts/silkscreen-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Sometype Mono"; font-weight: 400 700; font-display: swap;
+  src: url("./fonts/sometype-mono-latin-wght-normal.woff2") format("woff2-variations"); }
+@font-face { font-family: "Archivo"; font-weight: 100 900; font-display: swap;
+  src: url("./fonts/archivo-latin-wght-normal.woff2") format("woff2-variations"); }
 
 body { background: var(--bank-paper); color: var(--bank-ink); font-family: var(--bank-font); }
 
@@ -28,7 +41,26 @@ body { background: var(--bank-paper); color: var(--bank-ink); font-family: var(-
   background: var(--bank-paper);
   border-bottom: 1px solid var(--bank-ink);
 }
-.rf-frame-mode { letter-spacing: .18em; text-transform: uppercase; font-size: 9px; color: var(--bank-dim); }
+/*
+  "Local preview" is NOT a button. It is the runtime's mode label and it is the
+  "this economy is simulated" disclosure the vibeathon rules require, so it stays.
+  It was styled like the outlined buttons beside it and read as clickable, which is
+  why it looked pointless. It is now a filled status chip: clearly a badge, clearly
+  not a control.
+*/
+.rf-frame-mode {
+  font-family: var(--bank-display);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  font-size: 9px;
+  background: var(--bank-ink);
+  color: var(--bank-paper);
+  padding: 4px 7px;
+  border: 0;
+  box-shadow: none;
+  cursor: default;
+  user-select: none;
+}
 .rf-frame-toolbar button {
   border: 1px solid var(--bank-ink);
   background: var(--bank-paper);
@@ -66,8 +98,8 @@ body { background: var(--bank-paper); color: var(--bank-ink); font-family: var(-
   cursor: pointer;
 }
 .rf-frame-friends button strong {
-  font: 600 15px/1.15 system-ui, -apple-system, "Segoe UI", sans-serif;
-  letter-spacing: -.02em;
+  font: 400 13px/1.2 var(--bank-display);
+  letter-spacing: .01em;
 }
 .rf-frame-friends button small { font-size: 9px; color: var(--bank-dim); letter-spacing: .06em; }
 .rf-frame-friends button:hover { background: #ddd; }
@@ -80,11 +112,11 @@ body { background: var(--bank-paper); color: var(--bank-ink); font-family: var(-
 /* --------------------------------------------------------------------- menus */
 .rf-frame-menu { border: 2px solid var(--bank-ink); background: var(--bank-paper); box-shadow: 4px 4px 0 var(--bank-ink); }
 .rf-frame-menu-heading { border-bottom: 1px solid var(--bank-ink); }
-.rf-frame-menu-heading h2 { font: 600 12px/1.3 var(--bank-font); letter-spacing: .1em; text-transform: uppercase; }
-.rf-frame-menu-body { font-size: 12px; line-height: 1.55; }
+.rf-frame-menu-heading h2 { font: 400 11px/1.3 var(--bank-display); letter-spacing: .04em; text-transform: uppercase; }
+.rf-frame-menu-body { font-family: var(--bank-body); font-size: 13px; line-height: 1.6; }
 .rf-frame-menu-body p { color: var(--bank-dim); }
 .rf-frame-primary { background: var(--bank-ink); color: var(--bank-paper); border-color: var(--bank-ink); }
 .rf-frame-primary:hover:not(:disabled) { background: #333; }
 .rf-frame-note { font-size: 10px; color: var(--bank-dim); }
 .rf-frame-address, .rf-frame-wallet-balance { font-family: var(--bank-font); }
-.rf-frame-wallet-balance { font: 600 22px/1.1 system-ui, sans-serif; letter-spacing: -.03em; }
+.rf-frame-wallet-balance { font: 400 18px/1.2 var(--bank-display); letter-spacing: .01em; }

@@ -53,7 +53,7 @@ npm run dev:game -- games/first-bank
 Open the printed URL, connect a wallet holding a hardwired Generations NFT
 (generation 1 or higher) on Robinhood mainnet, and pick your Friend.
 
-## Assets
+## Typography and assets
 
 The banking hall is a **custom world** authored in `world.ts` using the SDK's own
 scene format: a chamfered ground polygon, marble floor patches, walking paths, and
@@ -61,5 +61,20 @@ props drawn from the supplied kit (`terminal` as teller windows, `tank` as the
 vault, `pipe` as columns, `bench` and `planter` for the lobby). The Friend is its
 own canonical on-chain sprite, unmodified. No third-party assets are used.
 
-The SDK renders light scenery on a dark ground; this game inverts that layer in
-CSS for a light-mode hall, which matches rarefriends.com's default appearance.
+The SDK's renderer is already black-on-white, so the hall needs no colour treatment.
+
+**Fonts are rarefriends.com's own three families**, read from their stylesheet and
+bundled locally because the sandbox CSP is `font-src 'self'`:
+
+| Role | Family | Licence |
+| --- | --- | --- |
+| Display | Silkscreen | SIL Open Font License 1.1 |
+| Body | Archivo | SIL Open Font License 1.1 |
+| Mono | Sometype Mono | SIL Open Font License 1.1 |
+
+80 KB total for all four files, sourced from the Fontsource packages. All three are
+OFL and redistributable; no proprietary font is used.
+
+**Your Friend's portrait** in the corner is its own canonical 16x16 on-chain mask,
+read through the SDK's sprite reader and drawn as SVG rects. Nothing is invented and
+nothing is recoloured.

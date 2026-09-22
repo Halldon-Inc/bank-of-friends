@@ -1,4 +1,32 @@
 /*
+  rarefriends.com's actual type system, read from their stylesheet:
+    --font-display : "Silkscreen", "Courier New", monospace
+    --font-body    : "Archivo Variable", "Archivo", system-ui, sans-serif
+    --font-mono    : "Sometype Mono Variable", "Sometype Mono", ui-monospace, monospace
+
+  Generic ui-monospace/system-ui stacks looked sloppy beside the real site. The
+  sandbox CSP is font-src 'self', so Google Fonts is blocked and these are bundled
+  as local woff2 (80 KB for all four). All three families are SIL Open Font
+  License; see README for attribution.
+*/
+@font-face {
+  font-family: "Silkscreen"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("./fonts/silkscreen-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Silkscreen"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("./fonts/silkscreen-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Sometype Mono"; font-style: normal; font-weight: 400 700; font-display: swap;
+  src: url("./fonts/sometype-mono-latin-wght-normal.woff2") format("woff2-variations");
+}
+@font-face {
+  font-family: "Archivo"; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url("./fonts/archivo-latin-wght-normal.woff2") format("woff2-variations");
+}
+
+/*
   THE FIRST BANK OF FRIENDS
 
   Styled to sit beside the SDK's own fishing example rather than beside a trading
@@ -22,8 +50,9 @@
   --paper: #eee;
   --ink: #111;
   --dim: #666;
-  --game-font: ui-monospace, SFMono-Regular, Consolas, monospace;
-  --display: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --game-font: "Sometype Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --display: "Silkscreen", "Courier New", monospace;
+  --body: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
 
   position: relative;
   isolation: isolate;
@@ -61,7 +90,7 @@
   min-width: 108px;
 }
 .bank-card small { display: block; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
-.bank-card strong { display: block; font: 600 20px/1.1 var(--display); letter-spacing: -.03em; margin-top: 2px; }
+.bank-card strong { display: block; font: 400 17px/1.15 var(--display); letter-spacing: .01em; margin-top: 3px; }
 .bank-card strong span { font: 400 10px/1 var(--game-font); letter-spacing: 0; margin-left: 3px; color: var(--dim); }
 .bank-card em { display: block; font-style: normal; font-size: 10px; color: var(--dim); margin-top: 3px; }
 
@@ -113,8 +142,8 @@
   border: 1px solid var(--ink);
   background: var(--paper);
   color: var(--ink);
-  font: 600 11px/1.1 var(--game-font);
-  letter-spacing: .04em;
+  font: 400 11px/1.15 var(--display);
+  letter-spacing: .02em;
   padding: 5px 8px;
   box-shadow: 2px 2px 0 var(--ink);
   transition: none;
@@ -151,9 +180,9 @@
 .bank-stats { margin: 10px 0; }
 .bank-stats > div { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0; border-bottom: 1px dotted #ccc; }
 .bank-stats dt { color: var(--dim); margin: 0; }
-.bank-stats dd { margin: 0; font: 600 13px/1.2 var(--display); letter-spacing: -.02em; }
+.bank-stats dd { margin: 0; font: 400 12px/1.25 var(--display); letter-spacing: .01em; }
 
-.bank-ledger { padding-left: 16px; margin: 8px 0; font-size: 11px; }
+.bank-ledger { padding-left: 16px; margin: 8px 0; font-family: var(--body); font-size: 12px; }
 .bank-ledger li { margin-bottom: 8px; line-height: 1.55; }
 
 /* --------------------------------------------------------------- the lever */
@@ -168,7 +197,7 @@
   background: var(--paper);
 }
 .bank-regime { font-size: 9px; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); }
-.bank-word { margin: 4px 0 10px; font: 600 clamp(28px, 11vw, 46px)/1 var(--display); letter-spacing: -.04em; }
+.bank-word { margin: 6px 0 12px; font: 400 clamp(24px, 9vw, 40px)/1.05 var(--display); letter-spacing: .02em; }
 .bank-verdict.armed .bank-word { background: var(--ink); color: var(--paper); display: inline-block; padding: 2px 10px; }
 .bank-verdict.spinning .bank-word { opacity: .3; }
 .bank-verdict:not(.spinning) .bank-word { animation: land 300ms cubic-bezier(.2, 1.4, .4, 1) both; }
@@ -197,7 +226,7 @@
 
 /* ------------------------------------------------------------------ receipt */
 .bank-receipt { text-align: center; }
-.bank-receipt h3 { font: 600 20px/1.2 var(--display); letter-spacing: -.03em; margin: 8px 0; }
+.bank-receipt h3 { font: 400 16px/1.3 var(--display); letter-spacing: .01em; margin: 10px 0; }
 .bank-receipt p { font-size: 11px; color: var(--dim); }
 .bank-receipt button { margin: 10px 4px 0; }
 
@@ -208,15 +237,15 @@
 /* ------------------------------------------------- the one desk, simplified */
 /* Four windows was a menu pretending to be a room. One counter, one loop:
    deposit, pull, see what happened. Everything explanatory is behind "why?". */
-.bank-lede { font-size: 12px; line-height: 1.6; margin-bottom: 12px; }
+.bank-lede { font-family: var(--body); font-size: 13px; line-height: 1.6; margin-bottom: 12px; }
 .bank-lede strong { font-weight: 600; }
 
 .bank-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .bank-slips { font-size: 10px; color: var(--dim); letter-spacing: .06em; }
 
 .bank-because {
-  font: 600 13px/1.5 var(--display);
-  letter-spacing: -.01em;
+  font: 500 13px/1.5 var(--body);
+  letter-spacing: 0;
   margin: 0 auto;
   max-width: 34ch;
 }
@@ -232,3 +261,24 @@
 }
 .bank-why summary:hover { color: var(--ink); }
 .bank-why[open] summary { color: var(--ink); }
+
+/* --------------------------------------------------------------- the portrait */
+/* Your Friend, from its own 16x16 on-chain mask. The SDK picker is text-only, so
+   this is the only place in the flow the Friend is actually visible. */
+.bank-card { display: flex; align-items: center; gap: 10px; }
+.bank-card-figures { min-width: 0; }
+.bank-portrait {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--ink);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+.bank-portrait svg { display: block; }
+.bank-portrait.is-loading { background: repeating-linear-gradient(45deg, #fff, #fff 3px, #e4e4e4 3px, #e4e4e4 6px); }
+.bank-portrait.is-failed { background: #fff; }
+@media (max-width: 520px) {
+  .bank-portrait { display: none; }   /* the frame is ~240px tall here; the numbers win */
+}
