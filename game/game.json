@@ -1,0 +1,11 @@
+{
+  "name": "The First Bank of Friends",
+  "consumable": "Deposit slip",
+  "price": "1000000000000000000",
+  "outcomes": [
+    { "name": "Desk stood down, deposit returned", "chanceBps": 5500, "reward": "1000000000000000000" },
+    { "name": "Choppy week, the grid worked", "chanceBps": 2800, "reward": "1080000000000000000" },
+    { "name": "Volatile chop, the grid ran hot", "chanceBps": 1000, "reward": "1200000000000000000" },
+    { "name": "Traded into a turn, small loss", "chanceBps": 700, "reward": "900000000000000000" }
+  ]
+}

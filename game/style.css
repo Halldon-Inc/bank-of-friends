@@ -1,0 +1,169 @@
+/*
+  THE FIRST BANK OF FRIENDS
+
+  Styled to sit beside the SDK's own fishing example rather than beside a trading
+  terminal. Their design language, matched deliberately:
+
+    --paper #eee / --ink #111, never pure white or pure black
+    12px/1.4 monospace for labels, system-ui with tight tracking for display numbers
+    1px borders, 2px on menus
+    a hard 2px 2px 0 offset shadow on anything floating over the world
+    44px square icon buttons, inset 18px from the frame
+    primary action = ink fill, paper text
+
+  NO FILTER ON THE CANVAS, deliberately. I assumed the renderer drew light scenery
+  on a dark ground and added invert(1) to get light mode. It is already black ink on
+  white; the invert was the only reason the hall ever looked dark. Proved it by
+  swapping in a loud tint and watching the props come back CREAM on black, which
+  only happens if they start black. The fix was to delete the rule.
+*/
+
+.bank {
+  --paper: #eee;
+  --ink: #111;
+  --dim: #666;
+  --game-font: ui-monospace, SFMono-Regular, Consolas, monospace;
+  --display: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--paper);
+  font: 12px/1.4 var(--game-font);
+}
+.bank *, .bank *::before, .bank *::after { box-sizing: border-box; }
+.bank h2, .bank h3, .bank p { margin: 0; }
+.bank button { font: inherit; color: inherit; border-radius: 0; padding: 8px 12px; min-height: 36px; border: 1px solid var(--ink); background: var(--paper); cursor: pointer; }
+.bank button:hover:not(:disabled) { background: #ddd; }
+.bank button:disabled { opacity: .45; cursor: default; }
+.bank button:focus-visible, .bank canvas:focus-visible { outline: 2px solid var(--ink); outline-offset: -3px; }
+.bank .rf-frame-primary, .bank .bank-primary { background: var(--ink); color: var(--paper); }
+.bank .rf-frame-primary:hover:not(:disabled), .bank .bank-primary:hover:not(:disabled) { background: #333; }
+
+.bank-world { position: absolute; inset: 0; overflow: hidden; }
+
+/* ------------------------------------------------------------------ the card */
+/* Their wallet readout is a bordered card with a hard shadow, not a flat bar. */
+.bank-card {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 3;
+  padding: 8px 12px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+  min-width: 108px;
+}
+.bank-card small { display: block; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+.bank-card strong { display: block; font: 600 20px/1.1 var(--display); letter-spacing: -.03em; margin-top: 2px; }
+.bank-card strong span { font: 400 10px/1 var(--game-font); letter-spacing: 0; margin-left: 3px; color: var(--dim); }
+.bank-card em { display: block; font-style: normal; font-size: 10px; color: var(--dim); margin-top: 3px; }
+
+/* 44px squares, inset 18px, exactly as the fishing example places its chrome. */
+.bank-icon {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-height: 0;
+  padding: 10px;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.bank-icon svg { display: block; width: 100%; height: 100%; }
+.bank-settings { right: 18px; top: 18px; }
+
+/* Their status line sits low-left and is small enough to ignore once oriented. */
+.bank-status {
+  position: absolute;
+  bottom: 54px;
+  left: 18px;
+  max-width: 62%;
+  font-size: 9px;
+  color: var(--dim);
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* One hint, not both. This media rule was lost in a rewrite and the two variants
+   rendered concatenated: "E at a windowTap to walk". */
+.bank-mobile { display: none; }
+@media (max-width: 620px) {
+  .bank-desktop { display: none; }
+  .bank-mobile { display: inline; }
+}
+
+.bank-loading { display: grid; place-items: center; gap: 12px; height: 100%; padding: 20px; background: var(--paper); color: var(--ink); }
+
+/* -------------------------------------------------------------------- menus */
+.bank .rf-frame-menu { border: 2px solid var(--ink); }
+.bank-small { font-size: 10px; color: var(--dim); line-height: 1.6; }
+.bank-feedback { font-size: 10px; color: var(--dim); margin-top: 10px; }
+
+.bank table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 8px 0; }
+.bank th { text-align: left; font-weight: 400; color: var(--dim); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; padding-bottom: 4px; border-bottom: 1px solid var(--ink); }
+.bank td { padding: 4px 0; border-bottom: 1px dotted #ccc; }
+
+.bank-stats { margin: 10px 0; }
+.bank-stats > div { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0; border-bottom: 1px dotted #ccc; }
+.bank-stats dt { color: var(--dim); margin: 0; }
+.bank-stats dd { margin: 0; font: 600 13px/1.2 var(--display); letter-spacing: -.02em; }
+
+.bank-ledger { padding-left: 16px; margin: 8px 0; font-size: 11px; }
+.bank-ledger li { margin-bottom: 8px; line-height: 1.55; }
+
+/* --------------------------------------------------------------- the lever */
+.bank-lever { width: 100%; letter-spacing: .12em; margin-top: 4px; }
+
+.bank-verdict {
+  border: 1px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 14px;
+  margin: 12px 2px 14px;
+  text-align: center;
+  background: var(--paper);
+}
+.bank-regime { font-size: 9px; letter-spacing: .22em; text-transform: uppercase; color: var(--dim); }
+.bank-word { margin: 4px 0 10px; font: 600 clamp(28px, 11vw, 46px)/1 var(--display); letter-spacing: -.04em; }
+.bank-verdict.armed .bank-word { background: var(--ink); color: var(--paper); display: inline-block; padding: 2px 10px; }
+.bank-verdict.spinning .bank-word { opacity: .3; }
+.bank-verdict:not(.spinning) .bank-word { animation: land 300ms cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes land { from { transform: translateY(-12px) scale(.95); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.bank-gates { list-style: none; margin: 0; padding: 0; text-align: left; }
+.bank-gates li { display: grid; grid-template-columns: 14px 78px 1fr; gap: 6px; align-items: baseline; font-size: 10px; padding: 3px 0; border-bottom: 1px dotted #ccc; }
+.bank-gates li:last-child { border-bottom: 0; }
+.bank-gates b { font-weight: 400; color: var(--dim); }
+.bank-gates i { font-style: normal; color: var(--dim); }
+.bank-gates li.blocked b, .bank-gates li.blocked i { color: var(--ink); font-weight: 600; }
+/* At 360px the SDK frame is only ~240px tall, so the chrome has to shrink out of
+   the way of the station prompts rather than sit on top of them. */
+@media (max-width: 520px) {
+  .bank-gates li { grid-template-columns: 14px 1fr; }
+  .bank-gates i { grid-column: 2; }
+  .bank-card { top: 8px; left: 8px; min-width: 0; padding: 4px 7px; box-shadow: 1px 1px 0 var(--ink); }
+  .bank-card small { font-size: 7px; letter-spacing: .06em; }
+  .bank-card strong { font-size: 13px; margin-top: 0; }
+  .bank-card strong span { font-size: 8px; }
+  .bank-card em { font-size: 8px; margin-top: 1px; }
+  .bank-icon { width: 32px; height: 32px; padding: 7px; box-shadow: 1px 1px 0 var(--ink); }
+  .bank-settings { right: 8px; top: 8px; }
+  .bank-status { bottom: 8px; left: 8px; font-size: 8px; max-width: 78%; }
+}
+
+/* ------------------------------------------------------------------ receipt */
+.bank-receipt { text-align: center; }
+.bank-receipt h3 { font: 600 20px/1.2 var(--display); letter-spacing: -.03em; margin: 8px 0; }
+.bank-receipt p { font-size: 11px; color: var(--dim); }
+.bank-receipt button { margin: 10px 4px 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bank-verdict:not(.spinning) .bank-word { animation: none; }
+}
