@@ -131,7 +131,12 @@ fork test proves that against the live contracts.
 **The keeper.** `npm run keeper` plans (and, only with a key and `--execute`, sends) the weekly
 `allocate()`, the claims and the collects. It claims only when a Friend's rewards are worth at
 least 20x the gas, suspends sold Friends first, and stops with an alarm if the 5% fee is ever
-pointed anywhere but the rewards contract.
+pointed anywhere but the rewards contract. With `--bank` it also runs the desk: it measures the
+market gates, reads the bank's one ask and one bid, and plans `closeAsk`, `closeBid`, `placeAsk`
+or `placeBid` (`lib/desk-plan.mjs`). Every desk call is simulated as the bank's keeper before
+anything is sent, and the planner follows each rule the contract enforces, so it never asks for a
+trade the contract would refuse. A filled range is closed and re-quoted; when the gates are off,
+bids come down and loss-locked asks keep resting.
 
 ## Why you can trust it: we attacked our own bank first
 
@@ -214,6 +219,7 @@ Things we found that are not in the docs, offered in good faith:
 npm install
 npm run verify           # 63 facts against live chain state
 npm run keeper -- --wallet 0xYOURWALLET   # dry run: what the keeper would claim and allocate
+npm run test:desk        # the keeper's desk planner against the contract's rules
 npm run backtest:gated   # the desk against the whole tape
 npm run derive           # every parameter, labelled MEASURED, DERIVED or CHOICE
 cd contracts && forge test
@@ -228,6 +234,8 @@ cd app && npm install && npm run dev      # the hall at /, the research at /docs
 | `contracts/mutate.sh` | **16/16** planted bugs caught (no ownership re-check, sweeping the whole wallet, rounding up, withdraw gated by halt, TWAP guard off, and eleven more) |
 | `npm run verify` | **63/63** facts asserted against live chain state, none skipped |
 | `npm run keeper -- --wallet huntclubhero.eth` | dry run: no alarm; claims planned for the one Friend worth claiming, the rest below 20x gas |
+| `npm run test:desk` | **16/16**: every planned ask and bid checked against the contract's reverts, restated from the Solidity |
+| `scripts/rehearse-desk.mjs` (local fork) | the keeper placed an ask and a bid, an outside buyer filled the ask, the keeper closed it and re-quoted, then with the real gates off it pulled the bid; all confirmed on a fork of live Robinhood Chain state, nothing broadcast |
 | `npm run backtest:gated` | real tape: desk stays off, +0.00% vs hold; ungated it would have lost 10.11% |
 | `npm run sweep` | 60 regimes: gated worst -6.76% vs ungated worst -42.98% |
 | `npm run sweep:hall <url>` | **168/168** across twelve sizes, 320px to 3440px: fill, overlap, signs on their artwork, plaque inside its plate |
