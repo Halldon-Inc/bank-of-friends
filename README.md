@@ -26,7 +26,10 @@ so it never pays the 5% toll, and it never touches anyone else's money.
    halted and the protocol's rewards switched off.
 6. **Keeper:** `npm run keeper` plans the weekly `allocate()` so rewards keep streaming for
    every activated Friend, claims when it is worth 20x the gas, and alarms if the 5% fee is re-pointed.
-   It is a dry run unless given a key and `--execute`; nothing is running today.
+   With `--bank` it also runs the desk: it measures the market gates, reads the Bank's one ask and one
+   bid, and plans closeAsk / closeBid / placeAsk / placeBid (`lib/desk-plan.mjs`), each simulated as
+   the Bank's keeper before anything is sent. It is a dry run unless given a key and `--execute`;
+   nothing is running today.
 
 **Not deployed, not audited.** Nothing here moves funds, and we will not deploy it to hold
 anyone's money before an external audit.
@@ -56,6 +59,7 @@ npm install
 
 npm run verify           # facts about the protocol, asserted against live chain state
 npm run keeper -- --wallet 0xYOU    # dry run: what the keeper would allocate and claim
+npm run test:desk        # the desk planner against the contract's placement rules
 npm run derive           # every parameter, labelled MEASURED / DERIVED / CHOICE
 npm run history          # pull every swap in the pool's history
 npm run backtest:gated   # the desk against the whole tape, gated and ungated

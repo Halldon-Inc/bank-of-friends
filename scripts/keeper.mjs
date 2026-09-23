@@ -42,16 +42,29 @@
  *     - while the desk is armed (quotingHalted is false) the Bank's price observer
  *       needs a poke every ~5 minutes (a TWAP wants 6 in the last hour), so the
  *       plan includes poke(). Run the keeper on a 5-minute schedule then.
+ *  3c. WITH a Bank: THE DESK. The market gates are measured from the pool's price path
+ *     (the shipped hourly seed, extended from Swap logs and cached in data/), the
+ *     Bank's and desk's state is read from chain, and lib/desk-plan.mjs decides which
+ *     of closeAsk / closeBid / placeAsk / placeBid to send. Every desk call is
+ *     SIMULATED from the Bank's keeper address, dry run included; a call that would
+ *     revert is dropped and the revert is printed. Only the Bank's keeper can place,
+ *     so --execute sends desk calls only when HARVESTER_PRIVATE_KEY is that keeper.
  *  4. REPORT. Live ETH/USD for display only. No price in this file is hardcoded.
+ *
+ * Rehearsal only: `--assume-armed` overrides the three market gates as met, so a local
+ * fork can exercise placements the real market does not arm for. It is refused unless
+ * --rpc points at localhost.
  */
 import fs from "node:fs";
 import { createWalletClient, createPublicClient, http, getAddress, isAddress, parseAbi } from "viem";
 import { mainnet } from "viem/chains";
 import { privateKeyToAccount } from "viem/accounts";
 import {
-  ADDR, ABI, CHAIN, POOL_SEED_BLOCK, client, fmt, scanLogs,
+  ADDR, ABI, CHAIN, POOL_ID, POOL_SEED_BLOCK, client, fmt, scanLogs, blocksPerDay,
   readPool, readStreams, readRewardsWiring, readOwners, ethUsd,
 } from "../lib/protocol.mjs";
+import { DEFAULT_GATES, measurePath, explain } from "../lib/strategy.mjs";
+import { planDesk } from "../lib/desk-plan.mjs";
 
 const args = process.argv.slice(2);
 const has = (f) => args.includes(f);
@@ -61,6 +74,12 @@ const EXECUTE = has("--execute");
 const MEMBERS = val("--members");
 const BANK = val("--bank") ? getAddress(val("--bank")) : null;
 const RPC = val("--rpc");
+const LOCAL_RPC = !!RPC && /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?\/?$/.test(RPC);
+const ASSUME_ARMED = has("--assume-armed");
+if (ASSUME_ARMED && !LOCAL_RPC) {
+  console.error("--assume-armed is a fork rehearsal switch; it needs --rpc http://127.0.0.1:<port>.");
+  process.exit(1);
+}
 /** quant's rule: a claim or collect must be worth 20x the gas it burns. */
 const GAS_MULTIPLE = Number(val("--gas-multiple") ?? 20);
 /** RF only becomes WETH through the pool, which takes 5% of the WETH side. */
@@ -87,6 +106,41 @@ const BANK_ABI = parseAbi([
   "function settle(address holder, uint256 maxSteps) returns (bool)",
   "function quotingHalted() view returns (bool)",
   "function poke()",
+  // the desk side
+  "function keeper() view returns (address)",
+  "function DESK() view returns (address)",
+  "function OBSERVER() view returns (address)",
+  "function bookR() view returns (uint256)",
+  "function bookW() view returns (uint256)",
+  "function ask() view returns (bool open, uint64 openedAt, uint256 units)",
+  "function bid() view returns (bool open, uint64 openedAt, uint256 units)",
+  "function maxRangeBps() view returns (uint256)",
+  "function maxDailyTurnoverBps() view returns (uint256)",
+  "function usedBpsRf() view returns (uint256)",
+  "function usedBpsWeth() view returns (uint256)",
+  "function usedModifies() view returns (uint256)",
+  "function usedAt() view returns (uint256)",
+  "function placeAsk(int24 tickLower, int24 tickUpper, uint256 amount)",
+  "function placeBid(int24 tickLower, int24 tickUpper, uint256 amount)",
+  "function closeAsk()",
+  "function closeBid()",
+]);
+
+/** RangeDesk (the Bank's desk) and its PoolObserver: read only. */
+const DESK_ABI = parseAbi([
+  "function ask() view returns (int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 input, uint256 reserved)",
+  "function bid() view returns (int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 input, uint256 reserved)",
+  "function costRf() view returns (uint256)",
+  "function costWeth() view returns (uint256)",
+  "function lastSellWethPerRf() view returns (uint256)",
+  "function lastSellAt() view returns (uint256)",
+  "function lossSpentWeth() view returns (uint256)",
+  "function twapEdgeTicks() view returns (int24)",
+  "function TICK_SPACING() view returns (int24)",
+]);
+const OBS_ABI = parseAbi([
+  "function spotTick() view returns (int24)",
+  "function twapTick() view returns (int24)",
 ]);
 
 const c = client(RPC ?? undefined);
@@ -181,6 +235,79 @@ async function readMember(m) {
   };
 }
 
+/* ------------------------------------------------------------------ market */
+
+/**
+ * The pool's hourly price path, for the desk's market gates. Same method as the site
+ * (app/lib/price-series.ts): seeded from app/lib/price-hourly.json, extended with every
+ * Swap log since, one close per hour = the last swap price at or before it. The keeper
+ * caches the extended series in data/keeper-series.json so each run scans only new
+ * blocks. Rehearsals (--rpc) never read or write the cache: a fork's clock and swaps
+ * are not the chain's. The last 74h of swaps are kept too, because hourly closes hide
+ * swings inside an hour and the swing gate counts them swap by swap.
+ */
+const HOUR = 3600, KEEP_HOURS = 9 * 24, SWAP_HOURS = 74;
+const CACHE = new URL("../data/keeper-series.json", import.meta.url);
+async function marketPath(pool) {
+  const seedFile = JSON.parse(fs.readFileSync(new URL("../app/lib/price-hourly.json", import.meta.url), "utf8"));
+  const seed = {
+    startTs: seedFile.startTs, closes: seedFile.closes, lastTs: seedFile.lastTs, scannedTo: seedFile.lastBlock,
+    lastPrice: seedFile.closes[seedFile.closes.length - 1], swaps: [], swapsFrom: null,
+  };
+  let prev = seed;
+  if (!RPC && fs.existsSync(CACHE)) {
+    const cached = JSON.parse(fs.readFileSync(CACHE, "utf8"));
+    if (cached.scannedTo >= seed.scannedTo) prev = cached;
+  }
+  const { head, secondsPerBlock: spb, headTimestamp: tNow } = await blocksPerDay(c);
+  const tOf = (b) => tNow - Number(head - BigInt(b)) * spb;
+  const from = BigInt(prev.scannedTo) + 1n;
+  const swap = ABI.poolManager.find((x) => x.type === "event" && x.name === "Swap");
+  const logs = from > head ? [] : await scanLogs(c, {
+    address: ADDR.PoolManager, event: swap, args: { id: POOL_ID }, fromBlock: from, toBlock: head, chunk: 100_000n, pace: 0, concurrency: 4,
+  });
+  const pts = logs
+    .map((l) => { const x = Number(l.args.sqrtPriceX96) / 2 ** 96; return { t: tOf(l.blockNumber), b: Number(l.blockNumber), i: Number(l.logIndex), p: x * x }; })
+    .sort((a, b) => (a.b === b.b ? a.i - b.i : a.b - b.b));
+  const endTs = Math.floor(tNow / HOUR) * HOUR;
+  const closes = [...prev.closes];
+  let p = prev.lastPrice, k = 0;
+  for (let h = prev.lastTs + HOUR; h <= endTs; h += HOUR) {
+    while (k < pts.length && pts[k].t <= h) p = pts[k++].p;
+    closes.push(p);
+  }
+  while (k < pts.length) p = pts[k++].p;
+  const drop = Math.max(0, closes.length - KEEP_HOURS);
+  const keepFrom = tNow - SWAP_HOURS * HOUR;
+  // Swap-level coverage starts where this cache started scanning, never earlier.
+  const next = {
+    startTs: prev.startTs + drop * HOUR, closes: closes.slice(drop), lastTs: Math.max(endTs, prev.lastTs),
+    scannedTo: Number(head), lastPrice: p,
+    swaps: [...(prev.swaps ?? []), ...pts].filter((x) => x.t >= keepFrom),
+    swapsFrom: Math.max(prev.swapsFrom ?? tOf(from), keepFrom),
+    updatedAt: new Date().toISOString(),
+  };
+  if (!RPC) {
+    fs.mkdirSync(new URL("../data/", import.meta.url), { recursive: true });
+    fs.writeFileSync(CACHE, JSON.stringify(next));
+  }
+
+  // Hourly path ending at the live price, walked back like the site's.
+  const at = (t) => (t < next.startTs || t > next.lastTs ? null : next.closes[Math.floor((t - next.startTs) / HOUR)] ?? null);
+  const back = [pool.wethPerRf];
+  for (let h = 1; h <= 8 * 24; h++) { const q = at(tNow - h * HOUR); if (q == null) break; back.push(q); }
+  const t72 = tNow - 72 * HOUR;
+  const ticks72 = next.swapsFrom <= t72 && at(t72) != null
+    ? [at(t72), ...next.swaps.filter((x) => x.t > t72).map((x) => x.p), pool.wethPerRf]
+    : null;
+  return {
+    measured: measurePath(back.reverse(), DEFAULT_GATES, ticks72),
+    newSwaps: pts.length,
+    seriesTo: new Date(next.lastTs * 1000).toISOString(),
+    swingSource: ticks72 ? "swap by swap" : "on hourly closes (the swap cache is not 72h deep yet; this can only under-count, so it errs toward off)",
+  };
+}
+
 /* --------------------------------------------------------------------- main */
 
 const members = BANK ? await membersFromBank(BANK, WALLET)
@@ -259,6 +386,8 @@ async function fitBatch(candidates, valueOf, estimate) {
 
 const claims = [];
 const bankTx = [];   // { what, fn, args }
+const deskTx = [];   // { fn, args, why }, each simulated clean as the Bank's keeper
+let deskKeeper = null;
 
 if (!BANK) {
   /* 3a. claim ---------------------------------------------------------------- */
@@ -358,6 +487,57 @@ if (!BANK) {
   } else {
     console.log(`  desk ${halted === true ? "halted" : "state unreadable"}: no poke needed`);
   }
+
+  /* 3c. the desk ------------------------------------------------------------- */
+  console.log("\n-- desk --");
+  const rb = (fn) => c.readContract({ address: BANK, abi: BANK_ABI, functionName: fn });
+  const [keeperAddr, deskAddr, obsAddr, bookR, bookW, uAsk, uBid, maxRangeBps, maxDailyTurnoverBps, usedBpsRf, usedBpsWeth, usedModifies, usedAt] =
+    await Promise.all(["keeper", "DESK", "OBSERVER", "bookR", "bookW", "ask", "bid", "maxRangeBps", "maxDailyTurnoverBps",
+      "usedBpsRf", "usedBpsWeth", "usedModifies", "usedAt"].map(rb));
+  const rd = (fn) => c.readContract({ address: deskAddr, abi: DESK_ABI, functionName: fn });
+  const [gAsk, gBid, costRf, costWeth, lastSellWethPerRf, lastSellAt, lossSpentWeth, twapEdgeTicks, tickSpacing] =
+    await Promise.all(["ask", "bid", "costRf", "costWeth", "lastSellWethPerRf", "lastSellAt", "lossSpentWeth", "twapEdgeTicks", "TICK_SPACING"].map(rd));
+  const [spotTick, twapTick, block] = await Promise.all([
+    c.readContract({ address: obsAddr, abi: OBS_ABI, functionName: "spotTick" }),
+    c.readContract({ address: obsAddr, abi: OBS_ABI, functionName: "twapTick" }).catch(() => null),
+    c.getBlock(),
+  ]);
+  const mk = await marketPath(pool);
+  const market = { ...mk.measured, mid: pool.wethPerRf, ethUsd: usd?.usd ?? null };
+  if (ASSUME_ARMED) Object.assign(market, { reversals72h: DEFAULT_GATES.minReversals72h, drift72h: 0, walkForward7d: 0.001 });
+  const range = (u, g) => ({ open: u[0], openedAt: Number(u[1]), lo: Number(g[0]), hi: Number(g[1]), liquidity: g[2] });
+  const desk = planDesk({
+    now: Number(block.timestamp), spotTick: Number(spotTick), twapTick: twapTick == null ? null : Number(twapTick),
+    tickSpacing: Number(tickSpacing), market,
+    bank: {
+      halted: halted === true, bookR, bookW, maxRangeBps, maxDailyTurnoverBps, usedBpsRf, usedBpsWeth, usedModifies, usedAt,
+      ask: range(uAsk, gAsk), bid: range(uBid, gBid),
+    },
+    desk: { costRf, costWeth, lastSellWethPerRf, lastSellAt: Number(lastSellAt), lossSpentWeth, twapEdgeTicks: Number(twapEdgeTicks) },
+  });
+  console.log(`  price path to ${mk.seriesTo} (+${mk.newSwaps} swaps this run); swings counted ${mk.swingSource}`);
+  if (ASSUME_ARMED) console.log("  REHEARSAL: --assume-armed set the three market gates as met. Never on a live chain.");
+  console.log(`  ${explain(desk.regime)}`);
+  for (const g of desk.regime.checks) console.log(`    ${g.status.padEnd(10)} ${g.label.padEnd(20)} ${g.detail}`);
+  console.log(`  book ${desk.book.rf.toFixed(2)} RF + ${desk.book.weth.toFixed(6)} WETH = ${desk.book.valueWeth.toFixed(6)} WETH;` +
+    ` spot tick ${spotTick}, TWAP ${twapTick ?? "not ready"}`);
+  for (const n of desk.notes) console.log(`  . ${n}`);
+  deskKeeper = keeperAddr;
+  if (/^0x0{40}$/.test(keeperAddr)) {
+    console.log("  the Bank has NO keeper: nobody can place ranges (anyone may close them).");
+  } else {
+    // Every desk call is simulated as the keeper. A run never closes and places the same side.
+    for (const a of desk.actions) {
+      try {
+        await c.simulateContract({ address: BANK, abi: BANK_ABI, functionName: a.fn, args: a.args, account: keeperAddr });
+        deskTx.push(a);
+        console.log(`  -> ${a.fn}(${a.args.join(", ")}): ${a.why}`);
+      } catch (e) {
+        console.log(`  x  ${a.fn}(${a.args.join(", ")}) would REVERT as the keeper: ${(e.shortMessage ?? e.message).split("\n")[0]}. Dropped.`);
+      }
+    }
+  }
+  if (!desk.actions.length) console.log("  nothing for the desk this run.");
 }
 
 /* 4. report ---------------------------------------------------------------- */
@@ -365,7 +545,8 @@ console.log(`\n-- plan --`);
 for (const a of allocs) console.log(`  allocate(${a.name})`);
 for (const cl of claims) console.log(`  claimBatch(${cl.name}, ${cl.batch.length} Friends)`);
 for (const t of bankTx) console.log(`  bank.${t.what}`);
-if (!allocs.length && !claims.length && !bankTx.length) console.log("  nothing worth sending this run.");
+for (const t of deskTx) console.log(`  bank.${t.fn}(${t.args.join(", ")})   [keeper only]`);
+if (!allocs.length && !claims.length && !bankTx.length && !deskTx.length) console.log("  nothing worth sending this run.");
 console.log(`  ETH/USD ${usd ? `${usd.usd} (${usd.source})` : "UNAVAILABLE, USD figures omitted rather than guessed"}`);
 
 if (!EXECUTE) {
@@ -406,6 +587,16 @@ for (const cl of claims) {
 for (const fn of ["suspendIfTransferred", "settle", "collect", "poke"]) {
   for (const t of bankTx.filter((x) => x.fn === fn)) {
     await send(`bank.${t.what}`, { address: BANK, abi: BANK_ABI, functionName: t.fn, args: t.args });
+  }
+}
+// The desk last, closes before placements, and only from the Bank's keeper key.
+if (deskTx.length) {
+  if (getAddress(deskKeeper) !== account.address) {
+    console.log(`  skip desk: ${deskTx.length} call(s) need the Bank's keeper ${deskKeeper}; this key is ${account.address}`);
+  } else {
+    for (const t of [...deskTx.filter((x) => x.fn.startsWith("close")), ...deskTx.filter((x) => x.fn.startsWith("place"))]) {
+      await send(`bank.${t.fn}(${t.args.join(", ")})`, { address: BANK, abi: BANK_ABI, functionName: t.fn, args: t.args });
+    }
   }
 }
 console.log(`\n${ok} confirmed, ${failed} failed.`);
