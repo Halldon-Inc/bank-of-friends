@@ -139,3 +139,63 @@
 {"t":1790424000,"pool":"EMBER","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 2.5% above the market; the buyer who takes it pays the pool's 1.00% fee.","lo":0.03824139119345068,"hi":0.038703029094302226,"size":9896.672493193531,"mode":"edge"}
 {"t":1790406060,"pool":"e/acc","strat":"standing","action":"filled","why":"ask [0.000002257, 0.000002285] crossed at 0.000002271 (+4.1% from the spot when placed; 5.5% vs a taker then)"}
 {"t":1790406060,"pool":"e/acc","strat":"standing","action":"place","why":"Rally: a take-profit ask rests from 104.0% to 105.3% above the time-weighted price.","lo":0.32760580619916774,"hi":0.32957725088579604,"size":398751.49982307066,"mode":"takeProfit"}
+{"t":1790431500,"pool":"Index","strat":"standing","action":"close","why":"chase: the market walked away"}
+{"t":1790431740,"pool":"UNIPCS","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 5.3% above the market; the buyer who takes it pays the pool's 5.00% fee.","lo":1.2903181270467084e-7,"hi":1.3058944367208856e-7,"size":358308.63699869765,"mode":"edge"}
+{"t":1790433000,"pool":"EMBER","strat":"standing","action":"filled","why":"ask [0.03824, 0.03870] crossed at 0.03847 (+3.1% from the spot when placed; 4.2% vs a taker then)"}
+{"t":1790433060,"pool":"Bucket","strat":"standing","action":"filled","why":"ask [0.000001092, 0.000001105] crossed at 0.000001099 (+4.3% from the spot when placed; 8.7% vs a taker then)"}
+{"t":1790433060,"pool":"Bucket","strat":"grid","action":"filled","why":"ask [0.000001086, 0.000001140] crossed at 0.000001112 (+5.6% from the spot when placed; 10.0% vs a taker then)"}
+{"t":1790433060,"pool":"Bucket","strat":"grid","action":"flip","why":"ask -> bid [0.000001003, 0.000001054]"}
+{"t":1790433840,"pool":"QSTRAT","strat":"standing","action":"filled","why":"ask [6.669e-8, 6.750e-8] crossed at 6.709e-8 (+2.4% from the spot when placed; 9.0% vs a taker then)"}
+{"t":1790433900,"pool":"QSTRAT","strat":"grid","action":"filled","why":"ask [6.629e-8, 6.961e-8] crossed at 6.793e-8 (+3.7% from the spot when placed; 10.3% vs a taker then)"}
+{"t":1790433900,"pool":"QSTRAT","strat":"grid","action":"flip","why":"ask -> bid [6.127e-8, 6.433e-8]"}
+{"t":1790434080,"pool":"TOOLS","strat":"standing","action":"filled","why":"ask [9.111e-8, 9.221e-8] crossed at 9.166e-8 (+2.8% from the spot when placed; 7.1% vs a taker then)"}
+{"t":1790434440,"pool":"TOOLS","strat":"grid","action":"filled","why":"ask [9.057e-8, 9.509e-8] crossed at 9.280e-8 (+4.2% from the spot when placed; 8.5% vs a taker then)"}
+{"t":1790434440,"pool":"TOOLS","strat":"grid","action":"flip","why":"ask -> bid [8.370e-8, 8.789e-8]"}
+{"t":1790434260,"pool":"EMBER","strat":"gridLoose","action":"filled","why":"ask [0.03824, 0.04207] crossed at 0.04011 (+10.1% from the spot when placed; 11.2% vs a taker then)"}
+{"t":1790434260,"pool":"EMBER","strat":"gridLoose","action":"flip","why":"ask -> bid [0.03456, 0.03801]"}
+{"t":1790434500,"pool":"COPPERINU","strat":"standing","action":"filled","why":"ask [9.629e-7, 9.745e-7] crossed at 9.687e-7 (+2.4% from the spot when placed; 7.8% vs a taker then)"}
+{"t":1790434920,"pool":"AA","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 1.8% above the market; the buyer who takes it pays the pool's 4.00% fee.","lo":0.00008823267214015342,"hi":0.00008929778887053741,"size":1063255.655964904,"mode":"edge"}
+{"t":1790434980,"pool":"TOOLS","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 1.8% above the market; the buyer who takes it pays the pool's 4.00% fee.","lo":9.909432588040333e-8,"hi":1.0029056103707732e-7,"size":441570.92723040073,"mode":"edge"}
+{"t":1790434980,"pool":"TOOLS","strat":"grid","action":"cancel","why":"not armed: bids come down, asks keep resting"}
+{"t":1790435100,"pool":"Index","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 2.0% above the market; the buyer who takes it pays the pool's 3.97% fee.","lo":0.00001074115494232483,"hi":0.000010870818745485456,"size":5176.043797036936,"mode":"edge"}
+{"t":1790435280,"pool":"Bucket","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 1.7% above the market; the buyer who takes it pays the pool's 3.97% fee.","lo":0.0000011053878979615479,"hi":0.0000011187317887802758,"size":40553.49327806603,"mode":"edge"}
+{"t":1790435280,"pool":"Bucket","strat":"grid","action":"cancel","why":"not armed: bids come down, asks keep resting"}
+{"t":1790434800,"pool":"EMBER","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 2.1% above the market; the buyer who takes it pays the pool's 1.00% fee.","lo":0.04260250560068958,"hi":0.04311678948636283,"size":8252.792853386323,"mode":"edge"}
+{"t":1790434800,"pool":"EMBER","strat":"gridLoose","action":"place","why":"armed: ask [0.04235, 0.04658]","lo":0.04234766858424564,"hi":0.04658243544267021,"size":4854.58403140372}
+{"t":1790435940,"pool":"DUST","strat":"standing","action":"close","why":"chase: the market walked away"}
+{"t":1790435940,"pool":"QSTRAT","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 1.8% above the market; the buyer who takes it pays the pool's 6.00% fee.","lo":7.702151376330209e-8,"hi":7.795129295868316e-8,"size":731339.5656205139,"mode":"edge"}
+{"t":1790435940,"pool":"QSTRAT","strat":"grid","action":"cancel","why":"not armed: bids come down, asks keep resting"}
+{"t":1790436060,"pool":"EMBER","strat":"standing","action":"filled","why":"ask [0.04260, 0.04312] crossed at 0.04286 (+2.7% from the spot when placed; 3.8% vs a taker then)"}
+{"t":1790437020,"pool":"COPPERINU","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 1.8% above the market; the buyer who takes it pays the pool's 5.00% fee.","lo":0.000001016332451797928,"hi":0.0000010286012936201799,"size":43202.4836037492,"mode":"edge"}
+{"t":1790438340,"pool":"DRILL","strat":"standing","action":"filled","why":"ask [0.00004426, 0.00004479] crossed at 0.00004452 (+3.1% from the spot when placed; 8.9% vs a taker then)"}
+{"t":1790438820,"pool":"DRILL","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 2.1% above the market; the buyer who takes it pays the pool's 5.30% fee.","lo":0.00004813490669510652,"hi":0.00004871597596562562,"size":1042.8384569879834,"mode":"edge"}
+{"t":1790438460,"pool":"UNIPCS","strat":"standing","action":"close","why":"chase: the market walked away"}
+{"t":1790438940,"pool":"DUST","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 2.0% above the market; the buyer who takes it pays the pool's 4.00% fee.","lo":1.5728337028435474e-7,"hi":1.5918204506136863e-7,"size":255475.27880233357,"mode":"edge"}
+{"t":1790401560,"pool":"MAST","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 1.9% above the market; the buyer who takes it pays the pool's 4.00% fee.","lo":2.0549797014789826e-9,"hi":2.0797867622599136e-9,"size":27679782.352515265,"mode":"edge"}
+{"t":1790438580,"pool":"SPACEHOOD","strat":"standing","action":"close","why":"chase: the market walked away"}
+{"t":1790438400,"pool":"ZCAT","strat":"standing","action":"close","why":"rally over, back to the edge"}
+{"t":1790438400,"pool":"EMBER","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 2.0% above the market; the buyer who takes it pays the pool's 1.00% fee.","lo":0.04285887615858035,"hi":0.043376254868016315,"size":6946.511555615776,"mode":"edge"}
+{"t":1790439360,"pool":"QSTRAT","strat":"grid","action":"place","why":"armed: ask [7.565e-8, 7.943e-8]","lo":7.564759754983264e-8,"hi":7.942997742732428e-8,"size":365624.936862291}
+{"t":1790439360,"pool":"QSTRAT","strat":"gridLoose","action":"place","why":"armed: ask [7.565e-8, 8.321e-8]","lo":7.564759754983264e-8,"hi":8.321235730481591e-8,"size":430146.9845438717}
+{"t":1790439060,"pool":"TOOLS","strat":"gridLoose","action":"place","why":"armed: ask [9.733e-8, 1.071e-7]","lo":9.732667299567414e-8,"hi":1.0705934029524156e-7,"size":358522.5328030921}
+{"t":1790441400,"pool":"DUST","strat":"standing","action":"filled","why":"ask [1.573e-7, 1.592e-7] crossed at 1.582e-7 (+2.6% from the spot when placed; 6.9% vs a taker then)"}
+{"t":1790442300,"pool":"QSTRAT","strat":"standing","action":"close","why":"chase: the market walked away"}
+{"t":1790442540,"pool":"TOOLS","strat":"standing","action":"close","why":"chase: the market walked away"}
+{"t":1790442420,"pool":"GOOSE","strat":"standing","action":"close","why":"chase: the market walked away"}
+{"t":1790442120,"pool":"SPACEHOOD","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 7.0% above the market; the buyer who takes it pays the pool's 0.70% fee.","lo":0.000020288430996628648,"hi":0.000020533346477069096,"size":1810494852.0799632,"mode":"edge"}
+{"t":1790442000,"pool":"ZCAT","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 5.9% above the market; the buyer who takes it pays the pool's 4.00% fee.","lo":21152.25997120544,"hi":21407.603320038572,"size":0.07424205087227924,"mode":"edge"}
+{"t":1790442900,"pool":"UNIPCS","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 2.0% above the market; the buyer who takes it pays the pool's 5.00% fee.","lo":1.1722132139379607e-7,"hi":1.1863637986982098e-7,"size":357810.2902644077,"mode":"edge"}
+{"t":1790442900,"pool":"UNIPCS","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 2.0% above the market; the buyer who takes it pays the pool's 5.00% fee.","lo":1.1722132139379607e-7,"hi":1.1863637986982098e-7,"size":357810.2902644077,"mode":"edge"}
+{"t":1790413740,"pool":"MARLIN","strat":"desk","action":"sell","why":"RF is 34.6% over its 24h average and a sale clears its cost after both tolls: sell 50.0% of the RF","amount":2051617.0330354031}
+{"t":1790392800,"pool":"AORB","strat":"desk","action":"sell","why":"RF is 147.4% over its 24h average and a sale clears its cost after both tolls: sell 50.0% of the RF","amount":202923.53476173538}
+{"t":1790398800,"pool":"AORB","strat":"desk","action":"buy","why":"RF is 32.1% under its 24h average and not collapsing: buy with 50.0% of the WETH, paying the toll","amount":0.1411797400649142}
+{"t":1790402400,"pool":"AORB","strat":"desk","action":"sell","why":"RF is 116.0% over its 24h average and a sale clears its cost after both tolls: sell 50.0% of the RF","amount":650547.5916626068}
+{"t":1790413980,"pool":"AORB","strat":"desk","action":"buy","why":"RF is 43.1% under its 24h average and not collapsing: buy with 50.0% of the WETH, paying the toll","amount":0.2146233583307574}
+{"t":1790443440,"pool":"DUST","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 1.8% above the market; the buyer who takes it pays the pool's 4.00% fee.","lo":1.5822985981163001e-7,"hi":1.601399603089149e-7,"size":217175.78537604876,"mode":"edge"}
+{"t":1790443020,"pool":"BUTTHOLE","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 4.1% above the market; the buyer who takes it pays the pool's 4.00% fee.","lo":0.000001501074242223303,"hi":0.0000015191947326284995,"size":98664.12823866804,"mode":"edge"}
+{"t":1790443440,"pool":"DUST","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 1.8% above the market; the buyer who takes it pays the pool's 4.00% fee.","lo":1.5822985981163001e-7,"hi":1.601399603089149e-7,"size":217175.78537604876,"mode":"edge"}
+{"t":1790443020,"pool":"BUTTHOLE","strat":"standing","action":"place","why":"Resting 15.0% of the bank's RF for sale 4.1% above the market; the buyer who takes it pays the pool's 4.00% fee.","lo":0.000001501074242223303,"hi":0.0000015191947326284995,"size":98664.12823866804,"mode":"edge"}
+{"t":1790444640,"pool":"DUST","strat":"gridLoose","action":"filled","why":"bid [1.456e-7, 1.601e-7] crossed at 1.527e-7 (-14.3% from the spot when placed; 21.5% vs a taker then)"}
+{"t":1790444640,"pool":"DUST","strat":"gridLoose","action":"flip","why":"bid -> ask [1.611e-7, 1.772e-7]"}
+{"t":1790444640,"pool":"DUST","strat":"gridLoose","action":"filled","why":"bid [1.456e-7, 1.601e-7] crossed at 1.527e-7 (-14.3% from the spot when placed; 21.5% vs a taker then)"}
+{"t":1790444640,"pool":"DUST","strat":"gridLoose","action":"flip","why":"bid -> ask [1.611e-7, 1.772e-7]"}

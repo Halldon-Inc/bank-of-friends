@@ -27,7 +27,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   DEFAULT_GATES, standingOrder, explainStanding, measurePath, evaluateRegime, openingLadder,
-  flipRange, lockOk, rangeAmounts, liquidityForRf, liquidityForWeth,
+  flipRange, lockOk, rangeAmounts, liquidityForRf, liquidityForWeth, TAKER, takerDecision, takerBreakEven,
 } from "../lib/strategy.mjs";
 
 const DIR = "data/paper";
@@ -38,7 +38,7 @@ const has = (f) => args.includes(f);
 const val = (f) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] : null; };
 const GT = "https://api.geckoterminal.com/api/v2";
 const PACE_MS = 3_500;                // GeckoTerminal's free tier is about 30 requests a minute
-const STRATS = ["standing", "grid", "gridLoose"];
+const STRATS = ["desk", "standing", "grid", "gridLoose"];
 const LOOSE = Object.freeze({ ...DEFAULT_GATES, gridStep: 0.10, maxDrift72hSteps: Infinity, minReversals72h: 3, maxDrawdown: 1, minWalkForwardEdge: 0 });
 const BOOK_USD = 1000;
 
@@ -105,7 +105,56 @@ function closesTo(d, startTs, t) {
   return out;
 }
 
+/**
+ * THE SWAP DESK on live bars: lib/strategy.mjs takerDecision every hour, executed as a TAKER at the minute bar's
+ * close with the pool's full fee and constant-product impact on the pool's reported depth (TVL). The price path
+ * is the real one (the desk's own swaps do not feed back into it, stated). Rebate: only on RF, at the founding
+ * member's share; the other pools' tolls go elsewhere.
+ */
+function simulateDesk(p, d, startTs) {
+  const fee = p.fee, tax = p.type === "B" ? (p.tax ?? 0) : 0;
+  const raw = d.minute.filter((b) => b[0] >= startTs);
+  const bars = []; let brokeAt = null;
+  for (const b of raw) { const prev = bars.at(-1)?.[4]; if (prev && (b[4] / prev > 5 || prev / b[4] > 5)) { brokeAt = b[0]; break; } bars.push(b); }
+  if (bars.length < 2 || !d.quoteUsd || !d.tvl) return brokeAt ? { broken: true, brokeAt } : null;
+  const quoteUsd = d.quoteUsd, p0 = bars[0][1];
+  const L = (px) => (d.tvl / 2 / quoteUsd) / Math.sqrt(px);                  // full-range depth implied by TVL
+  const buyGot = (w, px) => { const l = L(px), s0 = Math.sqrt(px), dy = w * (1 - fee); return l * (1 / s0 - 1 / (s0 + dy / l)) * (1 - tax); };
+  const sellNet = (q, px) => { const l = L(px), s0 = Math.sqrt(px), dq = q * (1 - tax); return l * (s0 - 1 / (1 / s0 + dq / l)) * (1 - fee); };
+  let rf = (BOOK_USD / 2) / quoteUsd / p0, weth = (BOOK_USD / 2) / quoteUsd;
+  const rf0 = rf, weth0 = weth;
+  let costRf = rf0, costWeth = rf0 * p0, lastSellNet = null, ema = null, trades = 0, toll = 0, lastDecision = "", lastHour = -1;
+  const decisions = [], hist = [];
+  const s = p.label === "RF" ? 0.002 : 0;
+  for (const b of d.hourly) if (b[0] + 3600 <= startTs) { ema = ema == null ? b[4] : ema + (b[4] - ema) * (2 / (TAKER.emaHours + 1)); hist.push([b[0] + 3600, b[4]]); }
+  for (const b of bars) {
+    const [t, , , , close] = b, hour = Math.floor(t / 3600);
+    if (hour === lastHour) continue;
+    lastHour = hour;
+    ema = ema == null ? close : ema + (close - ema) * (2 / (TAKER.emaHours + 1));
+    hist.push([t, close]);
+    const ago = hist.find((x) => x[0] >= t - 72 * 3600) ?? hist[0];
+    const o = takerDecision({ price: close, ema, drift72: close / ago[1] - 1 }, { rf, weth, avgCost: costRf > 0 ? costWeth / costRf : close, lastSellNet },
+      { buyPx: (w) => w / buyGot(w, close), sellNet: (q) => sellNet(q, close) });
+    const stamp = `${new Date(t * 1000).toISOString().slice(5, 16)}Z`;
+    if (p.label !== "RF") o.reason = o.reason.replace(/RF/g, p.label);
+    if (o.action === "buy") {
+      const got = buyGot(o.amount, close); weth -= o.amount; rf += got; costRf += got; costWeth += o.amount; toll += o.amount * fee; trades++;
+      decisions.push({ t, pool: p.label, strat: "desk", action: "buy", why: o.reason, amount: o.amount }); lastDecision = `${stamp} buy: ${o.reason}`;
+    } else if (o.action === "sell") {
+      const net = sellNet(o.amount, close), f = o.amount / rf; costRf *= 1 - f; costWeth *= 1 - f; rf -= o.amount; weth += net; lastSellNet = net / o.amount; toll += net / (1 - fee) * fee; trades++;
+      decisions.push({ t, pool: p.label, strat: "desk", action: "sell", why: o.reason, amount: o.amount }); lastDecision = `${stamp} sell: ${o.reason}`;
+    } else lastDecision = `${stamp} wait: ${o.reason}`;
+  }
+  const pEnd = bars.at(-1)[4];
+  const value = weth + (rf > 0 ? sellNet(rf, pEnd) : 0) + toll * s;
+  const hold = weth0 + sellNet(rf0, pEnd);
+  return { hours: (bars.at(-1)[0] - bars[0][0]) / 3600, priceChange: pEnd / p0 - 1, vsHold: value / hold - 1, fills: trades, vsTaker: 0, perUnitMedian: null,
+    open: [], trades, tollUsd: toll * quoteUsd, lastDecision, decisions, brokeAt, breakEven: takerBreakEven(s).swing };
+}
+
 function simulate(p, d, startTs, strat) {
+  if (strat === "desk") return simulateDesk(p, d, startTs);
   const tax = p.type === "B" ? (p.tax ?? 0) : 0, fee = p.fee, gates = strat === "gridLoose" ? LOOSE : DEFAULT_GATES;
   // Data sanity, conservative on both sides: a close more than 5x away from the previous close is a drained or
   // broken pool (the replay stops there and the pool is labelled), and a bar whose high or low is more than 3x
@@ -235,19 +284,24 @@ function report(results, startTs) {
   const lines = [`# Paper forward test: the desk on live pools across launchpads`, ``,
     `Started ${new Date(startTs * 1000).toISOString()}, report ${now}, tick ${state.ticks}. No money, no chain writes. Every pool starts with a $${BOOK_USD} book at its start price; fills are counted only when a minute bar crosses the whole range; gas is ignored; the taker on the same schedule pays the pool's fee and no impact (this favours the taker). Programmes: standing = the standing sell order (RF-only book); grid = the two-sided grid at the live gates ($500 + $500); gridLoose = the 2026-09-23 sweep's loosened setting (10% step, trend limit off, 3 swings, no drawdown stop, replay check on), whose in-sample result this is meant to test forward.`, ``];
   const usable = results.filter((r) => r.sim.standing && !r.sim.standing.broken);
-  for (const s of STRATS) {
+  {
+    const rows = results.map((r) => r.sim.desk).filter((x) => x && !x.broken);
+    lines.push(`- **the swap desk** (the product: swaps pooled funds as a taker, paying the full toll both ways): ${rows.length} pools, vs hold median ${pc(med(rows.map((x) => x.vsHold)))} (ahead ${rows.filter((x) => x.vsHold > 0).length}, behind ${rows.filter((x) => x.vsHold < 0).length}, no trade yet ${rows.filter((x) => x.trades === 0).length}), swaps ${rows.reduce((a, x) => a + x.trades, 0)}, toll paid $${rows.reduce((a, x) => a + x.tollUsd, 0).toFixed(2)}`);
+  }
+  for (const s of STRATS.filter((x) => x !== "desk")) {
     const rows = usable.map((r) => r.sim[s]).filter(Boolean);
     lines.push(`- **${s}**: ${rows.length} pools, vs taker on the same schedule median ${pc(med(rows.map((x) => x.vsTaker)))} (beat ${rows.filter((x) => x.vsTaker > 0).length}, lost ${rows.filter((x) => x.vsTaker < 0).length}, flat ${rows.filter((x) => x.vsTaker === 0).length}), vs hold median ${pc(med(rows.map((x) => x.vsHold)))}, fills ${rows.reduce((a, x) => a + x.fills, 0)}, per unit vs taker median ${pc(med(rows.map((x) => x.perUnitMedian)))}`);
   }
   const allFills = usable.flatMap((r) => (r.sim.standing?.fillList ?? []).map((f) => f.perUnitVsTaker)).sort((a, b) => a - b);
   if (allFills.length) lines.push(``, `**Every standing-order fill so far:** ${allFills.length} fills on ${usable.filter((r) => r.sim.standing?.fills).length} pools; per unit vs a taker at placement: median ${pc(allFills[allFills.length >> 1])}, worst ${pc(allFills[0])}, best ${pc(allFills.at(-1))}, ${allFills.filter((x) => x > 0).length} of ${allFills.length} positive. Filled pools vs a taker on the same schedule: ${usable.filter((r) => r.sim.standing?.fills).map((r) => `${r.p.label} ${pc(r.sim.standing.vsTaker)}`).join(", ")}.`);
-  lines.push(``, `| pool | launchpad | fee | type | vol 24h | hours | price since start | standing vs taker / vs hold / fills / open | grid vs taker / vs hold / fills | gridLoose vs taker / vs hold / fills | last standing decision |`, `| --- | --- | ---: | --- | ---: | ---: | ---: | --- | --- | --- | --- |`);
+  lines.push(``, `| pool | launchpad | fee | type | vol 24h | hours | price since start | swap desk vs hold / swaps | standing vs taker / vs hold / fills / open | grid vs taker / vs hold / fills | gridLoose vs taker / vs hold / fills | last swap-desk decision |`, `| --- | --- | ---: | --- | ---: | ---: | ---: | --- | --- | --- | --- | --- |`);
   for (const r of results) {
     const s = r.sim.standing, g = r.sim.grid, l = r.sim.gridLoose;
     const cell = (x, withOpen = false) => x?.broken && x.fills == null ? "pool drained before any bar" : x ? `${pc(x.vsTaker)} / ${pc(x.vsHold)} / ${x.fills}${withOpen ? ` / ${x.open.join(" ") || "none"}` : ""}${x.brokeAt ? ` (pool drained ${new Date(x.brokeAt * 1000).toISOString().slice(11, 16)}Z; replay stops there)` : ""}` : (r.bars.lastError ? "no bars" : "warming up");
-    lines.push(`| ${r.p.label} | ${r.p.launchpad} | ${(r.p.fee * 100).toFixed(2)}% | ${r.p.type} | $${Math.round(r.bars.vol24 ?? 0).toLocaleString("en-US")} | ${s ? s.hours.toFixed(1) : "0"} | ${s ? pc(s.priceChange) : "n/a"} | ${cell(s, true)} | ${cell(g)} | ${cell(l)} | ${s?.lastDecision ?? ""} |`);
+    lines.push(`| ${r.p.label} | ${r.p.launchpad} | ${(r.p.fee * 100).toFixed(2)}% | ${r.p.type} | $${Math.round(r.bars.vol24 ?? 0).toLocaleString("en-US")} | ${s ? s.hours.toFixed(1) : "0"} | ${s ? pc(s.priceChange) : "n/a"} | ${r.sim.desk && !r.sim.desk.broken ? `${pc(r.sim.desk.vsHold)} / ${r.sim.desk.trades}` : r.sim.desk?.broken ? "pool drained" : "warming up"} | ${cell(s, true)} | ${cell(g)} | ${cell(l)} | ${r.sim.desk?.lastDecision ?? s?.lastDecision ?? ""} |`);
   }
   lines.push(``, `## Reading it`, ``,
+    `- The swap desk is the product: every hour it asks lib/strategy.mjs takerDecision whether RF (or the pool's token) is 30% under or over its 24h average, and swaps as a taker, paying the pool's full fee and the impact on its reported depth. It never buys into a collapse (25% down over 72 hours), never holds more than 70% of the book in the token, and never sells below cost after both tolls. Most hours it waits.`,
     `- "vs taker on the same schedule" isolates execution: the same decisions, routed as a taker. Positive means resting the order beat swapping. "vs hold" is direction and says nothing about the programme.`,
     `- A pool with 0 fills has not been crossed yet; the standing order rests 1.9% to 3.1% above the market, so a quiet hour cannot fill it. Fills need buyers.`,
     `- Type B pools tax the maker's deposit; the 2026-09-23 sweep found every maker design loses there, and they are here to show it live.`,

@@ -103,8 +103,8 @@ export const GUARANTEES: readonly Line[] = [
   { text: "let anyone else's deposits, withdrawals or sales change your account.", tests: ["testFuzz_Isolation", "test_DonationMovesNobody"] },
   { text: "sell RF below what it paid plus 5%, except inside a loss budget of 5% of the book per 30 days, or, within 30 days of a sale, buy back above that sale's price minus 5%.",
     tests: ["test_AskBelowCostPlusLockNeedsBudget", "test_H_CanCutALossWithinTheBudget", "test_BidMustSitBelowLastSaleMinusLock", "test_I_CostBasisIsSizeWeighted"] },
-  { text: "swap. It only rests maker orders, which pay no 5% toll.",
-    tests: ["test_fork_AskFillsAsMakerWithNoHookFee", "test_fork_BidFillsAsMaker"] },
+  { text: "swap your RF or WETH at a loss by design: the swap desk sells only above cost after both 5% tolls, never buys into a collapse (25% down in 72 hours) and never holds more than 70% of the book in RF. Today these are the keeper's rules; the on-chain swap module that enforces them ships with the audit.",
+    tests: ["taker.test.mjs: sells only above cost", "taker.test.mjs: no buying into a collapse", "taker.test.mjs: RF cap", "taker.mjs: shipped desk reproduces its backtest"] },
   { text: "let its owner touch accounts. The owner can pause the desk, tighten its limits and, with two days' notice, change the keeper; it can never be the keeper.",
     tests: ["test_OwnerHasNoPathToHolderFunds", "test_KeeperChangeIsDelayedAndNeverTheOwner", "test_KeeperNeverTheOwnerAtDeploy"] },
 ];

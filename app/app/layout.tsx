@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "The First Bank of Friends",
   description:
-    "Sign once. The bank's keeper claims your Rare Friend's rewards into its own safe deposit box, in kind, and a maker-only desk becomes the liquidity the pool never had. Withdraw either asset any time.",
+    "Sign once. The bank's keeper claims your Rare Friend's RF and WETH rewards into your own safe deposit box, its swap desk trades the pooled funds when a move pays even after the 5% toll both ways, and you take everything home with a receipt, any time.",
   openGraph: {
     title: "The First Bank of Friends",
     description: "Sign once. Your Friend banks its own rewards, forever.",

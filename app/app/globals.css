@@ -651,6 +651,24 @@ a { color: var(--ink); text-underline-offset: 3px; }
 .floor-order div { display: contents; }
 .floor-order dt { color: var(--dim); }
 .floor-order dd { margin: 0; }
+.floor-breakeven { width: 100%; border-collapse: collapse; font-size: 0.66rem; margin: 4px 0 8px; }
+.floor-breakeven th, .floor-breakeven td { border-bottom: 1px solid #ccc; padding: 3px 4px; text-align: left; }
+.floor-breakeven td:nth-child(n+2), .floor-breakeven th:nth-child(n+2) { text-align: right; }
+.floor-shares { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.floor-shares button { all: unset; cursor: pointer; font-size: 0.62rem; letter-spacing: 0.06em; border: 1px solid var(--ink); padding: 4px 8px; background: var(--paper); }
+.floor-shares button.is-on { background: var(--ink); color: var(--paper); }
+.floor-shares button:focus-visible { outline: 2px solid #ccff00; outline-offset: 2px; }
+.floor-swaps { margin: 6px 0; padding-left: 18px; font-size: 0.64rem; text-align: left; }
+.receipt { border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); background: var(--paper); padding: 10px 12px; margin: 10px 0 4px; text-align: left; }
+.receipt-head { margin: 0 0 6px; font-size: 0.62rem; letter-spacing: 0.2em; text-transform: uppercase; display: flex; gap: 8px; align-items: center; }
+.receipt-table { width: 100%; border-collapse: collapse; font-size: 0.7rem; }
+.receipt-table th, .receipt-table td { padding: 3px 4px; border-bottom: 1px dashed #bbb; text-align: right; font-weight: 400; }
+.receipt-table th:first-child { text-align: left; color: var(--dim); }
+.receipt-table thead th { color: var(--dim); font-size: 0.58rem; letter-spacing: 0.1em; }
+.receipt-table td.is-neg { color: #7a1f1f; }
+.receipt-table td.is-pos { color: #2d5a00; }
+.receipt-total th, .receipt-total td { border-bottom: 0; border-top: 2px solid var(--ink); font-weight: 700 !important; color: var(--ink) !important; }
+.receipt-usd, .receipt-note { margin: 6px 0 0; font-size: 0.6rem; color: var(--dim); }
 .floor-mode { margin: 0; font-size: 0.56rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); }
 .floor-word { margin: 6px 0 8px; font-size: clamp(1.5rem, 7vw, 2.2rem); letter-spacing: 0.08em; line-height: 1; }
 .floor-word.is-loading { font-size: 0.8rem; color: var(--dim); }

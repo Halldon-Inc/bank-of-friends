@@ -1,3 +1,7 @@
+> **The swap desk (the product)** is documented in [TOKENOMICS.md](TOKENOMICS.md) and measured in
+> [TAKER.md](TAKER.md). This file documents the range-order desk in today's contract and the standing sell order,
+> both kept as research.
+
 # The maker-only desk
 
 The desk is a **two-range maker**: at most ONE ask range (RF above the price) and ONE

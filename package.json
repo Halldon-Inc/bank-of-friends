@@ -25,7 +25,10 @@
     "keeper": "node scripts/keeper.mjs",
     "test:desk": "node --test scripts/desk-plan.test.mjs",
     "rehearse:desk": "node scripts/rehearse-desk.mjs",
-    "economy": "node scripts/economy.mjs"
+    "economy": "node scripts/economy.mjs",
+    "taker": "node scripts/taker.mjs",
+    "test:taker": "node --test scripts/taker.test.mjs",
+    "paper": "node scripts/paper.mjs"
   },
   "dependencies": {
     "viem": "2.56.6"

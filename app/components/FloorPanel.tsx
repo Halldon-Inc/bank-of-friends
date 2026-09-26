@@ -1,155 +1,85 @@
 "use client";
 
 /**
- * THE TRADING FLOOR: is the desk on, right now?
+ * THE TRADING FLOOR: the swap desk, live.
  *
- * The headline is the LIVE verdict from /api/desk and nothing else. The old lever
- * rolled a random week and printed TRADED in the same breath as /docs printing
- * FLAT, so a judge saw a desk that had both traded and not traded. A simulated
- * week still exists, below a rule, worded as a conditional ("would quote") and
- * stamped, so it can never be read as something that happened.
+ * The bank swaps pooled RF and WETH through the pool when a move pays, even after the 5% toll both ways. The board
+ * is the LIVE decision from /api/desk (lib/strategy.mjs takerDecision on this hour's price). Below a rule, a
+ * clearly stamped SIMULATED week runs the same decision on a made-up price path and ends on a sample receipt.
  */
 
 import { useMemo, useRef, useState } from "react";
-import { DEFAULT_GATES, evaluateRegime, measurePath } from "@/lib/strategy.mjs";
 import type { ApiBank, ApiIdle } from "./VaultHolds";
+import Receipt from "./Receipt";
+import { simulateWeek, type SimWeek } from "@/lib/desk-sim";
 
 export type LiveGate = { gate: string; ok: boolean; detail: string; label?: string; status?: "met" | "blocking" | "unmeasured" };
-/** The fields of /api/desk the hall reads. Everything else there belongs to /docs. */
-export type LiveStanding = {
-  mode: "grid" | "edge" | "takeProfit" | "idle";
-  reason: string;
-  headline: string;
-  ask: { lo: number; hi: number; frac: number; aboveMidPct: number } | null;
-  edgeVsTakerPct: number | null;
-  book?: { label: string; rf: number; usd: number };
-  restingUsd: number | null;
-  feeToFriendsIfFilledUsd: number | null;
+export type LiveTaker = {
+  action: "buy" | "sell" | "wait"; reason: string;
+  price: number; ema24: number; vsAverage: number; drift72: number | null;
+  buyBelow: number; sellAbove: number; collapseGuard: boolean;
+  params: { band: number; frac: number; collapse: number; maxRfShare: number; fee: number };
+  breakEven: { label: string; share: number; cost: number; swing: number }[];
 };
-/** The word on the board: the grid when it is armed, else the standing order, else off. */
-export function floorWord(armed: boolean, standing?: LiveStanding | null) {
-  if (armed) return "DESK ON";
-  if (standing?.mode === "edge" || standing?.mode === "takeProfit") return "STANDING ORDER";
-  return "DESK OFF";
-}
+/** The fields of /api/desk the hall reads. Everything else there belongs to /docs. */
 export type LiveDesk = {
   asOf: string;
   armed: boolean;
   headline?: string;
-  standing?: LiveStanding | null;
+  taker?: LiveTaker | null;
   gates: LiveGate[];
-  thresholds?: { gridStep?: number; minReversals72h?: number; maxDrift72hSteps?: number };
-  grid?: { step?: number; makerEdge?: number };
-  market: { rfUsd: number; volume24hWeth: number; trades24h: number };
+  pool?: { virtualRf: number; virtualWeth: number };
+  market: { rfUsd: number; volume24hWeth: number; trades24h: number; mid?: number; ethUsd?: number };
   rewards?: { nextAllocateAt?: string | null; streamRfPerWeek?: number; streamWethPerWeek?: number };
   keeper?: { harvested24hRf?: number; harvested24hWeth?: number };
-  /** FriendBank's own totals; deployed=false until launch. */
   bank?: ApiBank | null;
-  /** Rewards earned by activated Friends protocol-wide and not yet claimed. */
   protocolIdle?: ApiIdle | null;
 };
 
-/** A measurement that cannot be taken yet is not a market verdict. */
-export const isPending = (g: LiveGate) => g.status === "unmeasured" || (g.status === undefined && /not yet measurable|history yet/i.test(g.detail));
-
-const REASONS: Record<string, string> = {
-  reversals72h: "The price is not swinging back and forth enough to earn on.",
-  drift72h: "The price has trended too far over three days. A range desk waits.",
-  walkForward7d: "Replayed over last week, the desk would not have paid.",
-  volume24h: "Too quiet. Barely anyone is trading today.",
-  trades24h: "Too quiet. Barely anyone is trading today.",
-  volFloor: "The price is barely moving, so there is nothing to earn.",
-  volCeiling: "Way too wild out there.",
-  drift24h: "The price moved too far today.",
-  drift1h: "The price is moving too fast right this minute.",
-  drift7d: "The price has trended all week. The desk does not lean into a trend.",
-  inventory: "The book is already leaning too far to one side.",
-  drawdown: "The desk is down. It stops itself until someone checks.",
-  breaker: "The breaker is tripped.",
-};
-const ORDER = ["breaker", "drawdown", "drift72h", "reversals72h", "walkForward7d", "drift7d", "drift24h", "volume24h", "trades24h", "volFloor", "volCeiling", "drift1h", "inventory"];
-
-export function plainReason(gates: LiveGate[]) {
-  const blocked = gates.filter((g) => !g.ok && !isPending(g)).map((g) => g.gate);
-  for (const g of ORDER) if (blocked.includes(g)) return REASONS[g];
-  if (blocked.length) return REASONS[blocked[0]] ?? "Conditions are not right.";
-  return "Conditions are not right.";
+/** The word on the board, from the live swap-desk decision. hall-play.mjs asserts it against /api/desk. */
+export function floorWord(taker?: LiveTaker | null) {
+  if (!taker) return "READING";
+  return taker.action === "buy" ? "BUY RF" : taker.action === "sell" ? "SELL RF" : "WAIT";
 }
 
-/* ================================================== the simulated week */
+/** One line for the marquee ticker. */
+export function tickerLine(taker?: LiveTaker | null) {
+  if (!taker) return "swap desk: reading";
+  return taker.action === "wait" ? `swap desk waiting: RF ${pct(taker.vsAverage)} vs its 24h average` : `swap desk: ${taker.action === "buy" ? "buying" : "selling"} RF`;
+}
 
-const RF_PRICE_WETH = 5.7e-7;
-const REGIMES = [
-  { name: "dead calm", trend: 0, sigma: 0.004, pull: 0.02, volume: 8, trades: 90 },
-  { name: "slow bleed", trend: -0.03, sigma: 0.010, pull: 0, volume: 40, trades: 600 },
-  { name: "hard dump", trend: -0.10, sigma: 0.020, pull: 0, volume: 70, trades: 900 },
-  { name: "quiet chop", trend: 0, sigma: 0.030, pull: 0.22, volume: 30, trades: 400 },
-  { name: "live chop", trend: 0, sigma: 0.048, pull: 0.26, volume: 55, trades: 800 },
-  { name: "wild chop", trend: 0, sigma: 0.075, pull: 0.30, volume: 90, trades: 1400 },
-  { name: "steady climb", trend: 0.03, sigma: 0.028, pull: 0.05, volume: 60, trades: 850 },
-  { name: "melt up", trend: 0.10, sigma: 0.045, pull: 0, volume: 120, trades: 1800 },
+const pct = (v: number, d = 1) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(d)}%`;
+const n = (v: number, d = 0) => v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const SHARES = [
+  { label: "just the founder", share: 0.002 },
+  { label: "half of all Friends", share: 0.5 },
+  { label: "nearly everyone", share: 0.9 },
 ];
 
-/** 240 hours: the 7-day replay gate needs at least 169 closes, so a 168-hour week could never arm. */
-const SIM_HOURS = 240;
-
-function rollWeek(seed: { current: number }) {
-  const rnd = () => { seed.current = (Math.imul(seed.current, 1664525) + 1013904223) >>> 0; return (seed.current >>> 8) / 16777216; };
-  const gauss = () => { const u = Math.max(rnd(), 1e-9), v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-  const r = REGIMES[Math.floor(rnd() * REGIMES.length)];
-  const path: number[] = [];
-  let p = RF_PRICE_WETH, anchor = RF_PRICE_WETH;
-  const perHour = Math.pow(1 + r.trend, 1 / 24) - 1;
-  for (let i = 0; i < SIM_HOURS; i++) {
-    anchor *= 1 + perHour;
-    p = p * Math.exp(-r.pull * Math.log(p / anchor) + r.sigma * gauss()) * (1 + perHour);
-    path.push(p);
-  }
-  return { regime: r, market: { ...measurePath(path, DEFAULT_GATES), ethUsd: 2734.86 } };
-}
-
-function Gates({ gates }: { gates: LiveGate[] }) {
-  return (
-    <ul className="hall-gates">
-      {gates.map((g) => {
-        const pending = isPending(g);
-        return (
-          <li key={g.gate} className={pending ? "pending" : g.ok ? "" : "blocked"}>
-            <span aria-hidden="true">{pending ? "·" : g.ok ? "□" : "■"}</span>
-            <b>{g.label ?? g.gate}</b>
-            <i>{g.detail}</i>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
 export default function FloorPanel({ live, error, bookRf, bookWeth, onBack }: { live: LiveDesk | null; error: string; bookRf: number; bookWeth: number; onBack: () => void }) {
-  const [showGates, setShowGates] = useState(false);
-  const [week, setWeek] = useState<ReturnType<typeof rollWeek> | null>(null);
+  const [week, setWeek] = useState<SimWeek | null>(null);
+  const [share, setShare] = useState(SHARES[1].share);
   const seed = useRef((Math.random() * 4294967296) >>> 0);
+  const t = live?.taker ?? null;
+  const word = floorWord(t);
 
-  const sim = useMemo(() => {
-    if (!week) return null;
-    const rf = bookRf || 3159, weth = bookWeth || 0.029;
-    const valueWeth = weth + rf * (week.market.mid ?? RF_PRICE_WETH);
-    return evaluateRegime(week.market, { rf, weth, valueWeth, hwmWeth: valueWeth, halted: false }, DEFAULT_GATES) as {
-      armed: boolean; checks: LiveGate[];
-    };
-  }, [week, bookRf, bookWeth]);
+  // The simulated week runs on the member's own box when there is one, else a $1,000 book half RF half WETH.
+  const simBook = useMemo(() => {
+    const mid = live?.market.mid ?? 6e-7, eth = live?.market.ethUsd ?? 2690;
+    if (bookRf > 0 || bookWeth > 0) return { rf: bookRf, weth: bookWeth, label: "your box" };
+    return { rf: 500 / eth / mid, weth: 500 / eth, label: "a $1,000 demo box" };
+  }, [live, bookRf, bookWeth]);
 
-  const blocking = live ? live.gates.filter((g) => !g.ok && !isPending(g)).length : 0;
-  const standingOn = !!live && !live.armed && (live.standing?.mode === "edge" || live.standing?.mode === "takeProfit");
-  const word = live ? floorWord(live.armed, live.standing) : "";
-  const t = live?.thresholds, step = t?.gridStep ?? live?.grid?.step;
-  const rule = t && step
-    ? `The desk arms only when the price has swung ${Math.round(step * 100)}% and back at least ${t.minReversals72h} times in 72 hours, has trended less than ${Math.round((t.maxDrift72hSteps ?? 0) * step * 100)}%, and replaying last week would have paid.`
-    : "The desk arms only when an objective rule on the last 72 hours and the last week is met.";
+  const roll = () => {
+    if (!live) return;
+    seed.current = (Math.imul(seed.current, 1664525) + 1013904223) >>> 0;
+    const v = { price: live.market.mid ?? 6e-7, virtualRf: live.pool?.virtualRf ?? 1.9e8, virtualWeth: live.pool?.virtualWeth ?? 114 };
+    setWeek(simulateWeek(seed.current, v, { rf: simBook.rf, weth: simBook.weth }, share));
+  };
 
   return (
     <div className="floor">
-      <p className="acct-kicker">the desk, live from chain</p>
+      <p className="acct-kicker">the swap desk, live from chain</p>
 
       {!live && !error && <p className="floor-word is-loading">reading the pool…</p>}
       {error && !live && (
@@ -158,52 +88,69 @@ export default function FloorPanel({ live, error, bookRf, bookWeth, onBack }: { 
         </p>
       )}
 
-      {live && (
+      {live && t && (
         <>
-          <div className={`floor-board${live.armed ? " armed" : ""}${standingOn ? " standing" : ""}`}>
-            <p className="floor-mode">maker-only range orders</p>
+          <div className={`floor-board${t.action !== "wait" ? " armed" : ""}`}>
+            <p className="floor-mode">swaps pooled RF and WETH, paying the toll</p>
             <p className="floor-word">{word}</p>
-            <p className="hall-because">
-              {live.armed ? "The rule is met. A deployed desk would be quoting both sides now." : standingOn ? live.standing!.headline : plainReason(live.gates)}
-            </p>
+            <p className="hall-because">{t.reason}.</p>
           </div>
-          {standingOn && live.standing?.ask && (
-            <dl className="floor-order">
-              <div><dt>resting</dt><dd>{Math.round(live.standing.ask.frac * 100)}% of {live.standing.book?.label ?? "the RF book"}{live.standing.restingUsd != null ? ` ($${live.standing.restingUsd.toFixed(2)})` : ""}</dd></div>
-              <div><dt>from</dt><dd>{live.standing.ask.aboveMidPct.toFixed(1)}% above the market{live.standing.mode === "takeProfit" ? ", a take-profit range" : ""}</dd></div>
-              {live.standing.edgeVsTakerPct != null && <div><dt>vs selling as a taker</dt><dd>+{live.standing.edgeVsTakerPct.toFixed(1)}% per RF</dd></div>}
-              {live.standing.feeToFriendsIfFilledUsd != null && <div><dt>if it fills</dt><dd>the buyer pays ${live.standing.feeToFriendsIfFilledUsd.toFixed(2)} to every Friend</dd></div>}
-            </dl>
-          )}
+          <dl className="floor-order">
+            <div><dt>RF now</dt><dd>{pct(t.vsAverage)} against its 24h average</dd></div>
+            <div><dt>buys below</dt><dd>{pct(-t.params.band, 0)} from the average, unless it is collapsing ({t.collapseGuard ? "it is: guard on" : "guard off"})</dd></div>
+            <div><dt>sells above</dt><dd>{pct(t.params.band, 0)} from the average, and only above cost after both tolls</dd></div>
+            <div><dt>each trade</dt><dd>{Math.round(t.params.frac * 100)}% of the idle side; RF never above {Math.round(t.params.maxRfShare * 100)}% of the book</dd></div>
+          </dl>
           <p className="acct-intro">
-            {standingOn
-              ? <>RF in your box is a standing sell order: the bank rests it above the market as a range order and never swaps, so it pays no 5% toll. The buyer who takes it pays the pool&rsquo;s 5% to every activated Friend. To keep your RF, set its cap to 0 or withdraw it; it stays in your Friend&rsquo;s wallet.</>
-              : <>By default the Bank only holds. When the desk is on, it rests maker orders on the RF/WETH pool: it never swaps and pays no 5% toll, and your RF or WETH takes part pro rata. Takers who trade against it still pay the pool&rsquo;s 5%, which goes to every activated Friend.</>}
+            Every swap pays the pool&rsquo;s 5%, in and out. That toll goes to every activated Friend, so the bank&rsquo;s members
+            get their share of it back as rewards. The more Friends bank here, the less a round trip really costs:
           </p>
-          <p className="hall-small" style={{ margin: "0 0 6px" }}>
-            {standingOn ? "The two-sided grid (bids too) waits for a two-way market. " : ""}{rule} Read at {new Date(live.asOf).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-            {live.armed ? "." : `: ${blocking} ${blocking === 1 ? "condition" : "conditions"} not met.`}
+          <table className="floor-breakeven">
+            <thead><tr><th>if the bank holds</th><th>toll per round trip</th><th>swing needed</th></tr></thead>
+            <tbody>
+              {t.breakEven.map((b) => (
+                <tr key={b.label}><td>{b.label} ({(b.share * 100).toFixed(b.share < 0.01 ? 2 : 0)}%)</td><td>{(b.cost * 100).toFixed(2)}%</td><td>{(b.swing * 100).toFixed(2)}%</td></tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="hall-small" style={{ margin: "6px 0" }}>
+            Read at {new Date(live.asOf).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}. Most hours it waits:
+            it trades only on a 30% move that is not a collapse. Tested on 16 real pools with a 4% to 6% toll and live on 22 more pools; the results, good and bad, are in docs/TAKER.md and docs/PAPER.md.
           </p>
-          <button type="button" className="hall-why" onClick={() => setShowGates((v) => !v)} aria-expanded={showGates}>
-            {showGates ? "hide the grid's conditions" : "show the grid's conditions"}
-          </button>
-          {showGates && <Gates gates={live.gates} />}
         </>
       )}
 
       <hr className="acct-rule" />
       <p className="acct-kicker">what if <span className="sim-stamp">simulated week</span></p>
       <p className="acct-intro">
-        Roll a made-up week and ask the same rule what it <em>would</em> do. Nothing here happened.
+        Run the same desk on a made-up week, on {simBook.label}, through a pool as deep as the real one. Nothing here happened.
       </p>
-      <button type="button" className="hall-lever is-quiet" onClick={() => setWeek(rollWeek(seed))}>
+      <div className="floor-shares" role="radiogroup" aria-label="How much of all Friend weight banks here">
+        {SHARES.map((x) => (
+          <button key={x.label} type="button" role="radio" aria-checked={share === x.share} className={share === x.share ? "is-on" : ""} onClick={() => setShare(x.share)}>{x.label}</button>
+        ))}
+      </div>
+      <button type="button" className="hall-lever is-quiet floor-roll" onClick={roll} disabled={!live}>
         {week ? "Roll another week" : "Simulate a week"}
       </button>
-      {week && sim && (
-        <div className={`floor-sim${sim.armed ? " armed" : ""}`}>
-          <p className="hall-regime">{week.regime.name}, simulated</p>
-          <p className="floor-sim-word">{sim.armed ? "would quote" : "would stay off"}</p>
-          {!sim.armed && <p className="hall-because">{plainReason(sim.checks)}</p>}
+      {week && (
+        <div className={`floor-sim${week.vsHold > 0 ? " armed" : ""}`}>
+          <p className="hall-regime">{week.regime}, simulated: RF {pct(week.priceChange)}</p>
+          <p className="floor-sim-word">{week.swaps.length === 0 ? "waited all week" : `${week.swaps.length} swap${week.swaps.length === 1 ? "" : "s"}, ${pct(week.vsHold)} vs holding`}</p>
+          {week.swaps.length > 0 && (
+            <ol className="floor-swaps">
+              {week.swaps.slice(0, 6).map((s, i) => (
+                <li key={i}>day {Math.ceil(s.hour / 24)}: {s.action === "buy" ? `bought ${n(s.rf)} RF for ${s.weth.toFixed(4)} WETH` : `sold ${n(s.rf)} RF for ${s.weth.toFixed(4)} WETH`}</li>
+              ))}
+              {week.swaps.length > 6 && <li>and {week.swaps.length - 6} more</li>}
+            </ol>
+          )}
+          <Receipt
+            title="Sample receipt"
+            r={{ depositedRf: week.start.rf, depositedWeth: week.start.weth, deskRf: week.end.rf - week.start.rf, deskWeth: week.end.weth - week.rebateWeth - week.start.weth, rebateWeth: week.rebateWeth }}
+            rfUsd={live?.market.rfUsd ? live.market.rfUsd * (1 + week.priceChange) : undefined} ethUsd={live?.market.ethUsd}
+            note={`Valued at the simulated week's closing price. The desk paid ${week.tollWeth.toFixed(5)} WETH in tolls; ${(share * 100).toFixed(share < 0.01 ? 1 : 0)}% of it came back as rewards. A swap that turns RF into WETH shows as minus RF and plus WETH: a trade, not a loss.`}
+          />
         </div>
       )}
       <button type="button" className="hall-lever floor-back" onClick={onBack}>Back to the hall</button>

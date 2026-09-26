@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { accountId, boxRf, boxWeth, removeAccount, totals, withdrawAsset, type Account } from "@/lib/accounts";
 import CloseAccount from "./CloseAccount";
+import Receipt, { type ReceiptLines } from "./Receipt";
 import type { WalletFriend } from "./Hall";
 import { Arrival } from "./AccountPanel";
 import { VaultHeadline, type BankTotals, type ProtocolIdle } from "./VaultHolds";
@@ -125,6 +126,8 @@ export default function VaultPanel({
 
   const [picked, setPicked] = useState<string | null>(null);
   const [closing, setClosing] = useState<string | null>(null);
+  const [closed, setClosed] = useState<{ label: string; r: ReceiptLines } | null>(null);
+  const receiptOf = (a: Account): ReceiptLines => ({ depositedRf: a.boxRf, depositedWeth: a.boxWeth, deskRf: a.pnlRf, deskWeth: a.pnlWeth, rebateWeth: 0 });
   useEffect(() => {
     if (picked && accounts.some((a) => a.id === picked)) return;
     setPicked(accounts.find((a) => a.id === current)?.id ?? accounts[0]?.id ?? null);
@@ -140,12 +143,24 @@ export default function VaultPanel({
   const maxRf = Math.max(0, ...accounts.map((a) => Math.max(a.boxRf, boxRf(a)) + a.owedRf));
   const maxWeth = Math.max(0, ...accounts.map((a) => Math.max(a.boxWeth, boxWeth(a)) + a.owedWeth));
 
+  if (closed) {
+    return (
+      <div className="vault-closed">
+        <p className="acct-kicker">account closed <span className="sim-stamp">simulated</span></p>
+        <p className="acct-head">{closed.label} took everything home</p>
+        <Receipt title={`Receipt: ${closed.label}`} r={closed.r} rfUsd={rfUsd} ethUsd={ethUsd} stamp={false}
+          note="Paid in kind to your wallet, and the bank's access to your Friend's wallet revoked in the same step. The desk has not traded on chain, so its line is what it would have been." />
+        <button type="button" className="hall-lever closed-back" onClick={() => setClosed(null)}>Back to the vault</button>
+      </div>
+    );
+  }
+
   const closingAcct = accounts.find((a) => a.id === closing);
   if (closingAcct) {
     return (
       <CloseAccount
         account={closingAcct}
-        onConfirm={() => { setClosing(null); onChange(removeAccount(closingAcct.id)); }}
+        onConfirm={() => { setClosed({ label: closingAcct.label, r: receiptOf(closingAcct) }); setClosing(null); onChange(removeAccount(closingAcct.id)); }}
         onCancel={() => setClosing(null)}
       />
     );
@@ -218,8 +233,9 @@ export default function VaultPanel({
           <AssetBar asset="WETH" deposited={open.boxWeth} pnl={open.pnlWeth} owed={open.owedWeth} max={maxWeth} digits={5} />
           <Arrival account={open} rfUsd={rfUsd} ethUsd={ethUsd} />
           <p className="box-pnl-line">
-            your share of desk gains: {signed(open.pnlRf, 0)} RF, {signed(open.pnlWeth, 5)} WETH{open.pnlRf === 0 && open.pnlWeth === 0 ? " (the desk has never traded)" : ""}
+            your share of the swap desk: {signed(open.pnlRf, 0)} RF, {signed(open.pnlWeth, 5)} WETH{open.pnlRf === 0 && open.pnlWeth === 0 ? " (nothing yet: the desk trades only on a 30% move that is not a collapse)" : ""}
           </p>
+          <Receipt title="Your receipt so far" r={receiptOf(open)} rfUsd={rfUsd} ethUsd={ethUsd} />
           <div className="box-actions">
             <button type="button" onClick={() => onChange(withdrawAsset(open.id, "rf"))} disabled={boxRf(open) <= 0}>
               {boxRf(open) > 0 ? "Take out RF" : "RF taken out"}

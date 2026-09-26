@@ -167,24 +167,21 @@ for (const vp of [
     // The floor reads the chain; a cold read can take the better part of a minute.
     await page.waitForSelector(".floor-board .floor-word", { timeout: 120_000 });
     const liveWord = (await page.textContent(".floor-board .floor-word"))?.trim();
-    const api = await page.evaluate(async () => { const j = await (await fetch("/api/desk")).json(); return { armed: j.armed, mode: j.standing?.mode ?? null, ask: !!j.standing?.ask }; });
-    // The word is the grid when armed, else the standing sell order, else off: the same rule as FloorPanel.floorWord.
-    const expectWord = api.armed ? "DESK ON" : api.mode === "edge" || api.mode === "takeProfit" ? "STANDING ORDER" : "DESK OFF";
-    if (liveWord !== expectWord) bad(`${label}: floor says "${liveWord}" but /api/desk armed=${api.armed} standing=${api.mode}`);
-    else ok(`${label}: floor headline "${liveWord}" matches /api/desk (armed=${api.armed}, standing=${api.mode})`);
-    if (expectWord === "STANDING ORDER") {
-      // A standing order on the board must show its price and its edge, read from the same API.
-      const order = ((await page.textContent(".floor .floor-order").catch(() => "")) ?? "").replace(/\s+/g, " ");
-      if (!api.ask || !/above the market/.test(order) || !/per RF/.test(order)) bad(`${label}: standing order shown without its price and edge: "${order.slice(0, 80)}"`);
-      else ok(`${label}: the standing order shows its price above the market and its edge per RF`);
-    }
+    const api = await page.evaluate(async () => (await (await fetch("/api/desk")).json()).taker?.action ?? null);
+    // The word is the swap desk's live decision: the same mapping as FloorPanel.floorWord.
+    const expectWord = api === "buy" ? "BUY RF" : api === "sell" ? "SELL RF" : api === "wait" ? "WAIT" : "READING";
+    if (liveWord !== expectWord) bad(`${label}: floor says "${liveWord}" but /api/desk taker.action=${api}`);
+    else ok(`${label}: floor headline "${liveWord}" matches /api/desk (swap desk: ${api})`);
+    const rows = await page.locator(".floor .floor-breakeven tbody tr").count();
+    if (rows < 3) bad(`${label}: the break-even table shows ${rows} membership rows`);
+    else ok(`${label}: the break-even table shows ${rows} membership levels`);
 
-    await page.click(".floor .hall-lever");
-    await page.waitForSelector(".floor-sim-word", { timeout: 10_000 });
-    const simWord = (await page.textContent(".floor-sim-word"))?.trim();
+    await page.click(".floor .floor-roll");
+    await page.waitForSelector(".floor-sim .receipt", { timeout: 10_000 });
+    const simWord = (await page.textContent(".floor-sim-word"))?.trim() ?? "";
     const stamp = await page.locator(".floor .sim-stamp").count();
-    if (!/^would (quote|stay off)$/.test(simWord ?? "") || !stamp) bad(`${label}: simulated week reads "${simWord}", stamp ${stamp}`);
-    else ok(`${label}: simulated week says "${simWord}" and is stamped`);
+    if (!/^(waited all week|\d+ swaps?, [+-]\d)/.test(simWord) || !stamp) bad(`${label}: simulated week reads "${simWord}", stamp ${stamp}`);
+    else ok(`${label}: simulated week says "${simWord}", stamped, and ends on a sample receipt`);
     const wordAfter = (await page.textContent(".floor-board .floor-word"))?.trim();
     if (wordAfter !== liveWord) bad(`${label}: simulating a week changed the live headline to "${wordAfter}"`);
     else ok(`${label}: the live headline ignores the simulation`);
@@ -192,10 +189,6 @@ for (const vp of [
     const back = await page.locator('.floor .hall-lever:has-text("Back to the hall")').count();
     if (back !== 1) bad(`${label}: the floor has no way back to the hall`);
     else ok(`${label}: the floor ends on "Back to the hall"`);
-    await page.click(".hall-why");
-    const gates = await page.locator(".floor .hall-gates li").count();
-    if (gates < 3) bad(`${label}: only ${gates} conditions shown`);
-    else ok(`${label}: ${gates} live conditions listed`);
 
     // Now the vault: one box, and its assets leave separately.
     await page.click(".hall-panel header button");
@@ -273,6 +266,12 @@ for (const vp of [
     else if (!/Closing also removes the bank.s access to your Friend.s wallet, in the same step/.test(closeText)) bad(`${label}: the close screen does not say it removes access in the same step: "${closeText.slice(0, 200)}"`);
     else ok(`${label}: close says it removes access in the same step, and carries no warning`);
     await page.click(".close-go");
+    // Closing ends on a RECEIPT: deposited, swap desk, toll rebate, coming home, per asset. Coming home must equal the box.
+    await page.waitForSelector(".vault-closed .receipt", { timeout: 10_000 });
+    const homeRow = (await page.locator(".vault-closed .receipt-total td").allTextContents()).map((x) => x.trim());
+    if (homeRow.length !== 2 || homeRow[0] !== home[0].trim() || homeRow[1] !== home[1].trim()) bad(`${label}: receipt says ${homeRow.join(" / ")} came home, the box held ${home.join(" / ")}`);
+    else ok(`${label}: closing ends on a receipt that matches the box (${homeRow.join(" RF / ")} WETH)`);
+    await page.click(".closed-back");
     await page.waitForSelector('.vault .hall-lever:has-text("Open my account at the desk")', { timeout: 10_000 });
     ok(`${label}: account closed; the vault's next step is "Open my account at the desk"`);
 

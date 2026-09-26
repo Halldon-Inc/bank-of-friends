@@ -97,7 +97,7 @@ export default function DeskView() {
   const status = (g: Desk["gates"][number]) => g.status ?? (g.ok ? "met" : "blocking");
   const active = d.friends.filter((f) => f.activated);
   const rw = d.rewards, vl = d.volumeLoop;
-  const deskWord = d.state === "armed" ? "Quoting" : d.state === "halted" ? "Halted" : d.state === "standing" ? "Standing order" : "Off";
+  const deskWord = d.taker ? (d.taker.action === "buy" ? "Buying RF" : d.taker.action === "sell" ? "Selling RF" : "Waiting") : "Off";
 
   return (
     <>
@@ -136,15 +136,42 @@ export default function DeskView() {
           </span>
         </div>
         <div className="docs-hero-cell">
-          <span className="docs-hero-label">the desk</span>
+          <span className="docs-hero-label">the swap desk</span>
           <span className="docs-hero-value docs-desk-state">{deskWord}</span>
           <span className="docs-hero-sub">{d.headline}</span>
         </div>
       </section>
 
+      {d.taker && (
+        <section className="panel docs-block">
+          <h2>The swap desk: live</h2>
+          <dl>
+            <div className="stat"><dt>decision</dt><dd>{deskWord}: {d.taker.reason}</dd></div>
+            <div className="stat"><dt>RF vs its 24h average</dt><dd>{pct(d.taker.vsAverage, 1)}</dd></div>
+            <div className="stat"><dt>buys below</dt><dd>{d.taker.buyBelow.toExponential(4)} WETH per RF, unless it is down {Math.round(d.taker.params.collapse * 100)}% over 72h ({d.taker.collapseGuard ? "it is" : "it is not"})</dd></div>
+            <div className="stat"><dt>sells above</dt><dd>{d.taker.sellAbove.toExponential(4)} WETH per RF, and only above cost after both tolls</dd></div>
+            <div className="stat"><dt>size and cap</dt><dd>{Math.round(d.taker.params.frac * 100)}% of the idle side a trade; RF never above {Math.round(d.taker.params.maxRfShare * 100)}% of the book</dd></div>
+          </dl>
+          <table className="docs-table">
+            <thead><tr><th>if the bank holds</th><th>toll per round trip, net of the rebate</th><th>swing a round trip must capture</th></tr></thead>
+            <tbody>
+              {d.taker.breakEven.map((b) => (
+                <tr key={b.label}><td>{b.label}, {(b.share * 100).toFixed(b.share < 0.01 ? 2 : 0)}%</td><td>{(b.cost * 100).toFixed(2)}%</td><td>{(b.swing * 100).toFixed(2)}%</td></tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="note">
+            The swap desk trades the pooled funds as a taker and pays the pool&rsquo;s 5% on every swap, in and out. That toll funds
+            the ActivationManager and streams back to every activated Friend the next week, so members get their share of it back:
+            the more Friends bank here, the smaller the swing a trade needs. Selected on the first half of 16 real 4% to 6% toll pools
+            and scored on the second half; live on 22 more pools. docs/TAKER.md has every result, including the pools where it lost.
+          </p>
+        </section>
+      )}
+
       {d.standing && d.standing.mode !== "grid" && (
         <section className="panel docs-block">
-          <h2>The standing sell order: live</h2>
+          <h2>Research: a resting sell order instead of a swap</h2>
           <dl>
             <div className="stat"><dt>mode</dt><dd>{d.standing.mode === "edge" ? "at the edge" : d.standing.mode === "takeProfit" ? "take-profit (rally)" : "idle"}</dd></div>
             {d.standing.ask && <div className="stat"><dt>the ask</dt><dd>{Math.round(d.standing.ask.frac * 100)}% of the RF book from {d.standing.ask.aboveMidPct.toFixed(2)}% above mid</dd></div>}
@@ -216,7 +243,7 @@ export default function DeskView() {
       </div>
 
       <section className="finding docs-block">
-        <h2>Why this desk exists</h2>
+        <h2>Why a bank, and why a swap desk</h2>
         <p>
           The $RAREFRIENDS market is a Uniswap v4 pool whose hook takes <strong>5% of every swap</strong>{" "}
           and routes it to activated Friends. The pool&rsquo;s own <strong>lpFee is {d.pool.lpFee}</strong>,
@@ -225,10 +252,12 @@ export default function DeskView() {
           the protocol&rsquo;s own seed is {d.pool.marketOwnsAll ? "100.00%" : "nearly all"} of it.
         </p>
         <p>
-          The hook has no liquidity callbacks, so liquidity never pays the toll. The desk would quote
-          only as <strong>range orders inside the pool</strong>: it would become the outside liquidity
-          the pool never had, it never swaps, and so it never pays 5%. Every taker who crosses its
-          ranges still pays 5% to every activated Friend.
+          Every swap pays <strong>5% of the WETH leg</strong>, in and out, and that 5% is exactly what
+          every activated Friend is paid in WETH. So a desk that swaps pooled funds is not paying a stranger:
+          it pays its own members, a week late, in proportion to how much of all Friend weight banks here.
+          At the founding member&rsquo;s share a round trip costs 9.73% and needs a 10.8% swing; with half of all
+          weight in the bank it costs 4.88% and needs 5.1%. The desk trades only when a move is large enough,
+          never buys into a collapse, and never sells below cost after both tolls.
         </p>
         <p>
           Every number on this page is read from chain.{" "}
@@ -238,13 +267,12 @@ export default function DeskView() {
       </section>
 
       <section className="panel docs-block docs-truth">
-        <h2>Volume and rewards: the truth</h2>
+        <h2>Volume and rewards: what the desk pays and gets back</h2>
         <p>
-          Rewards are the 5%, so more volume pays every Friend more. That does not mean the bank
-          should make volume. <strong>Takers who cross the bank&rsquo;s quotes pay 5% to every
-          activated Friend; the bank never pays the toll itself.</strong> If it traded to paint the chart, a
-          round trip of V WETH would pay 0.0975V in fees and members would get back only their
-          share s of all reward weight:
+          Rewards are the 5%, so more volume pays every Friend more. The swap desk pays the toll on every
+          trade, and its members get back their share s of all reward weight. That is why the desk trades
+          only when a move pays even after the toll, and never to paint the chart: a round trip of V WETH
+          costs members
         </p>
         <p className="docs-formula">net to members = &minus;0.0975 &times; V &times; (1 &minus; s)</p>
         <table className="docs-table">

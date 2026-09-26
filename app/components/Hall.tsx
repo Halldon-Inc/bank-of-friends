@@ -26,7 +26,7 @@ import { renderBank } from "@/lib/hall-art";
 import { loadAccounts, addAccount, removeAccount, accountId, type Account } from "@/lib/accounts";
 import AccountPanel from "./AccountPanel";
 import VaultPanel from "./VaultPanel";
-import FloorPanel, { plainReason, type LiveDesk } from "./FloorPanel";
+import FloorPanel, { tickerLine, type LiveDesk } from "./FloorPanel";
 import { Tick, compact, dollars, plaqueLines, readTotals, weth as wethFmt } from "./VaultHolds";
 
 type Station = "desk" | "floor" | "vault";
@@ -507,7 +507,7 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd, walletFriends = [
       const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = s % 60;
       items.push(`next allocate in ${hh ? `${hh}h ` : ""}${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`);
     }
-    items.push(live ? (live.armed ? "desk ON" : `desk OFF: ${plainReason(live.gates).replace(/\.$/, "").toLowerCase()}`) : "desk: reading");
+    items.push(tickerLine(live?.taker));
     return items;
   }, [live, rfUsd, bookRf, bookWeth, now, plaque]);
 

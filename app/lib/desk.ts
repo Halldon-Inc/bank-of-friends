@@ -1,6 +1,6 @@
 import { parseAbi } from "viem";
 import { ADDR, ABI, client, readPool, readPosition, scanLogs, blocksPerDay, FULL_RANGE, POOL_ID, ethUsd as readEthUsd } from "@/lib/protocol.mjs";
-import { DEFAULT_GATES, evaluateRegime, measurePath, explain, makerEdgePerRoundTrip, standingOrder, explainStanding, STANDING } from "@/lib/strategy.mjs";
+import { DEFAULT_GATES, evaluateRegime, measurePath, explain, makerEdgePerRoundTrip, standingOrder, explainStanding, STANDING, TAKER, takerDecision, takerBreakEven } from "@/lib/strategy.mjs";
 import { getSeries } from "@/lib/price-series";
 import * as protocol from "@/lib/protocol.mjs";
 import { assembleState } from "@/lib/upstream";
@@ -25,6 +25,20 @@ export type Desk = {
    * Computed by lib/strategy.mjs standingOrder from the same market read as the gates, on the
    * founding member's idle RF (the demo book). mode "grid" when the grid is armed.
    */
+  /**
+   * THE SWAP DESK (the product): lib/strategy.mjs takerDecision on this hour's price, for a reference book of
+   * $10,000 half RF half WETH, executed as a taker through the pool's live virtual reserves with the full toll.
+   */
+  taker: {
+    action: "buy" | "sell" | "wait";
+    reason: string;
+    price: number; ema24: number; vsAverage: number; drift72: number | null;
+    buyBelow: number; sellAbove: number;
+    collapseGuard: boolean;
+    params: { band: number; frac: number; collapse: number; maxRfShare: number; fee: number };
+    /** Toll cost to members per round trip, and the swing it must capture, at membership shares. */
+    breakEven: { label: string; share: number; cost: number; swing: number }[];
+  };
   standing: {
     mode: "grid" | "edge" | "takeProfit" | "idle";
     reason: string;
@@ -420,6 +434,35 @@ async function build(): Promise<Desk> {
     },
   };
 
+  // THE SWAP DESK on this hour: the same pure decision the backtests and the paper test run.
+  const ema24 = hourly.reduce((e: number | null, p: number) => (e == null ? p : e + (p - e) * (2 / (TAKER.emaHours + 1))), null as number | null) ?? pool.wethPerRf;
+  const ago72 = hourly.length > 72 ? hourly[hourly.length - 73] : hourly[0];
+  const drift72 = ago72 ? pool.wethPerRf / ago72 - 1 : null;
+  const refRf = 5_000 / price / pool.wethPerRf, refWeth = 5_000 / price;
+  const vx = pool.virtualRf, vy = pool.virtualWeth, k = vx * vy;
+  const takerOut = takerDecision(
+    { price: pool.wethPerRf, ema: ema24, drift72 },
+    { rf: refRf, weth: refWeth, avgCost: pool.wethPerRf, lastSellNet: null },
+    {
+      buyPx: (w: number) => w / (vx - k / (vy + w * (1 - TAKER.fee))),
+      sellNet: (q: number) => (vy - k / (vx + q)) * (1 - TAKER.fee),
+    },
+  );
+  const founderShare = s;
+  const taker: Desk["taker"] = {
+    action: takerOut.action, reason: takerOut.reason,
+    price: pool.wethPerRf, ema24, vsAverage: pool.wethPerRf / ema24 - 1, drift72,
+    buyBelow: ema24 * (1 - TAKER.band), sellAbove: ema24 * (1 + TAKER.band),
+    collapseGuard: drift72 != null && drift72 <= -TAKER.collapse,
+    params: { band: TAKER.band, frac: TAKER.frac, collapse: TAKER.collapse, maxRfShare: TAKER.maxRfShare, fee: TAKER.fee },
+    breakEven: [
+      { label: "the founding member today", share: founderShare },
+      { label: "10% of all weight", share: 0.10 },
+      { label: "half of all weight", share: 0.50 },
+      { label: "90% of all weight", share: 0.90 },
+    ].map((x) => ({ ...x, ...takerBreakEven(x.share) })),
+  };
+
   const thirdPartyLiquidity = (pool.liquidity - marketPos).toString();
 
   const [bk, idle] = await Promise.all([bankP, idleP]) as [any, any];
@@ -446,7 +489,8 @@ async function build(): Promise<Desk> {
     block: head.toString(),
     armed: regime.armed,
     state: book.halted ? "halted" : regime.armed ? "armed" : standing.mode === "edge" || standing.mode === "takeProfit" ? "standing" : "off",
-    headline: headline(regime, marketState, standing.headline),
+    headline: `Swap desk: ${taker.action === "wait" ? "waiting" : taker.action === "buy" ? "buying RF" : "selling RF"}. ${taker.reason}.`,
+    taker,
     standing,
     rule: `arms only when the market has made ${DEFAULT_GATES.minReversals72h} swings of ${DEFAULT_GATES.gridStep * 100}% in 72 hours, has trended less than ${DEFAULT_GATES.maxDrift72hSteps * DEFAULT_GATES.gridStep * 100}% over them, and the same grid would have beaten holding over the last 7 days`,
     ethUsdSource: eth.source,
