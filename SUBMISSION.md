@@ -177,6 +177,18 @@ Against **holding**, the result is the market's direction and nothing else: +71%
 
 Conversion demand exists: over the tape, 372M RF was sold into the pool (58% of gross volume by WETH; the daily sell share ran 30% to 93%). Every unit of it went through a taker swap, paid 5% and ate impact. The standing order is the same flow, resting instead.
 
+**Forward test, live, no money** ([`docs/PAPER.md`](https://github.com/Halldon-Inc/bank-of-friends/blob/main/docs/PAPER.md), running since 2026-09-26 03:20Z)
+
+The backtests above are history. This is the same code deciding in real time on live pools across launchpads: Rare Friends, Pons v2, Project Mars, the Robinhood Index hooks, fresh Robinhood launches, Long.xyz, StonkFun, Ember and pump.fun. A fill counts only when a minute bar crosses the whole resting range, one-trade wicks cannot fill, a drained pool is cut off, and the taker it is compared with pays no price impact.
+
+| after 10.8 hours, 21 live pools | fills | per unit vs a taker at the moment of the decision | total vs a taker making the same decisions |
+| --- | ---: | --- | --- |
+| standing sell order | 15 on 8 pools | median **+6.9%**, worst +2.9%, **15 of 15 positive** | **ahead on all 8 filled pools** (+0.5% to +5.8%) |
+| two-sided grid, live gates | 3 | median +7.8% | ahead on 3, flat elsewhere: too few fills to judge |
+| grid, loosened in-sample setting | 2 | median +11.6% | ahead on 2: too few fills to judge |
+
+The pools behind the taker were unfilled orders marked a few thousandths of a percent under the market, and ZCAT, a StonkFun transfer-tax coin, where the tax on the maker's deposit cost 0.9% before any fill. That is why the bank refuses transfer-tax pools. The test keeps running; the file is rewritten every 15 minutes.
+
 **At scale** (DERIVED from live `/api/desk` inputs: this week's streams, total weight, prices)
 
 DERIVED from live `/api/desk` inputs on 2026-09-26 (RF stream 85.4M RF a week, WETH stream 29.55 WETH a week, total weight 1,036M, RF $0.00161, ETH $2,690), at the real-tape median edge of +8.2%, assuming each member routes their whole RF stream through the bank and it all fills:
@@ -319,6 +331,7 @@ Things we found that are not in the docs, offered in good faith:
 npm install
 npm run verify           # 63 facts against live chain state
 npm run economy          # the standing order vs the taker route: real tape, 16 other pools, synthetic regimes
+node scripts/paper.mjs --tick   # the live forward test across launchpads, one pass (no money)
 npm run keeper -- --wallet 0xYOURWALLET   # dry run: what the keeper would claim and allocate
 npm run test:desk        # the keeper's desk planner against the contract's rules
 npm run backtest:gated   # the two-sided grid against the whole tape
@@ -337,6 +350,7 @@ cd app && npm install && npm run dev      # the hall at /, the research at /docs
 | `npm run economy` | instrument checks 3/3; real tape per unit **+8.2%** vs the taker route (10 runs); 16 pools out of sample **+7.9%** per unit, beat **14 of 16** on total vs a taker on the same schedule; synthetic chop / slide / rally all positive vs the same-schedule taker |
 | `npm run test:desk` | **30/30**: every planned ask and bid, standing order and grid, checked against the contract's reverts restated from the Solidity |
 | `npm run keeper -- --wallet huntclubhero.eth` | dry run 2026-09-26: 8 Friends found on chain (7 earning), claims planned for RF x3 and WETH x6, nothing sent, no alarm |
+| `node scripts/paper.mjs --loop 900` | forward test on 21 live pools across 7 launchpads since 2026-09-26 03:20Z: standing sell order 15 of 15 fills ahead of the taker route per unit (median +6.9%), ahead of the same-schedule taker on all 8 filled pools; decision log in `data/paper/log.jsonl` |
 | `scripts/rehearse-desk.mjs` (local fork) | 2026-09-26, fork of live Robinhood Chain state at block 72,700,207: four real Genesis enrolled, 49,403 RF collected, and with the real gates OFF (no armed override) the keeper planned and sent `placeAsk` 1.9% above mid as the standing order; the contract accepted it (2 confirmed, 0 failed) and the next run found it resting. Nothing broadcast |
 | `npm run backtest:gated` | real tape (10,012 swaps, 9.4 days): the two-sided grid stays off, +0.00% vs hold; ungated it would have lost 9.16% |
 | `npm run sweep` | 60 regimes: gated worst -6.76% vs ungated worst -42.98% |

@@ -37,3 +37,9 @@ gen-sales.json
 !data/
 data/*
 !data/tokens/
+!data/paper/
+data/paper/*
+!data/paper/universe.json
+!data/paper/report.md
+!data/paper/report.json
+!data/paper/log.jsonl
