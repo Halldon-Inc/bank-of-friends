@@ -63,7 +63,7 @@ import {
   ADDR, ABI, CHAIN, POOL_ID, POOL_SEED_BLOCK, client, fmt, scanLogs, blocksPerDay,
   readPool, readStreams, readRewardsWiring, readOwners, ethUsd,
 } from "../lib/protocol.mjs";
-import { DEFAULT_GATES, measurePath, explain } from "../lib/strategy.mjs";
+import { DEFAULT_GATES, measurePath, explain, explainStanding } from "../lib/strategy.mjs";
 import { planDesk } from "../lib/desk-plan.mjs";
 
 const args = process.argv.slice(2);
@@ -168,13 +168,32 @@ const WALLET = await resolveWallet(val("--wallet"));
  * in one call). Discovery only: every fact that matters is re-read from chain.
  */
 async function membersFromWallet(owner) {
-  const r = await fetch(`https://rarefriends.com/api/protocol/state?address=${owner.toLowerCase()}`, { signal: AbortSignal.timeout(15000) });
-  if (!r.ok) throw new Error(`discovery failed: rarefriends.com HTTP ${r.status}`);
+  const r = await fetch(`https://rarefriends.com/api/protocol/state?address=${owner.toLowerCase()}`, { signal: AbortSignal.timeout(15000) }).catch(() => null);
+  if (!r?.ok) {
+    // rarefriends.com retired this endpoint on 2026-09-25 (HTTP 404). Discover from the chain
+    // instead: every Friend ever transferred TO the wallet, in both collections. readMember
+    // re-reads ownerOf, so a Friend since sold is reported as "not ours" rather than claimed.
+    console.log(`  discovery: rarefriends.com answered ${r ? `HTTP ${r.status}` : "nothing"}; scanning Transfer logs on chain instead`);
+    return membersFromChain(owner);
+  }
   const j = await r.json();
   const byName = { Genesis: ADDR.Genesis, Generations: ADDR.Generations };
   return (j.account?.friends ?? [])
     .filter((f) => byName[f.collection])
     .map((f) => ({ collection: byName[f.collection], tokenId: BigInt(f.id), owner }));
+}
+
+/** MEASURED: the protocol's deploy block (scripts/fetch-history.mjs); no Friend moved before it. */
+const PROTOCOL_DEPLOY_BLOCK = 62_624_268n;
+const TRANSFER = parseAbi(["event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"])[0];
+async function membersFromChain(owner) {
+  const head = await c.getBlockNumber();
+  const out = new Map();
+  for (const collection of [ADDR.Genesis, ADDR.Generations]) {
+    const logs = await scanLogs(c, { address: collection, event: TRANSFER, args: { to: owner }, fromBlock: PROTOCOL_DEPLOY_BLOCK, toBlock: head, chunk: 1_000_000n });
+    for (const l of logs) out.set(`${collection}:${l.args.tokenId}`, { collection, tokenId: l.args.tokenId, owner });
+  }
+  return [...out.values()];
 }
 
 function membersFromFile(path) {
@@ -519,6 +538,9 @@ if (!BANK) {
   if (ASSUME_ARMED) console.log("  REHEARSAL: --assume-armed set the three market gates as met. Never on a live chain.");
   console.log(`  ${explain(desk.regime)}`);
   for (const g of desk.regime.checks) console.log(`    ${g.status.padEnd(10)} ${g.label.padEnd(20)} ${g.detail}`);
+  // The standing sell order: what the ask slot does while the grid is off (lib/strategy.mjs standingOrder).
+  console.log(`  standing order [${desk.standing.mode}]: ${explainStanding(desk.standing, { mid: market.mid, twap: twapTick == null ? undefined : 1.0001 ** Number(twapTick) })}`);
+  if (!desk.standing.place && desk.standing.mode !== "grid") console.log(`    ${desk.standing.reason}${desk.standing.close ? ` -> ${desk.standing.closeWhy}` : ""}`);
   console.log(`  book ${desk.book.rf.toFixed(2)} RF + ${desk.book.weth.toFixed(6)} WETH = ${desk.book.valueWeth.toFixed(6)} WETH;` +
     ` spot tick ${spotTick}, TWAP ${twapTick ?? "not ready"}`);
   for (const n of desk.notes) console.log(`  . ${n}`);

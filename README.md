@@ -1,8 +1,11 @@
 # The First Bank of Friends
 
 **Sign up once, and the bank is built to harvest your Rare Friend's RF and WETH rewards into
-your own safe deposit box for good.** The bank's desk only ever rests maker orders in the $RAREFRIENDS pool,
-so it never pays the 5% toll, and it never touches anyone else's money.
+your own safe deposit box for good.** RF in your box is a standing sell order: the bank rests it
+above the market as a range order in the $RAREFRIENDS pool, never swaps, so never pays the 5% toll,
+and every buyer who takes it pays 5% to every Friend. It never touches anyone else's money.
+The economy is written up in [docs/TOKENOMICS.md](docs/TOKENOMICS.md); the evidence is generated
+by `npm run economy` into [docs/EVIDENCE.md](docs/EVIDENCE.md).
 
 - **Play:** <https://bank-of-friends-nu.vercel.app> (no wallet, no install). Walk into the hall:
   the Desk opens an account, the Trading Floor shows the desk's live decision, the Vault is a
@@ -20,8 +23,11 @@ so it never pays the 5% toll, and it never touches anyone else's money.
    nothing from the buyer.
 3. **Accounts in kind:** every holder owns exact RF and exact WETH, plus units in any open
    desk order they funded. No shares, no NAV, no price in the accounting.
-4. **Maker-only desk:** off until an objective rule arms it; single-sided Uniswap v4 range
-   orders, loss-locked on chain, bounded by a time-weighted price, never a swap.
+4. **Maker-only desk, two programmes:** the **standing sell order** rests members' RF above the
+   market whenever it is worth its gas (moving to a take-profit range in a rally), and the
+   **two-sided grid** adds bids only when an objective rule says the market is two-way. Both are
+   single-sided Uniswap v4 range orders, loss-locked on chain, bounded by a time-weighted price,
+   never a swap.
 5. **Exit:** withdraw RF, WETH or both at any time, with no owner check, even with the desk
    halted and the protocol's rewards switched off.
 6. **Keeper:** `npm run keeper` plans the weekly `allocate()` so rewards keep streaming for
@@ -43,7 +49,7 @@ contracts/   FriendBank (ledger), RangeDesk (maker desk), PoolObserver (TWAP). N
              can prove each exploit against it
 lib/         protocol reader and the strategy module, shared by everything
 scripts/     verification, keeper, backtests, parameter derivation, UI harnesses
-docs/        economics, backtests, strategy results
+docs/        TOKENOMICS (the economy), EVIDENCE (generated), economics, backtests, strategy
 game/        the abandoned FriendSDK build, frozen for reference (it cannot admit a Genesis)
 ```
 
@@ -60,6 +66,7 @@ npm install
 npm run verify           # facts about the protocol, asserted against live chain state
 npm run keeper -- --wallet 0xYOU    # dry run: what the keeper would allocate and claim
 npm run test:desk        # the desk planner against the contract's placement rules
+npm run economy          # the standing order vs the taker route: real tape, 16 other pools, synthetic
 npm run derive           # every parameter, labelled MEASURED / DERIVED / CHOICE
 npm run history          # pull every swap in the pool's history
 npm run backtest:gated   # the desk against the whole tape, gated and ungated
@@ -95,8 +102,9 @@ the chain, so it stays fully measured without a redeploy.
 
 ## Status and honesty
 
-- The desk **has never traded**. On the real tape it would have stayed off for the pool's
-  whole life, and the same ladder without its arming rule would have lost 10.11% of the book.
+- The desk **has never traded on chain** (nothing is deployed). Replayed on the real tape, the
+  two-sided grid stays off for the pool's whole life (ungated it would have lost about 10% of the
+  book), and the standing sell order fills above the market, see `docs/EVIDENCE.md`.
 - The bank's income depends on one externally owned key that owns every Rare Friends contract.
   The keeper alarms if the 5% fee is re-pointed or the rewards contract is retired; the bank
   cannot prevent either.

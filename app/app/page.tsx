@@ -1,4 +1,5 @@
 import HallShell from "@/components/HallShell";
+import { assembleState } from "@/lib/upstream";
 
 /**
  * The front door IS the hall.
@@ -17,12 +18,9 @@ const SHOWCASE = "0x913105f2d2bfb8392f7845ef79e0c2c62f2755df";
 /** The showcase Friend AND the prices, from one read. */
 async function showcase() {
   try {
-    const r = await fetch(`https://rarefriends.com/api/protocol/state?address=${SHOWCASE}`, {
-      next: { revalidate: 300 },
-      signal: AbortSignal.timeout(12_000),
-    });
-    if (!r.ok) return null;
-    const j = await r.json();
+    // rarefriends.com retired its state route on 2026-09-25; lib/upstream.ts assembles the same shape from
+    // their snapshot and owned-nfts routes plus chain reads.
+    const j = await assembleState(SHOWCASE, 20_000);
     const prices = {
       rfUsd: Number(j?.protocol?.prices?.rfUsd ?? 0),
       ethUsd: Number(j?.protocol?.prices?.ethUsd ?? 0),

@@ -1,8 +1,9 @@
 import { parseAbi } from "viem";
 import { ADDR, ABI, client, readPool, readPosition, scanLogs, blocksPerDay, FULL_RANGE, POOL_ID, ethUsd as readEthUsd } from "@/lib/protocol.mjs";
-import { DEFAULT_GATES, evaluateRegime, measurePath, explain, makerEdgePerRoundTrip } from "@/lib/strategy.mjs";
+import { DEFAULT_GATES, evaluateRegime, measurePath, explain, makerEdgePerRoundTrip, standingOrder, explainStanding, STANDING } from "@/lib/strategy.mjs";
 import { getSeries } from "@/lib/price-series";
 import * as protocol from "@/lib/protocol.mjs";
+import { assembleState } from "@/lib/upstream";
 
 export type Gate = { gate: string; ok: boolean; status: "met" | "blocking" | "unmeasured"; label: string; detail: string };
 export type Friend = {
@@ -17,15 +18,35 @@ export type Desk = {
   /** The arming rule in one line, for the hall's Trading Floor. */
   rule: string;
   ethUsdSource: string;
-  state: "off" | "armed" | "halted";
+  state: "off" | "armed" | "halted" | "standing";
   headline: string;
+  /**
+   * The standing sell order: what the ONE ask slot holds while the two-sided grid is off.
+   * Computed by lib/strategy.mjs standingOrder from the same market read as the gates, on the
+   * founding member's idle RF (the demo book). mode "grid" when the grid is armed.
+   */
+  standing: {
+    mode: "grid" | "edge" | "takeProfit" | "idle";
+    reason: string;
+    headline: string;
+    /** The range the keeper would rest right now, in WETH per RF, and how far above mid its lower edge sits. */
+    ask: { lo: number; hi: number; frac: number; aboveMidPct: number } | null;
+    /** DERIVED per unit sold: the range's average fill against the taker route (0.95 x mid). */
+    edgeVsTakerPct: number | null;
+    /** Which book the order was computed on: the founding member's idle RF, or, when that is under the programme's floor, one Genesis's share of this week's RF stream. */
+    book: { label: string; rf: number; usd: number };
+    /** The RF the order would rest, in USD, and the 5% the taker who fills it would pay to every Friend. */
+    restingUsd: number | null;
+    feeToFriendsIfFilledUsd: number | null;
+    params: { minBookUsd: number; widthSpacings: number; frac: number; chase: number; brakeDrift24h: number; takeProfitLo: number; takeProfitHi: number };
+  };
   gates: Gate[];
   thresholds: Record<string, number>;
   grid: { step: number; rungs: number; lockBps: number; makerEdge: number };
   market: {
     mid: number; rfUsd: number; ethUsd: number; volume24hWeth: number; trades24h: number;
     drift1h: number | null; drift24h: number | null; drift72h: number | null; drift7d: number | null;
-    hourlyVol: number | null; reversals72h: number | null; walkForward7d: number | null; historyHours: number;
+    hourlyVol: number | null; reversals72h: number | null; walkForward7d: number | null; high72h: number | null; historyHours: number;
     /** How far the self-extending hourly history reaches, and where its tip came from. */
     historyTo: string; historySource: string;
   };
@@ -106,11 +127,9 @@ async function ethUsd(): Promise<{ usd: number; source: string }> {
 /** Discovery only. Every value below is read from chain. */
 async function founderFriends(): Promise<Friend[]> {
   try {
-    const r = await fetch(`https://rarefriends.com/api/protocol/state?address=${FOUNDER.toLowerCase()}`, {
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!r.ok) return [];
-    const j = await r.json();
+    // rarefriends.com retired its state route on 2026-09-25; lib/upstream.ts assembles the same shape.
+    // Without portraits: the docs page draws its own tiles from `image` only when present.
+    const j = await assembleState(FOUNDER, 12_000, true);
     return (j.account?.friends ?? []).map((f: any) => ({
       id: String(f.id),
       collection: f.collection as string,
@@ -308,6 +327,7 @@ async function build(): Promise<Desk> {
     hourlyVol: measured.hourlyVol,
     reversals72h: measured.reversals72h,
     walkForward7d: measured.walkForward7d,
+    high72h: measured.high72h,
     historyHours: measured.historyHours,
     historyTo: new Date(HISTORY.lastTs * 1000).toISOString(),
     historySource: HISTORY.source,
@@ -320,6 +340,7 @@ async function build(): Promise<Desk> {
   const book = { rf: idleRf, weth: idleWeth, valueWeth: bookValueWeth, hwmWeth: bookValueWeth, halted: false };
 
   const regime = evaluateRegime(marketState, book, DEFAULT_GATES);
+
 
   const [sWeth, sRf, totalWeightRaw, hookRewards, marketPos, perGenesis, depositFee, convEnabled, ...positions] = await readsP;
 
@@ -366,6 +387,39 @@ async function build(): Promise<Desk> {
   const s = totalWeight > 0 ? memberWeight / totalWeight : 0;
   const volumeLoop = { memberWeight, memberShare: s, costPerWethRoundTrip: 0.0975 * (1 - s), inducedMultiple: s > 0 ? (1.95 * (1 - s)) / s : null };
 
+  // The standing sell order on the same read: the ask the keeper would rest right now while the
+  // grid is off. Pure, price space; the keeper translates it to ticks. Computed on the founding
+  // member's idle RF; when that book is under the programme's floor (a claim has just emptied it,
+  // or the stream is small) it is computed instead on one Genesis's share of this week's RF stream,
+  // and the API says which book it used. Either way the numbers are live, never typed in.
+  const soState = { gridArmed: regime.armed, ask: undefined, now: headTimestamp };
+  let soBook = { label: "the founding member's idle RF", rf: idleRf, usd: idleRf * pool.wethPerRf * price };
+  let so = standingOrder(marketState, book, soState, DEFAULT_GATES);
+  if (so.mode === "idle") {
+    const genesisRf = e18(sRf[1]) * 604_800 * (totalWeight > 0 ? GENESIS_WEIGHT / totalWeight : 0);
+    const ref = { rf: genesisRf, weth: 0, valueWeth: genesisRf * pool.wethPerRf, hwmWeth: genesisRf * pool.wethPerRf, halted: false };
+    const alt = standingOrder(marketState, ref, soState, DEFAULT_GATES);
+    if (alt.mode !== "idle") { so = alt; soBook = { label: "one Genesis's share of this week's RF stream", rf: genesisRf, usd: genesisRf * pool.wethPerRf * price }; }
+  }
+  const soAsk = so.place
+    ? { lo: so.place.lo, hi: so.place.hi, frac: so.place.frac, aboveMidPct: (so.place.lo / pool.wethPerRf - 1) * 100 }
+    : null;
+  const soAvg = soAsk ? Math.sqrt(soAsk.lo * soAsk.hi) : null;
+  const standing: Desk["standing"] = {
+    mode: so.mode,
+    reason: so.reason,
+    headline: explainStanding(so),
+    ask: soAsk,
+    edgeVsTakerPct: soAvg ? (soAvg / (0.95 * pool.wethPerRf) - 1) * 100 : null,
+    book: soBook,
+    restingUsd: soAsk ? soBook.rf * soAsk.frac * pool.wethPerRf * price : null,
+    feeToFriendsIfFilledUsd: soAsk && soAvg ? soBook.rf * soAsk.frac * soAvg * 0.05 * price : null,
+    params: {
+      minBookUsd: STANDING.minBookUsd, widthSpacings: STANDING.widthSpacings, frac: STANDING.frac, chase: STANDING.chase,
+      brakeDrift24h: STANDING.brakeDrift24h, takeProfitLo: STANDING.takeProfitLo, takeProfitHi: STANDING.takeProfitHi,
+    },
+  };
+
   const thirdPartyLiquidity = (pool.liquidity - marketPos).toString();
 
   const [bk, idle] = await Promise.all([bankP, idleP]) as [any, any];
@@ -391,8 +445,9 @@ async function build(): Promise<Desk> {
     asOf: new Date().toISOString(),
     block: head.toString(),
     armed: regime.armed,
-    state: book.halted ? "halted" : regime.armed ? "armed" : "off",
-    headline: headline(regime, marketState),
+    state: book.halted ? "halted" : regime.armed ? "armed" : standing.mode === "edge" || standing.mode === "takeProfit" ? "standing" : "off",
+    headline: headline(regime, marketState, standing.headline),
+    standing,
     rule: `arms only when the market has made ${DEFAULT_GATES.minReversals72h} swings of ${DEFAULT_GATES.gridStep * 100}% in 72 hours, has trended less than ${DEFAULT_GATES.maxDrift72hSteps * DEFAULT_GATES.gridStep * 100}% over them, and the same grid would have beaten holding over the last 7 days`,
     ethUsdSource: eth.source,
     gates: regime.checks,
@@ -420,8 +475,13 @@ async function build(): Promise<Desk> {
 }
 
 /** The desk's state in one sentence a member can read. */
-function headline(regime: ReturnType<typeof evaluateRegime>, m: { historyHours: number }) {
+function headline(regime: ReturnType<typeof evaluateRegime>, m: { historyHours: number }, standingLine: string) {
   if (regime.armed) return "The desk is quoting both sides with range orders. It never pays the 5% toll; every taker who crosses it pays 5% to every Friend.";
+  return `${standingLine} ${gridLine(regime, m)}`;
+}
+
+/** Why the two-sided grid is off, in one sentence. */
+function gridLine(regime: ReturnType<typeof evaluateRegime>, m: { historyHours: number }) {
   const by = Object.fromEntries(regime.checks.map((c: any) => [c.gate, c]));
   const why: string[] = [];
   if (by.reversals72h?.status === "blocking") why.push(`the market has swung back ${by.reversals72h.detail.split(" ")[0]} times in 72 hours and the desk needs ${DEFAULT_GATES.minReversals72h}`);
@@ -429,7 +489,7 @@ function headline(regime: ReturnType<typeof evaluateRegime>, m: { historyHours: 
   if (by.walkForward7d?.status === "blocking") why.push("replaying the grid on the last week loses to holding");
   for (const k of ["inventory", "drawdown", "breaker"]) if (by[k]?.status === "blocking") why.push(`${by[k].label}: ${by[k].detail}`);
   const unmeasured = regime.checks.filter((c: any) => c.status === "unmeasured").map((c: any) => c.label);
-  let s = why.length ? `The desk is off: ${why.join("; ")}.` : "The desk is off.";
+  let s = why.length ? `The two-sided grid waits: ${why.join("; ")}.` : "The two-sided grid waits.";
   if (unmeasured.length) s += ` Not yet measurable: ${unmeasured.join(", ")} (${(m.historyHours / 24).toFixed(1)} days of price history so far).`;
   return s;
 }

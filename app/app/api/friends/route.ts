@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assembleState } from "@/lib/upstream";
 
 /**
  * Every Friend in a wallet, WITH its on-chain artwork, and what each one is allowed
@@ -67,15 +68,11 @@ export async function GET(req: Request) {
 
   let state: any;
   try {
-    // NEVER send an Origin header and NEVER add a query key other than `address`:
-    // their route 403s on a mismatched Origin and throws on any extra key.
-    const r = await fetch(`https://rarefriends.com/api/protocol/state?address=${address}`, {
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!r.ok) return json({ error: `rarefriends.com answered ${r.status}. Try again shortly.` }, 502);
-    state = await r.json();
-  } catch {
-    return json({ error: "rarefriends.com did not answer. Try again in a minute." }, 502);
+    // rarefriends.com retired its state route on 2026-09-25; lib/upstream.ts assembles the same shape from
+    // their snapshot and owned-nfts routes plus chain reads.
+    state = await assembleState(address, 16_000);
+  } catch (e) {
+    return json({ error: `The Friend read failed (${String((e as Error)?.message ?? e).slice(0, 120)}). Try again in a minute.` }, 502);
   }
 
   const all = Array.isArray(state?.account?.friends) ? state.account.friends : [];

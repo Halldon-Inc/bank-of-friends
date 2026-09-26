@@ -24,7 +24,8 @@
     "play:hall": "node scripts/hall-play.mjs",
     "keeper": "node scripts/keeper.mjs",
     "test:desk": "node --test scripts/desk-plan.test.mjs",
-    "rehearse:desk": "node scripts/rehearse-desk.mjs"
+    "rehearse:desk": "node scripts/rehearse-desk.mjs",
+    "economy": "node scripts/economy.mjs"
   },
   "dependencies": {
     "viem": "2.56.6"

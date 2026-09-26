@@ -347,8 +347,143 @@ export function measurePath(hourly, gates = DEFAULT_GATES, ticks = null) {
     hourlyVol: back(24) ? realisedVol(back(24)) : null,
     reversals72h: ticks ? countReversals(ticks, gates.gridStep) : (w72 ? countReversals(w72, gates.gridStep) : null),
     walkForward7d: w7d ? replayGrid(w7d, gates).vsHold : null,
+    // The 72h high feeds the standing order's trend brake (a new high means "do not sell at the edge").
+    high72h: ticks ? Math.max(...ticks) : (w72 ? Math.max(...w72) : null),
     historyHours: Math.max(0, n - 1),
   };
+}
+
+/* ============================================================ the standing sell order */
+
+/**
+ * The standing sell order: what the ONE ask slot holds when the two-sided grid is off.
+ * Harvested RF is offered as a MAKER just above the market instead of sold as a taker.
+ * Measured on the real tape (bank-of-friends-notes/2026-09-23/mm-research.md): a one to
+ * two tick-spacing ask past the TWAP edge filled at a median 1.018x to 1.022x the spot at
+ * placement, where a taker receives at most 0.95x, about +7% per RF sold. Keeper-only,
+ * no contract change: the contract already allows any ask that is beyond spot, beyond the
+ * TWAP edge and above the cost of RF the desk BOUGHT (harvested RF has no basis).
+ */
+export const STANDING = Object.freeze({
+  minBookUsd: 50,        // CHOICE: below this gas eats the edge (the $100/day stream lost 0.3% to gas over 72h)
+  widthSpacings: 2,      // 1.2%: MEASURED best fill premium in the sweep (w 0.6% to 1.2%; 2% worst everywhere)
+  frac: 0.15,            // contract max per placement
+  chase: 0.02,           // MEASURED: chase 2% best or tied; 4% often never filled
+  brakeDrift24h: 0.10,   // CHOICE: trend brake, UNMEASURED on real data (no rally in the tape)
+  releaseDrift24h: 0.03, // CHOICE
+  takeProfitLo: 1.10,    // CHOICE: take-profit range [TWAP x 1.10, TWAP x 2.0]
+  takeProfitHi: 2.0,
+  requoteSeconds: 3600,  // at most one re-quote an hour
+});
+
+/** The live inputs the standing order reads. app/lib/desk.ts must supply every one. */
+export const STANDING_INPUTS = Object.freeze(["market.mid", "market.ethUsd", "market.drift24h", "market.high72h", "book.rf", "book.valueWeth"]);
+
+/**
+ * PURE. Price space (WETH per RF), snapped to the tick grid against the bank.
+ *
+ *   market: { mid, twap?, ethUsd, drift24h, high72h }
+ *   book:   { rf (IDLE RF, the amount an ask can be sized from), weth, valueWeth, avgCost? }
+ *   state:  { gridArmed, ask?: { lo, hi, openedAt, mode? }, now }
+ *
+ * Returns { mode: "grid" | "edge" | "takeProfit" | "idle", reason, place?: { lo, hi, frac }, close?: true, closeWhy? }
+ *
+ *   grid        the two-sided grid is armed and owns both slots; nothing here
+ *   edge        rest STANDING.frac of idle RF one spacing past the TWAP edge, widthSpacings wide;
+ *               close and re-place ("chase") once the market has walked more than `chase` away,
+ *               at most once an hour
+ *   takeProfit  the brake fired (24h drift over brakeDrift24h, or a new 72h high): an edge ask
+ *               would sell into a rally, so the slot holds a wide range [TWAP x 1.10, TWAP x 2.0]
+ *               instead; it is realised once half crossed, and released once the 24h drift is
+ *               back under releaseDrift24h
+ *   idle        the idle RF is worth less than minBookUsd, so an order is not worth its gas
+ *
+ * A brake input that is missing (drift24h or high72h null) is UNMEASURED: the edge programme
+ * runs, because selling at the edge is the measured default and the brake is only insurance.
+ * The contract stores no mode for an open ask, so when `state.ask.mode` is absent it is
+ * inferred: an ask whose lower edge is at or above TWAP x takeProfitLo (less 1%) is take-profit.
+ *
+ * @param {{ mid: number, twap?: number, ethUsd: number | null, drift24h: number | null, high72h: number | null }} market
+ * @param {{ rf: number, weth: number, valueWeth: number, avgCost?: number }} book
+ * @param {{ gridArmed?: boolean, now?: number, ask?: { lo: number, hi: number, openedAt: number, mode?: "edge" | "takeProfit" } | null }} [state]
+ * @param {typeof DEFAULT_GATES} [gates]
+ * @returns {{ mode: "grid" | "edge" | "takeProfit" | "idle", reason: string, place?: { lo: number, hi: number, frac: number }, close?: true, closeWhy?: string }}
+ */
+export function standingOrder(market, book, state = {}, gates = DEFAULT_GATES) {
+  const P = STANDING, S = gates.tickSpacing, lock = gates.lockBps / 10_000;
+  if (state.gridArmed) return { mode: "grid", reason: "the two-sided grid is armed and owns both slots" };
+  const mid = market.mid, twap = market.twap ?? mid;
+  const ask = state.ask ?? null;
+  const now = state.now ?? 0;
+  const pct = (v) => `${(v * 100).toFixed(1)}%`;
+  const brakeMeasured = market.drift24h != null && market.high72h != null;
+  const atHigh = market.high72h != null && market.high72h > 0 && mid >= market.high72h;
+  const braked = (market.drift24h != null && market.drift24h > P.brakeDrift24h) || atHigh;
+  const released = market.drift24h != null && market.drift24h < P.releaseDrift24h && !atHigh;
+  const askMode = ask ? (ask.mode ?? (ask.lo >= twap * P.takeProfitLo * 0.99 ? "takeProfit" : "edge")) : null;
+  const edgeMul = 1.0001 ** gates.twapEdgeTicks, spacingMul = 1.0001 ** S;
+  // The loss-lock on RF the desk BOUGHT; harvested RF has no basis and is never locked.
+  const lockLo = book.avgCost > 0 ? snapPrice(book.avgCost * (1 + lock), S, "up") : 0;
+  const bookUsd = book.rf * mid * (market.ethUsd ?? 0);
+
+  /* an open take-profit ask: ratchet, release, or keep */
+  if (ask && askMode === "takeProfit") {
+    if (mid >= Math.sqrt(ask.lo * ask.hi)) {
+      return { mode: "takeProfit", reason: "the rally crossed half the take-profit range", close: true, closeWhy: "half crossed: realise and re-place" };
+    }
+    if (released) {
+      return { mode: "edge", reason: `the 24h drift is back to ${pct(market.drift24h)}, under ${pct(P.releaseDrift24h)}`, close: true, closeWhy: "rally over, back to the edge" };
+    }
+    return { mode: "takeProfit", reason: `a take-profit ask is resting from ${pct(ask.lo / twap - 1)} to ${pct(ask.hi / twap - 1)} above the time-weighted price` };
+  }
+
+  /* the brake: an edge ask must not sell into a rally */
+  if (braked) {
+    if (ask) return { mode: "takeProfit", reason: "rally: the edge ask would sell into it", close: true, closeWhy: "rally: switching the slot to a take-profit ask" };
+    if (market.ethUsd == null) return { mode: "idle", reason: "no live ETH/USD, so the size floor cannot be checked" };
+    if (bookUsd < P.minBookUsd) return { mode: "idle", reason: `the idle RF is worth $${bookUsd.toFixed(2)}, under the $${P.minBookUsd} floor, so an order is not worth its gas` };
+    const lo = Math.max(snapPrice(Math.max(twap * P.takeProfitLo, mid * edgeMul * spacingMul), S, "up"), lockLo);
+    const hi = Math.max(snapPrice(twap * P.takeProfitHi, S, "up"), lo * spacingMul);
+    const why = atHigh ? "the price is at a new 72h high" : `the 24h drift is ${pct(market.drift24h)}, over ${pct(P.brakeDrift24h)}`;
+    return { mode: "takeProfit", reason: `rally (${why}): a take-profit ask instead of selling at the edge`, place: { lo, hi, frac: P.frac } };
+  }
+
+  /* the edge programme */
+  const edgePrice = Math.max(mid, twap) * edgeMul;
+  const loNow = Math.max(snapPrice(edgePrice, S, "up") * spacingMul, lockLo);
+  const hiNow = loNow * 1.0001 ** (P.widthSpacings * S);
+  const brakeNote = brakeMeasured ? "" : " (the trend brake is not yet measurable, so the edge programme runs by default)";
+  if (ask) {
+    const age = now - ask.openedAt;
+    if (age < P.requoteSeconds) return { mode: "edge", reason: `the edge ask was placed ${(age / 60).toFixed(0)} minutes ago; at most one re-quote an hour${brakeNote}` };
+    if (ask.lo > loNow * (1 + P.chase)) {
+      return { mode: "edge", reason: `the ask sits ${pct(ask.lo / loNow - 1)} above where the edge is now, beyond the ${pct(P.chase)} chase`, close: true, closeWhy: "chase: the market walked away" };
+    }
+    return { mode: "edge", reason: `the edge ask is resting ${pct(ask.lo / mid - 1)} above the market${brakeNote}` };
+  }
+  if (market.ethUsd == null) return { mode: "idle", reason: "no live ETH/USD, so the size floor cannot be checked" };
+  if (bookUsd < P.minBookUsd) return { mode: "idle", reason: `the idle RF is worth $${bookUsd.toFixed(2)}, under the $${P.minBookUsd} floor, so an order is not worth its gas` };
+  return {
+    mode: "edge",
+    reason: `resting ${pct(P.frac)} of the idle RF from ${pct(loNow / mid - 1)} to ${pct(hiNow / mid - 1)} above the market${lockLo > 0 && loNow === lockLo ? ", held up by the loss-lock on bought RF" : ""}${brakeNote}`,
+    place: { lo: loNow, hi: hiNow, frac: P.frac },
+  };
+}
+
+/** One sentence for the logs, the dashboard and the hall. */
+export function explainStanding(order, market = null) {
+  const pct = (v) => `${(v * 100).toFixed(1)}%`;
+  switch (order?.mode) {
+    case "grid": return "The two-sided grid is armed and holds both slots.";
+    case "idle": return `Idle: ${order.reason}.`;
+    case "takeProfit":
+      if (order.place && market?.mid) return `Rally: a take-profit ask rests from ${pct(order.place.lo / (market.twap ?? market.mid) - 1)} to ${pct(order.place.hi / (market.twap ?? market.mid) - 1)} above the time-weighted price.`;
+      return `Rally: ${order.reason}${order.close ? ` (${order.closeWhy})` : ""}.`;
+    case "edge":
+      if (order.place && market?.mid) return `Resting ${pct(order.place.frac)} of the bank's RF for sale ${pct(order.place.lo / market.mid - 1)} above the market; the buyer who takes it pays 5% to every Friend.`;
+      return `Standing order: ${order.reason}${order.close ? ` (${order.closeWhy})` : ""}.`;
+    default: return "No standing order.";
+  }
 }
 
 /**

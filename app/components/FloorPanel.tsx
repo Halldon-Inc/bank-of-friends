@@ -16,10 +16,27 @@ import type { ApiBank, ApiIdle } from "./VaultHolds";
 
 export type LiveGate = { gate: string; ok: boolean; detail: string; label?: string; status?: "met" | "blocking" | "unmeasured" };
 /** The fields of /api/desk the hall reads. Everything else there belongs to /docs. */
+export type LiveStanding = {
+  mode: "grid" | "edge" | "takeProfit" | "idle";
+  reason: string;
+  headline: string;
+  ask: { lo: number; hi: number; frac: number; aboveMidPct: number } | null;
+  edgeVsTakerPct: number | null;
+  book?: { label: string; rf: number; usd: number };
+  restingUsd: number | null;
+  feeToFriendsIfFilledUsd: number | null;
+};
+/** The word on the board: the grid when it is armed, else the standing order, else off. */
+export function floorWord(armed: boolean, standing?: LiveStanding | null) {
+  if (armed) return "DESK ON";
+  if (standing?.mode === "edge" || standing?.mode === "takeProfit") return "STANDING ORDER";
+  return "DESK OFF";
+}
 export type LiveDesk = {
   asOf: string;
   armed: boolean;
   headline?: string;
+  standing?: LiveStanding | null;
   gates: LiveGate[];
   thresholds?: { gridStep?: number; minReversals72h?: number; maxDrift72hSteps?: number };
   grid?: { step?: number; makerEdge?: number };
@@ -123,6 +140,8 @@ export default function FloorPanel({ live, error, bookRf, bookWeth, onBack }: { 
   }, [week, bookRf, bookWeth]);
 
   const blocking = live ? live.gates.filter((g) => !g.ok && !isPending(g)).length : 0;
+  const standingOn = !!live && !live.armed && (live.standing?.mode === "edge" || live.standing?.mode === "takeProfit");
+  const word = live ? floorWord(live.armed, live.standing) : "";
   const t = live?.thresholds, step = t?.gridStep ?? live?.grid?.step;
   const rule = t && step
     ? `The desk arms only when the price has swung ${Math.round(step * 100)}% and back at least ${t.minReversals72h} times in 72 hours, has trended less than ${Math.round((t.maxDrift72hSteps ?? 0) * step * 100)}%, and replaying last week would have paid.`
@@ -141,24 +160,32 @@ export default function FloorPanel({ live, error, bookRf, bookWeth, onBack }: { 
 
       {live && (
         <>
-          <div className={`floor-board${live.armed ? " armed" : ""}`}>
+          <div className={`floor-board${live.armed ? " armed" : ""}${standingOn ? " standing" : ""}`}>
             <p className="floor-mode">maker-only range orders</p>
-            <p className="floor-word">{live.armed ? "DESK ON" : "DESK OFF"}</p>
+            <p className="floor-word">{word}</p>
             <p className="hall-because">
-              {live.armed ? "The rule is met. A deployed desk would be quoting now." : plainReason(live.gates)}
+              {live.armed ? "The rule is met. A deployed desk would be quoting both sides now." : standingOn ? live.standing!.headline : plainReason(live.gates)}
             </p>
           </div>
+          {standingOn && live.standing?.ask && (
+            <dl className="floor-order">
+              <div><dt>resting</dt><dd>{Math.round(live.standing.ask.frac * 100)}% of {live.standing.book?.label ?? "the RF book"}{live.standing.restingUsd != null ? ` ($${live.standing.restingUsd.toFixed(2)})` : ""}</dd></div>
+              <div><dt>from</dt><dd>{live.standing.ask.aboveMidPct.toFixed(1)}% above the market{live.standing.mode === "takeProfit" ? ", a take-profit range" : ""}</dd></div>
+              {live.standing.edgeVsTakerPct != null && <div><dt>vs selling as a taker</dt><dd>+{live.standing.edgeVsTakerPct.toFixed(1)}% per RF</dd></div>}
+              {live.standing.feeToFriendsIfFilledUsd != null && <div><dt>if it fills</dt><dd>the buyer pays ${live.standing.feeToFriendsIfFilledUsd.toFixed(2)} to every Friend</dd></div>}
+            </dl>
+          )}
           <p className="acct-intro">
-            By default the Bank only holds. When the desk is on, it rests maker orders on the RF/WETH
-            pool: it never swaps and pays no 5% toll, and your RF or WETH takes part pro rata. Takers
-            who trade against it still pay the pool&rsquo;s 5%, which goes to every activated Friend.
+            {standingOn
+              ? <>RF in your box is a standing sell order: the bank rests it above the market as a range order and never swaps, so it pays no 5% toll. The buyer who takes it pays the pool&rsquo;s 5% to every activated Friend. To keep your RF, set its cap to 0 or withdraw it; it stays in your Friend&rsquo;s wallet.</>
+              : <>By default the Bank only holds. When the desk is on, it rests maker orders on the RF/WETH pool: it never swaps and pays no 5% toll, and your RF or WETH takes part pro rata. Takers who trade against it still pay the pool&rsquo;s 5%, which goes to every activated Friend.</>}
           </p>
           <p className="hall-small" style={{ margin: "0 0 6px" }}>
-            {rule} Read at {new Date(live.asOf).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+            {standingOn ? "The two-sided grid (bids too) waits for a two-way market. " : ""}{rule} Read at {new Date(live.asOf).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
             {live.armed ? "." : `: ${blocking} ${blocking === 1 ? "condition" : "conditions"} not met.`}
           </p>
           <button type="button" className="hall-why" onClick={() => setShowGates((v) => !v)} aria-expanded={showGates}>
-            {showGates ? "hide the conditions" : "show the conditions"}
+            {showGates ? "hide the grid's conditions" : "show the grid's conditions"}
           </button>
           {showGates && <Gates gates={live.gates} />}
         </>

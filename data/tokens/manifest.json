@@ -1,0 +1,138 @@
+{
+  "source": "GeckoTerminal hourly OHLCV, fetched 2026-09-23/24; fee types verified from Raydium configs, the StonkFun API and the Robinhood v4 hooks (see bank-of-friends-notes/2026-09-23/tax-tokens/discovery)",
+  "tokens": [
+    {
+      "label": "DRILL",
+      "chain": "robinhood",
+      "type": "A",
+      "fee": 0.053,
+      "bars": 356
+    },
+    {
+      "label": "COPPERINU",
+      "chain": "robinhood",
+      "type": "A",
+      "fee": 0.05,
+      "bars": 572
+    },
+    {
+      "label": "UNIPCS",
+      "chain": "robinhood",
+      "type": "A",
+      "fee": 0.05,
+      "bars": 438
+    },
+    {
+      "label": "AA",
+      "chain": "robinhood",
+      "type": "A",
+      "fee": 0.04,
+      "bars": 480
+    },
+    {
+      "label": "DUST",
+      "chain": "robinhood",
+      "type": "A",
+      "fee": 0.04,
+      "bars": 485
+    },
+    {
+      "label": "MOO",
+      "chain": "robinhood",
+      "type": "A",
+      "fee": 0.04,
+      "bars": 341
+    },
+    {
+      "label": "MAST",
+      "chain": "robinhood",
+      "type": "A",
+      "fee": 0.04,
+      "bars": 491
+    },
+    {
+      "label": "Index",
+      "chain": "robinhood",
+      "type": "A",
+      "fee": 0.0397,
+      "bars": 1954
+    },
+    {
+      "label": "BUTTHOLE",
+      "chain": "solana",
+      "type": "A",
+      "fee": 0.04,
+      "bars": 1130
+    },
+    {
+      "label": "MANLET",
+      "chain": "solana",
+      "type": "A",
+      "fee": 0.04,
+      "bars": 1102
+    },
+    {
+      "label": "FRIES",
+      "chain": "solana",
+      "type": "A",
+      "fee": 0.04,
+      "bars": 1109
+    },
+    {
+      "label": "REDACTED",
+      "chain": "solana",
+      "type": "A",
+      "fee": 0.04,
+      "bars": 1039
+    },
+    {
+      "label": "CLANKER",
+      "chain": "solana",
+      "type": "A",
+      "fee": 0.04,
+      "bars": 1137
+    },
+    {
+      "label": "UBI",
+      "chain": "solana",
+      "type": "A",
+      "fee": 0.04,
+      "bars": 962
+    },
+    {
+      "label": "USWR",
+      "chain": "solana",
+      "type": "A",
+      "fee": 0.04,
+      "bars": 2981
+    },
+    {
+      "label": "DOGE-1",
+      "chain": "solana",
+      "type": "A",
+      "fee": 0.04,
+      "bars": 2877
+    },
+    {
+      "label": "ZCAT",
+      "chain": "solana",
+      "type": "B",
+      "fee": 0.04,
+      "bars": 579
+    },
+    {
+      "label": "PURR",
+      "chain": "solana",
+      "type": "B",
+      "fee": 0.04,
+      "bars": 807
+    },
+    {
+      "label": "RAYCAT",
+      "chain": "solana",
+      "type": "B",
+      "fee": 0.04,
+      "bars": 990
+    }
+  ]
+}

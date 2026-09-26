@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#111"/>
+    </marker>
+    <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#111" stroke-width="1.2"/>
+    </pattern>
+  </defs>
+  <rect width="1400" height="820" fill="#eeeeee"/>
+
+  <!-- title -->
+  <text x="40" y="52" font-size="26" fill="#111" letter-spacing="1">THE FIRST BANK OF FRIENDS &#183; the economy in one picture</text>
+  <text x="40" y="78" font-size="13" fill="#555">Every arrow is a measured mechanism of the live Rare Friends protocol (Robinhood Chain 4663). Nothing here is deployed; the contract is written and tested.</text>
+
+  <!-- 1. protocol pays -->
+  <g transform="translate(40,110)">
+    <rect x="0" y="0" width="400" height="118" fill="#eee" stroke="#111" stroke-width="2"/>
+    <rect x="5" y="5" width="400" height="118" fill="none" stroke="#111" stroke-width="2" opacity="0.15"/>
+    <text x="16" y="28" font-size="12" fill="#555" letter-spacing="2">1  EVERY WEEK THE PROTOCOL PAYS EACH FRIEND</text>
+    <text x="16" y="58" font-size="14" fill="#111">RF    from activations, hardwires, Reserve fees</text>
+    <text x="16" y="84" font-size="14" fill="#111">WETH  5% of every swap in the RF pool</text>
+    <text x="16" y="106" font-size="11" fill="#555">(a claim pays the Friend's own wallet; claimed at 20x the gas)</text>
+  </g>
+
+  <!-- 2. your box -->
+  <g transform="translate(40,272)">
+    <rect x="0" y="0" width="400" height="190" fill="#eee" stroke="#111" stroke-width="2"/>
+    <text x="16" y="28" font-size="12" fill="#555" letter-spacing="2">2  YOUR SAFE DEPOSIT BOX</text>
+    <text x="16" y="54" font-size="15" fill="#111">exact RF + exact WETH. No shares, no NAV.</text>
+    <text x="16" y="88" font-size="15" fill="#111">RF in the box   = a standing SELL order</text>
+    <text x="16" y="108" font-size="13" fill="#555">resting ABOVE the market, 15% at a time, 1.2% wide</text>
+    <text x="16" y="138" font-size="15" fill="#111">WETH in the box = a standing BID</text>
+    <text x="16" y="158" font-size="13" fill="#555">below the last sale, only while the market is two-way</text>
+    <text x="16" y="180" font-size="12" fill="#555">cap 0 = keep it; withdraw any time, no owner check</text>
+  </g>
+
+  <!-- 3. the pool -->
+  <g transform="translate(520,272)">
+    <rect x="0" y="0" width="380" height="190" fill="#eee" stroke="#111" stroke-width="2"/>
+    <text x="16" y="28" font-size="12" fill="#555" letter-spacing="2">3  THE RF / WETH POOL (Uniswap v4 + hook)</text>
+    <text x="16" y="56" font-size="13" fill="#111">lpFee = 0: makers earn nothing, so nobody makes</text>
+    <text x="16" y="80" font-size="13" fill="#111">takers pay 5%, to every activated Friend</text>
+    <text x="16" y="104" font-size="13" fill="#111">no liquidity hooks: a range order pays no toll</text>
+    <!-- mini book -->
+    <line x1="230" y1="130" x2="360" y2="130" stroke="#111" stroke-width="1" stroke-dasharray="3 3"/>
+    <text x="228" y="127" font-size="10" fill="#555">market</text>
+    <rect x="300" y="112" width="60" height="12" fill="#ccff00" stroke="#111"/>
+    <text x="24" y="122" font-size="12" fill="#111">the bank's ASK, +1% to +2%</text>
+    <rect x="300" y="138" width="60" height="12" fill="url(#hatch)" stroke="#111"/>
+    <text x="24" y="148" font-size="12" fill="#111">the bank's BID (when armed)</text>
+    <text x="16" y="178" font-size="12" fill="#555">the pool's first outside liquidity (MEASURED: 0 before)</text>
+  </g>
+
+  <!-- 4. taker -->
+  <g transform="translate(980,272)">
+    <rect x="0" y="0" width="380" height="190" fill="#eee" stroke="#111" stroke-width="2"/>
+    <text x="16" y="28" font-size="12" fill="#555" letter-spacing="2">4  AN OUTSIDE TAKER CROSSES THE ORDER</text>
+    <text x="16" y="58" font-size="14" fill="#111">the member is filled ABOVE the market</text>
+    <text x="16" y="78" font-size="13" fill="#555">median fill 1.018x to 1.022x spot (MEASURED)</text>
+    <text x="16" y="104" font-size="13" fill="#111">a taker would have received 0.95x, less impact</text>
+    <text x="16" y="136" font-size="15" fill="#111">= about +7% per RF vs the taker route</text>
+    <text x="16" y="160" font-size="13" fill="#555">paid by a buyer who was going to buy anyway;</text>
+    <text x="16" y="178" font-size="13" fill="#555">it does not need the price to go anywhere</text>
+  </g>
+
+  <!-- 5. fee to friends -->
+  <g transform="translate(520,520)">
+    <rect x="0" y="0" width="840" height="120" fill="#111"/>
+    <text x="20" y="32" font-size="12" fill="#ccff00" letter-spacing="2">5  THE TAKER PAYS 5% IN WETH TO THE ACTIVATION MANAGER</text>
+    <text x="20" y="62" font-size="16" fill="#eee">streamed next week to EVERY activated Friend, by weight: members get their share s back</text>
+    <text x="20" y="88" font-size="16" fill="#eee">the proceeds land in the boxes of the members who funded that order, exactly</text>
+    <text x="20" y="110" font-size="12" fill="#aaa">the bank itself pays 0%: it is liquidity, not a swap. It never swaps, so it can never pay the toll.</text>
+  </g>
+
+  <!-- 6. genesis -->
+  <g transform="translate(40,520)">
+    <rect x="0" y="0" width="400" height="120" fill="#eee" stroke="#111" stroke-width="2" stroke-dasharray="6 4"/>
+    <text x="16" y="28" font-size="12" fill="#555" letter-spacing="2">6  POOLED (DESIGNED, NOT YET ON CHAIN)</text>
+    <text x="16" y="56" font-size="14" fill="#111">WETH buys a Genesis only under a floor-backed max bid</text>
+    <text x="16" y="78" font-size="14" fill="#111">pooled RF pays its 100,000 RF activation in kind</text>
+    <text x="16" y="100" font-size="13" fill="#555">weight compounds; the Reserve floor (900k RF) bounds the capital</text>
+  </g>
+
+  <!-- arrows -->
+  <line x1="240" y1="228" x2="240" y2="272" stroke="#111" stroke-width="2" marker-end="url(#a)"/>
+  <text x="250" y="256" font-size="12" fill="#555">harvest, in kind</text>
+  <line x1="440" y1="367" x2="520" y2="367" stroke="#111" stroke-width="2" marker-end="url(#a)"/>
+  <text x="443" y="358" font-size="10" fill="#555">rests orders</text>
+  <line x1="900" y1="367" x2="980" y2="367" stroke="#111" stroke-width="2" marker-end="url(#a)"/>
+  <text x="912" y="358" font-size="11" fill="#555">a fill</text>
+  <line x1="1170" y1="462" x2="1170" y2="520" stroke="#111" stroke-width="2" marker-end="url(#a)"/>
+  <text x="1180" y="496" font-size="12" fill="#555">5% toll</text>
+  <path d="M 520 580 C 470 580, 470 400, 440 400" fill="none" stroke="#111" stroke-width="2" marker-end="url(#a)"/>
+  <text x="446" y="470" font-size="11" fill="#555">proceeds</text>
+  <text x="446" y="484" font-size="11" fill="#555">to the box</text>
+  <path d="M 1360 600 L 1385 600 L 1385 250 L 1170 250 L 1170 272" fill="none" stroke="#111" stroke-width="2" stroke-dasharray="5 4"/><path d="M 1170 250 L 700 250 L 700 160 L 440 160" fill="none" stroke="#111" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#a)"/>
+  <text x="720" y="242" font-size="12" fill="#555">next week's WETH rewards: the loop closes</text>
+  <line x1="240" y1="462" x2="240" y2="520" stroke="#111" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#a)"/>
+
+  <!-- rules -->
+  <g transform="translate(40,672)">
+    <text x="0" y="18" font-size="12" fill="#555" letter-spacing="2">WHAT MAKES IT NOT LOSE</text>
+    <text x="0" y="44" font-size="13" fill="#111">never swaps &#183; never sells bought RF below cost x 1.05 &#183; never bids above the last sale x 0.95 &#183; every range 1% clear of a TWAP anyone can poke</text>
+    <text x="0" y="66" font-size="13" fill="#111">bids only on measured chop (6 swings of 5% in 72h, trend under 10%, last week replayed beats holding) &#183; asks move to a take-profit range in a rally</text>
+    <text x="0" y="88" font-size="13" fill="#111">exit any time, no owner check, no pause &#183; a range's proceeds go only to the members who funded it &#183; the owner can never be the keeper</text>
+    <text x="0" y="118" font-size="12" fill="#555">Not claimed: beating holding RF in a rally. The promise is per unit sold, against the route the member would otherwise have taken.   docs/TOKENOMICS.md &#183; npm run economy</text>
+  </g>
+</svg>

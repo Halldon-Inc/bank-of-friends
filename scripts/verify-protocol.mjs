@@ -136,8 +136,9 @@ async function main() {
     // and 502s on 0x0, so this check skipped on every run while still reporting
     // "ALL CHECKS PASS": the one assertion tying our slot decode to their published
     // number was never actually made. Ask about an address that exists.
-    const r = await fetch(`https://rarefriends.com/api/protocol/state?address=${ADDR.Market}`, { signal: AbortSignal.timeout(12000) });
-    if (r.ok) api = await r.json();
+    // 2026-09-25: they retired /api/protocol/state; /api/protocol/snapshot carries the same prices block.
+    const r = await fetch("https://rarefriends.com/api/protocol/snapshot", { signal: AbortSignal.timeout(12000) });
+    if (r.ok) { const j = await r.json(); if (j?.prices?.rfUsd) api = { protocol: { prices: j.prices } }; }
   } catch { /* their API is unversioned and has 502'd before; never let it fail our run */ }
   if (!api?.protocol?.prices?.rfUsd) {
     skip("slot0 price agrees with rarefriends.com rfUsd", "their API did not answer; chain assertions above stand alone");

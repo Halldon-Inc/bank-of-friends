@@ -97,7 +97,7 @@ export default function DeskView() {
   const status = (g: Desk["gates"][number]) => g.status ?? (g.ok ? "met" : "blocking");
   const active = d.friends.filter((f) => f.activated);
   const rw = d.rewards, vl = d.volumeLoop;
-  const deskWord = d.state === "armed" ? "Quoting" : d.state === "halted" ? "Halted" : "Off";
+  const deskWord = d.state === "armed" ? "Quoting" : d.state === "halted" ? "Halted" : d.state === "standing" ? "Standing order" : "Off";
 
   return (
     <>
@@ -142,8 +142,28 @@ export default function DeskView() {
         </div>
       </section>
 
+      {d.standing && d.standing.mode !== "grid" && (
+        <section className="panel docs-block">
+          <h2>The standing sell order: live</h2>
+          <dl>
+            <div className="stat"><dt>mode</dt><dd>{d.standing.mode === "edge" ? "at the edge" : d.standing.mode === "takeProfit" ? "take-profit (rally)" : "idle"}</dd></div>
+            {d.standing.ask && <div className="stat"><dt>the ask</dt><dd>{Math.round(d.standing.ask.frac * 100)}% of the RF book from {d.standing.ask.aboveMidPct.toFixed(2)}% above mid</dd></div>}
+            {d.standing.edgeVsTakerPct != null && <div className="stat"><dt>vs the taker route</dt><dd>+{d.standing.edgeVsTakerPct.toFixed(2)}% per RF sold</dd></div>}
+            {d.standing.restingUsd != null && <div className="stat"><dt>resting</dt><dd>{usd(d.standing.restingUsd)} of {d.standing.book.label} ({n(d.standing.book.rf, 0)} RF)</dd></div>}
+            {d.standing.feeToFriendsIfFilledUsd != null && <div className="stat"><dt>if it fills</dt><dd>the buyer pays {usd(d.standing.feeToFriendsIfFilledUsd)} to every Friend</dd></div>}
+          </dl>
+          <p className="note">
+            {d.standing.reason} The order rests {(d.standing.params.widthSpacings * 0.6).toFixed(1)}% wide, {Math.round(d.standing.params.frac * 100)}% of idle RF at a time,
+            is re-placed when the market walks {Math.round(d.standing.params.chase * 100)}% away, and moves to a take-profit range
+            (+{Math.round((d.standing.params.takeProfitLo - 1) * 100)}% to +{Math.round((d.standing.params.takeProfitHi - 1) * 100)}%) when the price rises
+            more than {Math.round(d.standing.params.brakeDrift24h * 100)}% in a day. Harvested RF has no cost basis, so nothing here is sold at a loss to the bank;
+            it is sold above the market instead of 5% below it as a taker. See docs/TOKENOMICS.md.
+          </p>
+        </section>
+      )}
+
       <section className="panel docs-block">
-        <h2>Arming conditions: live</h2>
+        <h2>The two-sided grid&rsquo;s arming conditions: live</h2>
         {d.gates.map((g, i) => {
           const s = status(g);
           return (

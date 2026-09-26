@@ -167,9 +167,17 @@ for (const vp of [
     // The floor reads the chain; a cold read can take the better part of a minute.
     await page.waitForSelector(".floor-board .floor-word", { timeout: 120_000 });
     const liveWord = (await page.textContent(".floor-board .floor-word"))?.trim();
-    const api = await page.evaluate(async () => (await (await fetch("/api/desk")).json()).armed);
-    if (liveWord !== (api ? "DESK ON" : "DESK OFF")) bad(`${label}: floor says "${liveWord}" but /api/desk armed=${api}`);
-    else ok(`${label}: floor headline "${liveWord}" matches /api/desk`);
+    const api = await page.evaluate(async () => { const j = await (await fetch("/api/desk")).json(); return { armed: j.armed, mode: j.standing?.mode ?? null, ask: !!j.standing?.ask }; });
+    // The word is the grid when armed, else the standing sell order, else off: the same rule as FloorPanel.floorWord.
+    const expectWord = api.armed ? "DESK ON" : api.mode === "edge" || api.mode === "takeProfit" ? "STANDING ORDER" : "DESK OFF";
+    if (liveWord !== expectWord) bad(`${label}: floor says "${liveWord}" but /api/desk armed=${api.armed} standing=${api.mode}`);
+    else ok(`${label}: floor headline "${liveWord}" matches /api/desk (armed=${api.armed}, standing=${api.mode})`);
+    if (expectWord === "STANDING ORDER") {
+      // A standing order on the board must show its price and its edge, read from the same API.
+      const order = ((await page.textContent(".floor .floor-order").catch(() => "")) ?? "").replace(/\s+/g, " ");
+      if (!api.ask || !/above the market/.test(order) || !/per RF/.test(order)) bad(`${label}: standing order shown without its price and edge: "${order.slice(0, 80)}"`);
+      else ok(`${label}: the standing order shows its price above the market and its edge per RF`);
+    }
 
     await page.click(".floor .hall-lever");
     await page.waitForSelector(".floor-sim-word", { timeout: 10_000 });

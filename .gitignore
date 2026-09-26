@@ -32,3 +32,8 @@ rf.css
 
 gen-offers.json
 gen-sales.json
+
+# the 16-pool out-of-sample bars for scripts/economy.mjs are shipped (2.6 MB); the swap tape is not
+!data/
+data/*
+!data/tokens/

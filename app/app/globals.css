@@ -646,6 +646,11 @@ a { color: var(--ink); text-underline-offset: 3px; }
   padding: 12px; margin: 0 0 10px; text-align: center;
 }
 .floor-board.armed { background: #ccff00; }
+.floor-board.standing { background: repeating-linear-gradient(0deg, var(--paper) 0 3px, #e9ffb0 3px 4px); }
+.floor-order { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0 0 10px; font-size: 0.7rem; border: 1px solid var(--ink); padding: 8px 10px; }
+.floor-order div { display: contents; }
+.floor-order dt { color: var(--dim); }
+.floor-order dd { margin: 0; }
 .floor-mode { margin: 0; font-size: 0.56rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); }
 .floor-word { margin: 6px 0 8px; font-size: clamp(1.5rem, 7vw, 2.2rem); letter-spacing: 0.08em; line-height: 1; }
 .floor-word.is-loading { font-size: 0.8rem; color: var(--dim); }
