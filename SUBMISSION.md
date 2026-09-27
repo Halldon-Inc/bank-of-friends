@@ -1,7 +1,25 @@
-**Play it: <https://bank-of-friends-nu.vercel.app>** with no wallet, no signature and no install.
-You land inside the hall with a Friend already on the marble.
+![The First Bank of Friends in 30 seconds](https://raw.githubusercontent.com/Halldon-Inc/bank-of-friends/main/docs/media/demo.gif)
 
-![The economy in one picture](https://raw.githubusercontent.com/Halldon-Inc/bank-of-friends/main/docs/media/economy.png)
+**Sign once. Your Friend's rewards auto-deposit into your own box. A swap desk trades the pool, and the toll it pays
+comes back to you. Take it all home, with a receipt.**
+
+**Try it, no wallet:** [walk the hall](https://bank-of-friends-nu.vercel.app) &middot;
+[simulate a week on the swap desk](https://bank-of-friends-nu.vercel.app/?open=floor) &middot;
+[open an account](https://bank-of-friends-nu.vercel.app/?open=desk) &middot;
+[see your box and receipt](https://bank-of-friends-nu.vercel.app/?open=vault) &middot;
+[the live desk and research](https://bank-of-friends-nu.vercel.app/docs)
+
+![Every Friend who joins makes every trade cheaper](https://raw.githubusercontent.com/Halldon-Inc/bank-of-friends/main/docs/media/network.png)
+
+**The idea no one else has:** every swap in the $RAREFRIENDS pool pays 5%, and that 5% is exactly what every
+activated Friend is paid. So when the bank's desk pays the toll, it pays its own members. A round trip costs members
+9.75% x (1 - their share of all Friend weight): **10.8% of break-even swing at one Genesis, 5.1% at half of all
+weight, 1.0% at 90%. Every Friend who joins makes every trade cheaper for everyone else.** That network effect exists
+only because this pool pays its toll to Friends.
+
+**The honest line, said once:** the desk is a strict swing trader, not a profit guarantee. Out of sample it beat
+holding on 7 to 9 of 16 real 4% to 6% toll pools, and every result, including the losing pools, is published and
+reproducible below. Nothing is deployed; the contract is tested and unaudited.
 
 | The hall | The Trading Floor: the swap desk, live |
 | --- | --- |
@@ -35,8 +53,8 @@ here, the cheaper every trade gets, and you can take everything home with a rece
 
 **Playable demo**
 
-<https://bank-of-friends-nu.vercel.app> &middot; the live swap desk and the research are at
-<https://bank-of-friends-nu.vercel.app/docs>.
+<https://bank-of-friends-nu.vercel.app> &middot; no wallet, no signature, no install. A 30-second walkthrough is at the
+top of this file and in [`docs/media/demo.mp4`](https://github.com/Halldon-Inc/bank-of-friends/blob/main/docs/media/demo.mp4).
 
 ---
 
@@ -60,17 +78,19 @@ here, the cheaper every trade gets, and you can take everything home with a rece
 
 Walk with WASD, the arrows, or a tap. Three stations:
 
-- **The Desk** opens your account: the three signup calls, a daily cap per asset, what you let the bank do and what it
+- **[The Desk](https://bank-of-friends-nu.vercel.app/?open=desk)** opens your account: the three signup calls, a daily cap per asset, what you let the bank do and what it
   cannot do, each line with the test that proves it.
-- **The Trading Floor** is the swap desk, live from chain: BUY RF, SELL RF or WAIT, with the reason, the buy and sell
+- **[The Trading Floor](https://bank-of-friends-nu.vercel.app/?open=floor)** is the swap desk, live from chain: BUY RF, SELL RF or WAIT, with the reason, the buy and sell
   levels, and the break-even table by membership. "Simulate a week" runs the same desk on a made-up week (you pick how
   much of all Friend weight banks here), lists its swaps and ends on a **sample receipt**.
-- **The Vault** is a wall of safe deposit boxes. Open yours to see its RF and WETH, its **receipt so far**, take either
+- **[The Vault](https://bank-of-friends-nu.vercel.app/?open=vault)** is a wall of safe deposit boxes. Open yours to see its RF and WETH, its **receipt so far**, take either
   asset out, or close the account and get the **final receipt**.
 
 The demo is simulated end to end and stamped SIMULATED: the contract is not deployed and no funds move.
 
 ## The economy
+
+![The economy in one picture](https://raw.githubusercontent.com/Halldon-Inc/bank-of-friends/main/docs/media/economy.png)
 
 Full write-up: [`docs/TOKENOMICS.md`](https://github.com/Halldon-Inc/bank-of-friends/blob/main/docs/TOKENOMICS.md).
 Evidence: [`docs/TAKER.md`](https://github.com/Halldon-Inc/bank-of-friends/blob/main/docs/TAKER.md) (`npm run taker`)
@@ -123,11 +143,7 @@ the first halves only:
   Pons v2, Project Mars, the Robinhood Index hooks, Long.xyz, StonkFun, Ember, pump.fun), every decision logged in
   `data/paper/log.jsonl`.
 
-**Reading it honestly.** The desk is a swing trader with strict rules. On young 4% to 6% toll tokens it beat holding
-about half the time out of sample, its median improves with every point of toll that comes back, and one pool in four
-still lost more than 20% against holding. **We do not claim guaranteed profit.** What is structural, and belongs only
-to Rare Friends, is the rebate: the break-even swing falls from 10.8% to 5.1% as membership goes from one Genesis to
-half of all weight.
+**In short:** a strict swing trader whose median improves with every point of toll that comes back; one pool in four still did more than 20% worse than holding. The rebate is the structural edge.
 
 **Where the RF goes**
 

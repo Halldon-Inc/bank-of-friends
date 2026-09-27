@@ -225,6 +225,12 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd, walletFriends = [
   const charPx = frame ? Math.max(24, Math.round((CHAR_UNITS * frame.width) / hall.viewBox.width)) : 44;
   /** Which destination is open, if any. */
   const [open, setOpen] = useState<null | Station>(null);
+  // Deep links for the submission: /?open=floor opens the Trading Floor (the swap desk and its simulated week),
+  // /?open=desk the signup, /?open=vault the boxes and receipts. Anything else is ignored.
+  useEffect(() => {
+    const want = new URLSearchParams(window.location.search).get("open");
+    if (want === "floor" || want === "desk" || want === "vault") setOpen(want);
+  }, []);
   const [accounts, setAccounts] = useState<Account[]>([]);
   useEffect(() => { setAccounts(loadAccounts()); }, []);
   const account = useMemo(

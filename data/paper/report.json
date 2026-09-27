@@ -1,18 +1,18 @@
 {
  "startedAt": 1790392800,
- "at": "2026-09-26T17:52:09.519Z",
- "tick": 28,
+ "at": "2026-09-27T16:03:28.200Z",
+ "tick": 68,
  "pools": [
   {
    "label": "RF",
    "launchpad": "Rare Friends (v4 hook)",
    "fee": 0.05,
    "type": "A",
-   "vol24": 8894.0390202456,
+   "vol24": 20539.3594051065,
    "sim": {
     "desk": {
-     "hours": 13.833333333333334,
-     "priceChange": -0.007915582670947385,
+     "hours": 35.88333333333333,
+     "priceChange": -0.10642175088560668,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -20,30 +20,30 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:03Z wait: RF is -0.5% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T15:00Z wait: RF is -5.4% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10779388386996702
     },
     "standing": {
-     "hours": 13.833333333333334,
-     "priceChange": -0.007915582670947385,
-     "vsHold": 0,
-     "vsTaker": 0,
+     "hours": 35.88333333333333,
+     "priceChange": -0.10642175088560668,
+     "vsHold": 2.220446049250313e-16,
+     "vsTaker": 2.220446049250313e-16,
      "fills": 0,
      "sells": 0,
      "perUnitMedian": null,
      "open": [
-      "ask +3.0%"
+      "ask +2.0%"
      ],
      "soldFrac": 0,
-     "lastDecision": "09-26T03:54Z place: Resting 15.0% of the bank's RF for sale 2.2% above the market; the buyer who takes it pays 5% to every Friend.",
-     "valueUsd": 992.0844173290526,
+     "lastDecision": "09-27T13:03Z place: Resting 15.0% of the bank's RF for sale 2.1% above the market; the buyer who takes it pays 5% to every Friend.",
+     "valueUsd": 893.5782491143935,
      "brokeAt": null,
      "fillList": []
     },
     "grid": {
-     "hours": 13.833333333333334,
-     "priceChange": -0.007915582670947385,
+     "hours": 35.88333333333333,
+     "priceChange": -0.10642175088560668,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -51,14 +51,14 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:03Z off: swings in 72h, last week replayed",
-     "valueUsd": 996.0422086645262,
+     "lastDecision": "09-27T15:00Z off: swings in 72h, last week replayed",
+     "valueUsd": 946.7891245571967,
      "brokeAt": null,
      "fillList": []
     },
     "gridLoose": {
-     "hours": 13.833333333333334,
-     "priceChange": -0.007915582670947385,
+     "hours": 35.88333333333333,
+     "priceChange": -0.10642175088560668,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -66,8 +66,8 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:03Z off: swings in 72h, last week replayed",
-     "valueUsd": 996.0422086645262,
+     "lastDecision": "09-27T15:00Z off: swings in 72h, last week replayed",
+     "valueUsd": 946.7891245571967,
      "brokeAt": null,
      "fillList": []
     }
@@ -78,11 +78,11 @@
    "launchpad": "standalone hook (Project Mars)",
    "fee": 0.053,
    "type": "A",
-   "vol24": 42470.6385013379,
+   "vol24": 14294.1704978658,
    "sim": {
     "desk": {
-     "hours": 14.266666666666667,
-     "priceChange": 0.04572927184344744,
+     "hours": 36.016666666666666,
+     "priceChange": -0.15220985624384942,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -90,24 +90,24 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:02Z wait: RF is +0.6% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T15:01Z wait: RF is -11.0% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 14.266666666666667,
-     "priceChange": 0.04572927184344744,
-     "vsHold": -0.009449956332267528,
-     "vsTaker": 0.011757550722383714,
+     "hours": 36.016666666666666,
+     "priceChange": -0.15220985624384942,
+     "vsHold": 0.02336518465647286,
+     "vsTaker": 0.014069702001131779,
      "fills": 1,
      "sells": 1,
      "perUnitMedian": 0.08920640323915352,
      "open": [
-      "ask +1.3%"
+      "ask +5.6%"
      ],
      "soldFrac": 0.15,
-     "lastDecision": "09-26T16:07Z place: Resting 15.0% of the bank's RF for sale 2.1% above the market; the buyer who takes it pays the pool's 5.30% fee.",
-     "valueUsd": 1035.847175889153,
+     "lastDecision": "09-27T14:32Z place: Resting 15.0% of the bank's RF for sale 2.0% above the market; the buyer who takes it pays the pool's 5.30% fee.",
+     "valueUsd": 867.5989170149505,
      "brokeAt": null,
      "fillList": [
       {
@@ -119,8 +119,8 @@
      ]
     },
     "grid": {
-     "hours": 14.266666666666667,
-     "priceChange": 0.04572927184344744,
+     "hours": 36.016666666666666,
+     "priceChange": -0.15220985624384942,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -128,14 +128,14 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:02Z off: swings in 72h, last week replayed",
-     "valueUsd": 1022.8646359217237,
+     "lastDecision": "09-27T15:01Z off: swings in 72h, trend over 72h, last week replayed",
+     "valueUsd": 923.8950718780752,
      "brokeAt": null,
      "fillList": []
     },
     "gridLoose": {
-     "hours": 14.266666666666667,
-     "priceChange": 0.04572927184344744,
+     "hours": 36.016666666666666,
+     "priceChange": -0.15220985624384942,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -143,8 +143,8 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:02Z off: swings in 72h, last week replayed",
-     "valueUsd": 1022.8646359217237,
+     "lastDecision": "09-27T15:01Z off: swings in 72h, last week replayed",
+     "valueUsd": 923.8950718780752,
      "brokeAt": null,
      "fillList": []
     }
@@ -155,11 +155,11 @@
    "launchpad": "Pons v2",
    "fee": 0.05,
    "type": "A",
-   "vol24": 24715.7657217991,
+   "vol24": 12211.0662654812,
    "sim": {
     "desk": {
-     "hours": 13.083333333333334,
-     "priceChange": -0.031516962221965095,
+     "hours": 36.15,
+     "priceChange": -0.061062431454392385,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -167,24 +167,24 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T16:32Z wait: RF is +3.6% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T15:39Z wait: RF is -1.9% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 13.083333333333334,
-     "priceChange": -0.031516962221965095,
-     "vsHold": 0.019160411411237144,
-     "vsTaker": 0.021556278974272036,
-     "fills": 2,
-     "sells": 2,
+     "hours": 36.15,
+     "priceChange": -0.061062431454392385,
+     "vsHold": 0.02436988258147732,
+     "vsTaker": 0.030266014721582524,
+     "fills": 3,
+     "sells": 3,
      "perUnitMedian": 0.07835030973926749,
      "open": [
-      "ask +12.5%"
+      "ask -0.7%"
      ],
-     "soldFrac": 0.2775,
-     "lastDecision": "09-26T15:37Z place: Resting 15.0% of the bank's RF for sale 1.8% above the market; the buyer who takes it pays the pool's 5.00% fee.",
-     "valueUsd": 987.0395712266667,
+     "soldFrac": 0.38587499999999997,
+     "lastDecision": "09-27T10:27Z place: Resting 15.0% of the bank's RF for sale 2.2% above the market; the buyer who takes it pays the pool's 5.00% fee.",
+     "valueUsd": 961.819366842402,
      "brokeAt": null,
      "fillList": [
       {
@@ -198,21 +198,27 @@
        "side": "ask",
        "perUnitVsTaker": 0.07835030973926749,
        "fromSpot": 0.024432794252304157
+      },
+      {
+       "t": 1790504820,
+       "side": "ask",
+       "perUnitVsTaker": 0.08406472816610422,
+       "fromSpot": 0.029861491757799064
       }
      ]
     },
     "grid": {
-     "hours": 13.083333333333334,
-     "priceChange": -0.031516962221965095,
-     "vsHold": 0.005859370327220947,
-     "vsTaker": 0.006679204429653085,
+     "hours": 36.15,
+     "priceChange": -0.061062431454392385,
+     "vsHold": 0.00823435047371568,
+     "vsTaker": 0.0067655892832163556,
      "fills": 1,
      "sells": 1,
      "perUnitMedian": 0.09144048145929085,
      "open": [],
      "soldFrac": 0.15,
-     "lastDecision": "09-26T16:32Z off: trend over 72h",
-     "valueUsd": 990.0085544396146,
+     "lastDecision": "09-27T15:39Z off: trend over 72h",
+     "valueUsd": 977.4517300158332,
      "brokeAt": null,
      "fillList": [
       {
@@ -224,19 +230,19 @@
      ]
     },
     "gridLoose": {
-     "hours": 13.083333333333334,
-     "priceChange": -0.031516962221965095,
-     "vsHold": -1.1102230246251565e-16,
-     "vsTaker": -1.1102230246251565e-16,
+     "hours": 36.15,
+     "priceChange": -0.061062431454392385,
+     "vsHold": 2.220446049250313e-16,
+     "vsTaker": 2.220446049250313e-16,
      "fills": 0,
      "sells": 0,
      "perUnitMedian": null,
      "open": [
-      "ask +5.3%"
+      "ask +8.7%"
      ],
      "soldFrac": 0,
      "lastDecision": "09-26T03:31Z place: armed: ask [9.514e-7, 0.000001047]",
-     "valueUsd": 984.2415188890172,
+     "valueUsd": 969.468784272804,
      "brokeAt": null,
      "fillList": []
     }
@@ -247,11 +253,11 @@
    "launchpad": "Pons v2",
    "fee": 0.05,
    "type": "A",
-   "vol24": 25381.7489652857,
+   "vol24": 11146.1955770346,
    "sim": {
     "desk": {
-     "hours": 14.283333333333333,
-     "priceChange": -0.1973991046085406,
+     "hours": 36.21666666666667,
+     "priceChange": -0.25095038423556837,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -259,24 +265,24 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:15Z wait: RF is -9.4% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T15:39Z wait: RF is -6.2% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 14.283333333333333,
-     "priceChange": -0.1973991046085406,
-     "vsHold": 0.037523847371044194,
-     "vsTaker": 0.013670632702550423,
-     "fills": 1,
-     "sells": 1,
-     "perUnitMedian": 0.08063274736291337,
+     "hours": 36.21666666666667,
+     "priceChange": -0.25095038423556837,
+     "vsHold": 0.05071860116566285,
+     "vsTaker": 0.02448616890503552,
+     "fills": 2,
+     "sells": 2,
+     "perUnitMedian": 0.08637599054693945,
      "open": [
-      "ask +10.2%"
+      "ask +2.9%"
      ],
-     "soldFrac": 0.15,
-     "lastDecision": "09-26T17:15Z place: Resting 15.0% of the bank's RF for sale 2.0% above the market; the buyer who takes it pays the pool's 5.00% fee.",
-     "valueUsd": 832.717568889992,
+     "soldFrac": 0.2775,
+     "lastDecision": "09-27T08:20Z place: Resting 15.0% of the bank's RF for sale 1.8% above the market; the buyer who takes it pays the pool's 5.00% fee.",
+     "valueUsd": 787.0403644796808,
      "brokeAt": null,
      "fillList": [
       {
@@ -284,40 +290,46 @@
        "side": "ask",
        "perUnitVsTaker": 0.08063274736291337,
        "fromSpot": 0.026601109994767613
+      },
+      {
+       "t": 1790497200,
+       "side": "ask",
+       "perUnitVsTaker": 0.08637599054693945,
+       "fromSpot": 0.03205719101959259
       }
      ]
     },
     "grid": {
-     "hours": 14.283333333333333,
-     "priceChange": -0.1973991046085406,
-     "vsHold": -1.1102230246251565e-16,
-     "vsTaker": -1.1102230246251565e-16,
+     "hours": 36.21666666666667,
+     "priceChange": -0.25095038423556837,
+     "vsHold": 0,
+     "vsTaker": 0,
      "fills": 0,
      "sells": 0,
      "perUnitMedian": null,
      "open": [
-      "ask +28.1%"
+      "ask +37.2%"
      ],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:15Z off: trend over 72h, last week replayed",
-     "valueUsd": 901.3004476957296,
+     "lastDecision": "09-27T15:39Z off: trend over 72h",
+     "valueUsd": 874.5248078822157,
      "brokeAt": null,
      "fillList": []
     },
     "gridLoose": {
-     "hours": 14.283333333333333,
-     "priceChange": -0.1973991046085406,
-     "vsHold": -1.1102230246251565e-16,
-     "vsTaker": -1.1102230246251565e-16,
+     "hours": 36.21666666666667,
+     "priceChange": -0.25095038423556837,
+     "vsHold": 0,
+     "vsTaker": 0,
      "fills": 0,
      "sells": 0,
      "perUnitMedian": null,
      "open": [
-      "ask +28.1%"
+      "ask +37.2%"
      ],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:15Z off: last week replayed",
-     "valueUsd": 901.3004476957296,
+     "lastDecision": "09-27T08:20Z off: last week replayed",
+     "valueUsd": 874.5248078822157,
      "brokeAt": null,
      "fillList": []
     }
@@ -328,42 +340,67 @@
    "launchpad": "Pons v2",
    "fee": 0.04,
    "type": "A",
-   "vol24": 16339.8552231926,
+   "vol24": 28660.3552040118,
    "sim": {
     "desk": {
-     "hours": 14.35,
-     "priceChange": -0.4363147931706187,
-     "vsHold": 0,
-     "fills": 0,
+     "hours": 36.53333333333333,
+     "priceChange": 0.5802408058637976,
+     "vsHold": -0.0880718667523962,
+     "fills": 10,
      "vsTaker": 0,
      "perUnitMedian": null,
      "open": [],
-     "trades": 0,
-     "tollUsd": 0,
-     "lastDecision": "09-26T17:05Z wait: RF is 32.4% under its average, but 69.0% down over 72 hours: a collapse, not a dip",
+     "trades": 10,
+     "tollUsd": 25.819801265697247,
+     "lastDecision": "09-27T15:30Z wait: RF is +20.2% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 14.35,
-     "priceChange": -0.4363147931706187,
-     "vsHold": 0,
-     "vsTaker": 0,
-     "fills": 0,
-     "sells": 0,
-     "perUnitMedian": null,
+     "hours": 36.53333333333333,
+     "priceChange": 0.5802408058637976,
+     "vsHold": -0.2745205417252401,
+     "vsTaker": 0.007796861619976614,
+     "fills": 4,
+     "sells": 4,
+     "perUnitMedian": 0.06816149906410174,
      "open": [
-      "ask +10.9%"
+      "ask +11.0%"
      ],
-     "soldFrac": 0,
-     "lastDecision": "09-26T15:02Z place: Resting 15.0% of the bank's RF for sale 1.8% above the market; the buyer who takes it pays the pool's 4.00% fee.",
-     "valueUsd": 563.6852068293813,
+     "soldFrac": 0.47799374999999994,
+     "lastDecision": "09-27T06:11Z place: Rally: a take-profit ask rests from 10.4% to 101.2% above the time-weighted price.",
+     "valueUsd": 1146.4322437817377,
      "brokeAt": null,
-     "fillList": []
+     "fillList": [
+      {
+       "t": 1790460780,
+       "side": "ask",
+       "perUnitVsTaker": 0.06816149906410174,
+       "fromSpot": 0.02543503910153766
+      },
+      {
+       "t": 1790462100,
+       "side": "ask",
+       "perUnitVsTaker": 0.07074136649233465,
+       "fromSpot": 0.027911711832641295
+      },
+      {
+       "t": 1790467200,
+       "side": "ask",
+       "perUnitVsTaker": 0.06809409943337363,
+       "fromSpot": 0.025370335456038617
+      },
+      {
+       "t": 1790468400,
+       "side": "ask",
+       "perUnitVsTaker": 0.0655634772122835,
+       "fromSpot": 0.022940938123792165
+      }
+     ]
     },
     "grid": {
-     "hours": 14.35,
-     "priceChange": -0.4363147931706187,
+     "hours": 36.53333333333333,
+     "priceChange": 0.5802408058637976,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -371,27 +408,52 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:05Z off: trend over 72h, last week replayed",
-     "valueUsd": 781.8426034146906,
+     "lastDecision": "09-27T15:30Z off: trend over 72h, last week replayed, inventory",
+     "valueUsd": 1290.1204029318988,
      "brokeAt": null,
      "fillList": []
     },
     "gridLoose": {
-     "hours": 14.35,
-     "priceChange": -0.4363147931706187,
-     "vsHold": 0,
-     "vsTaker": 0,
-     "fills": 0,
-     "sells": 0,
-     "perUnitMedian": null,
+     "hours": 36.53333333333333,
+     "priceChange": 0.5802408058637976,
+     "vsHold": -0.0519151014826722,
+     "vsTaker": 0.02650592680104813,
+     "fills": 4,
+     "sells": 4,
+     "perUnitMedian": 0.10973593362125533,
      "open": [
-      "ask +80.3%"
+      "ask +9.0%"
      ],
-     "soldFrac": 0,
-     "lastDecision": "09-26T17:05Z off: last week replayed",
-     "valueUsd": 781.8426034146906,
+     "soldFrac": 0.47799374999999994,
+     "lastDecision": "09-27T15:30Z off: last week replayed",
+     "valueUsd": 1223.1436712888233,
      "brokeAt": null,
-     "fillList": []
+     "fillList": [
+      {
+       "t": 1790475900,
+       "side": "ask",
+       "perUnitVsTaker": 0.13065443237412122,
+       "fromSpot": 0.0854282550791563
+      },
+      {
+       "t": 1790481300,
+       "side": "ask",
+       "perUnitVsTaker": 0.10633737671345678,
+       "fromSpot": 0.062083881644918515
+      },
+      {
+       "t": 1790485260,
+       "side": "ask",
+       "perUnitVsTaker": 0.10568263811360601,
+       "fromSpot": 0.06145533258906166
+      },
+      {
+       "t": 1790486040,
+       "side": "ask",
+       "perUnitVsTaker": 0.10973593362125533,
+       "fromSpot": 0.06534649627640521
+      }
+     ]
     }
    }
   },
@@ -400,11 +462,11 @@
    "launchpad": "Pons v2",
    "fee": 0.04,
    "type": "A",
-   "vol24": 44795.8319793264,
+   "vol24": 31578.7465378694,
    "sim": {
     "desk": {
-     "hours": 14.466666666666667,
-     "priceChange": -0.22630739678406753,
+     "hours": 36.61666666666667,
+     "priceChange": -0.29455300587956357,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -412,24 +474,24 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:24Z wait: RF is -9.0% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T15:16Z wait: RF is -8.7% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 14.466666666666667,
-     "priceChange": -0.22630739678406753,
-     "vsHold": 0.14608024209645998,
-     "vsTaker": 0.03019996994406826,
-     "fills": 3,
-     "sells": 3,
+     "hours": 36.61666666666667,
+     "priceChange": -0.29455300587956357,
+     "vsHold": 0.22024360446107782,
+     "vsTaker": 0.03760037785665937,
+     "fills": 4,
+     "sells": 4,
      "perUnitMedian": 0.06875883246657088,
      "open": [
-      "ask +29.7%"
+      "ask +18.8%"
      ],
-     "soldFrac": 0.38587499999999997,
-     "lastDecision": "09-26T17:24Z place: Resting 15.0% of the bank's RF for sale 1.8% above the market; the buyer who takes it pays the pool's 4.00% fee.",
-     "valueUsd": 886.7138060019565,
+     "soldFrac": 0.4779937500000001,
+     "lastDecision": "09-27T14:03Z place: Resting 15.0% of the bank's RF for sale 5.2% above the market; the buyer who takes it pays the pool's 4.00% fee.",
+     "valueUsd": 860.8171828617541,
      "brokeAt": null,
      "fillList": [
       {
@@ -449,23 +511,29 @@
        "side": "ask",
        "perUnitVsTaker": 0.06875883246657088,
        "fromSpot": 0.026008479167907828
+      },
+      {
+       "t": 1790486160,
+       "side": "ask",
+       "perUnitVsTaker": 0.0686078485720274,
+       "fromSpot": 0.025863534629146256
       }
      ]
     },
     "grid": {
-     "hours": 14.466666666666667,
-     "priceChange": -0.22630739678406753,
-     "vsHold": 0.023097881271404885,
-     "vsTaker": 0.006331515859723913,
+     "hours": 36.61666666666667,
+     "priceChange": -0.29455300587956357,
+     "vsHold": 0.030024610968213628,
+     "vsTaker": 0.006541965117194737,
      "fills": 1,
      "sells": 1,
      "perUnitMedian": 0.07841251545891881,
      "open": [
-      "ask +48.0%"
+      "ask +62.3%"
      ],
      "soldFrac": 0.15,
-     "lastDecision": "09-26T12:13Z off: trend over 72h",
-     "valueUsd": 907.3305721884916,
+     "lastDecision": "09-27T15:16Z off: trend over 72h",
+     "valueUsd": 878.326188322906,
      "brokeAt": null,
      "fillList": [
       {
@@ -477,20 +545,20 @@
      ]
     },
     "gridLoose": {
-     "hours": 14.466666666666667,
-     "priceChange": -0.22630739678406753,
-     "vsHold": 0.006976185527846068,
-     "vsTaker": 0.021642418268221775,
+     "hours": 36.61666666666667,
+     "priceChange": -0.29455300587956357,
+     "vsHold": 0.006615369297125584,
+     "vsTaker": 0.021316910060857674,
      "fills": 2,
      "sells": 1,
      "perUnitMedian": 0.21497309158946853,
      "open": [
-      "ask +48.0%",
-      "ask +32.0%"
+      "ask +62.3%",
+      "ask +44.8%"
      ],
      "soldFrac": 0.15,
      "lastDecision": "09-26T17:44Z flip: bid -> ask [1.611e-7, 1.772e-7]",
-     "valueUsd": 893.0331059426676,
+     "valueUsd": 858.364577901608,
      "brokeAt": null,
      "fillList": [
       {
@@ -514,11 +582,11 @@
    "launchpad": "Pons v2",
    "fee": 0.04,
    "type": "A",
-   "vol24": 6.0500197694,
+   "vol24": 8.2159900133,
    "sim": {
     "desk": {
-     "hours": 10.883333333333333,
-     "priceChange": -0.0023071153825233726,
+     "hours": 21.083333333333332,
+     "priceChange": -0.0042955793932376585,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -526,30 +594,30 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T16:03Z wait: RF is -6.4% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T02:51Z wait: RF is -5.7% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 10.883333333333333,
-     "priceChange": -0.0023071153825233726,
-     "vsHold": 0,
-     "vsTaker": 0,
+     "hours": 21.083333333333332,
+     "priceChange": -0.0042955793932376585,
+     "vsHold": 2.220446049250313e-16,
+     "vsTaker": 2.220446049250313e-16,
      "fills": 0,
      "sells": 0,
      "perUnitMedian": null,
      "open": [
-      "ask +2.1%"
+      "ask +2.4%"
      ],
      "soldFrac": 0,
      "lastDecision": "09-26T05:46Z place: Resting 15.0% of the bank's RF for sale 1.9% above the market; the buyer who takes it pays the pool's 4.00% fee.",
-     "valueUsd": 997.6928846174766,
+     "valueUsd": 995.7044206067623,
      "brokeAt": null,
      "fillList": []
     },
     "grid": {
-     "hours": 10.883333333333333,
-     "priceChange": -0.0023071153825233726,
+     "hours": 21.083333333333332,
+     "priceChange": -0.0042955793932376585,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -557,14 +625,14 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T16:03Z off: swings in 72h, trend over 72h, last week replayed",
-     "valueUsd": 998.8464423087382,
+     "lastDecision": "09-27T02:51Z off: swings in 72h, trend over 72h, last week replayed",
+     "valueUsd": 997.8522103033811,
      "brokeAt": null,
      "fillList": []
     },
     "gridLoose": {
-     "hours": 10.883333333333333,
-     "priceChange": -0.0023071153825233726,
+     "hours": 21.083333333333332,
+     "priceChange": -0.0042955793932376585,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -572,8 +640,8 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T16:03Z off: swings in 72h, last week replayed",
-     "valueUsd": 998.8464423087382,
+     "lastDecision": "09-27T02:51Z off: swings in 72h, last week replayed",
+     "valueUsd": 997.8522103033811,
      "brokeAt": null,
      "fillList": []
     }
@@ -584,36 +652,36 @@
    "launchpad": "Pons v2",
    "fee": 0.04,
    "type": "A",
-   "vol24": 13583.013354356,
+   "vol24": 14040.9296767625,
    "sim": {
     "desk": {
-     "hours": 14.416666666666666,
-     "priceChange": 0.4586539798621063,
-     "vsHold": 0.018849486544143756,
-     "fills": 1,
+     "hours": 34.06666666666667,
+     "priceChange": 0.08961883992725528,
+     "vsHold": 0.18048030504429913,
+     "fills": 2,
      "vsTaker": 0,
      "perUnitMedian": null,
      "open": [],
-     "trades": 1,
-     "tollUsd": 14.737469404722045,
-     "lastDecision": "09-26T17:45Z wait: RF is +16.5% against its 24h average; the desk trades only past 30.0% either way",
+     "trades": 2,
+     "tollUsd": 23.299062596963033,
+     "lastDecision": "09-27T13:24Z wait: RF is -8.7% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 14.416666666666666,
-     "priceChange": 0.4586539798621063,
-     "vsHold": -0.04800742190904417,
-     "vsTaker": 0.0035594638636451403,
-     "fills": 1,
-     "sells": 1,
+     "hours": 34.06666666666667,
+     "priceChange": 0.08961883992725528,
+     "vsHold": 0.019596910264726652,
+     "vsTaker": 0.046079694375785296,
+     "fills": 2,
+     "sells": 2,
      "perUnitMedian": 0.0772786555316387,
      "open": [
-      "ask -17.7%"
+      "ask +1.9%"
      ],
-     "soldFrac": 0.15,
-     "lastDecision": "09-26T08:05Z place: Rally: a take-profit ask rests from 10.2% to 100.9% above the time-weighted price.",
-     "valueUsd": 1388.62776283156,
+     "soldFrac": 0.26497144073779555,
+     "lastDecision": "09-27T13:24Z place: Resting 15.0% of the bank's RF for sale 1.9% above the market; the buyer who takes it pays the pool's 4.00% fee.",
+     "valueUsd": 1110.972002556065,
      "brokeAt": null,
      "fillList": [
       {
@@ -621,39 +689,55 @@
        "side": "ask",
        "perUnitVsTaker": 0.0772786555316387,
        "fromSpot": 0.034187509310373176
+      },
+      {
+       "t": 1790481540,
+       "side": "ask",
+       "perUnitVsTaker": 0.06888331869784903,
+       "fromSpot": 0.02612798594993504
       }
      ]
     },
     "grid": {
-     "hours": 14.416666666666666,
-     "priceChange": 0.4586539798621063,
-     "vsHold": 0,
-     "vsTaker": 0,
-     "fills": 0,
-     "sells": 0,
-     "perUnitMedian": null,
-     "open": [],
-     "soldFrac": 0,
-     "lastDecision": "09-26T17:45Z off: trend over 72h",
-     "valueUsd": 1229.3269899310533,
-     "brokeAt": null,
-     "fillList": []
-    },
-    "gridLoose": {
-     "hours": 14.416666666666666,
-     "priceChange": 0.4586539798621063,
-     "vsHold": -0.023675631603659708,
-     "vsTaker": 0.0070232212816625506,
+     "hours": 34.06666666666667,
+     "priceChange": 0.08961883992725528,
+     "vsHold": 0.002471940803572492,
+     "vsTaker": 0.005970138003523751,
      "fills": 1,
      "sells": 1,
-     "perUnitMedian": 0.11638276847097995,
+     "perUnitMedian": 0.07960189862227374,
      "open": [
-      "bid -30.4%",
-      "ask +4.6%"
+      "ask +6.9%"
      ],
      "soldFrac": 0.15,
-     "lastDecision": "09-26T09:09Z place: armed: ask [6.914e-8, 7.605e-8]",
-     "valueUsd": 1200.2218969970097,
+     "lastDecision": "09-27T13:24Z off: trend over 72h",
+     "valueUsd": 1047.3921270007927,
+     "brokeAt": null,
+     "fillList": [
+      {
+       "t": 1790481540,
+       "side": "ask",
+       "perUnitVsTaker": 0.07960189862227374,
+       "fromSpot": 0.036417822677382805
+      }
+     ]
+    },
+    "gridLoose": {
+     "hours": 34.06666666666667,
+     "priceChange": 0.08961883992725528,
+     "vsHold": 0.005722263548985085,
+     "vsTaker": 0.03329259950993024,
+     "fills": 3,
+     "sells": 2,
+     "perUnitMedian": 0.11638276847097995,
+     "open": [
+      "bid -6.9%",
+      "ask +61.7%",
+      "ask +40.0%"
+     ],
+     "soldFrac": 0.27749999999999997,
+     "lastDecision": "09-26T21:45Z flip: bid -> ask [6.914e-8, 7.605e-8]",
+     "valueUsd": 1050.7880948231218,
      "brokeAt": null,
      "fillList": [
       {
@@ -661,6 +745,18 @@
        "side": "ask",
        "perUnitVsTaker": 0.11638276847097995,
        "fromSpot": 0.07172745773214051
+      },
+      {
+       "t": 1790451960,
+       "side": "ask",
+       "perUnitVsTaker": 0.11007659068513442,
+       "fromSpot": 0.06567352705772911
+      },
+      {
+       "t": 1790459100,
+       "side": "bid",
+       "perUnitVsTaker": 0.24990867280767226,
+       "fromSpot": -0.16660577742310645
       }
      ]
     }
@@ -671,11 +767,11 @@
    "launchpad": "Pons v2",
    "fee": 0.04,
    "type": "A",
-   "vol24": 2096.0059960374,
+   "vol24": 1599.6237732019,
    "sim": {
     "desk": {
-     "hours": 10.3,
-     "priceChange": 0.02733305415105347,
+     "hours": 33.9,
+     "priceChange": 0.0683414375477649,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -683,30 +779,30 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T13:03Z wait: RF is +15.7% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T13:20Z wait: RF is +10.3% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 10.3,
-     "priceChange": 0.02733305415105347,
-     "vsHold": -0.000015217185365123953,
-     "vsTaker": -0.000015217185365123953,
+     "hours": 33.9,
+     "priceChange": 0.0683414375477649,
+     "vsHold": -0.0003520709653999088,
+     "vsTaker": -0.0003520709653999088,
      "fills": 0,
      "sells": 0,
      "perUnitMedian": null,
      "open": [
-      "ask -1.0%"
+      "ask -4.8%"
      ],
      "soldFrac": 0,
      "lastDecision": "09-26T03:26Z place: Rally: a take-profit ask rests from 12.0% to 100.5% above the time-weighted price.",
-     "valueUsd": 1027.317421033537,
+     "valueUsd": 1067.9653055464707,
      "brokeAt": null,
      "fillList": []
     },
     "grid": {
-     "hours": 10.3,
-     "priceChange": 0.02733305415105347,
+     "hours": 33.9,
+     "priceChange": 0.0683414375477649,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -714,14 +810,14 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T13:03Z off: swings in 72h, trend over 72h, last week replayed",
-     "valueUsd": 1013.6665270755269,
+     "lastDecision": "09-27T13:20Z off: swings in 72h, last week replayed",
+     "valueUsd": 1034.1707187738825,
      "brokeAt": null,
      "fillList": []
     },
     "gridLoose": {
-     "hours": 10.3,
-     "priceChange": 0.02733305415105347,
+     "hours": 33.9,
+     "priceChange": 0.0683414375477649,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -729,8 +825,8 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T13:03Z off: last week replayed",
-     "valueUsd": 1013.6665270755269,
+     "lastDecision": "09-27T13:20Z off: last week replayed",
+     "valueUsd": 1034.1707187738825,
      "brokeAt": null,
      "fillList": []
     }
@@ -741,11 +837,11 @@
    "launchpad": "Pons v2",
    "fee": 0.06,
    "type": "A",
-   "vol24": 2604.2613363303,
+   "vol24": 4049.6455317247,
    "sim": {
     "desk": {
-     "hours": 13.216666666666667,
-     "priceChange": -0.1519433378412851,
+     "hours": 35.63333333333333,
+     "priceChange": -0.3215256593084046,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -753,30 +849,30 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:14Z wait: RF is -11.9% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T15:06Z wait: RF is -17.0% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 13.216666666666667,
-     "priceChange": -0.1519433378412851,
+     "hours": 35.63333333333333,
+     "priceChange": -0.3215256593084046,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
      "sells": 0,
      "perUnitMedian": null,
      "open": [
-      "ask +2.5%"
+      "ask +3.9%"
      ],
      "soldFrac": 0,
-     "lastDecision": "09-26T13:00Z place: Resting 15.0% of the bank's RF for sale 2.4% above the market; the buyer who takes it pays the pool's 6.00% fee.",
-     "valueUsd": 848.0566621587147,
+     "lastDecision": "09-27T14:07Z place: Resting 15.0% of the bank's RF for sale 1.9% above the market; the buyer who takes it pays the pool's 6.00% fee.",
+     "valueUsd": 678.4743406915954,
      "brokeAt": null,
      "fillList": []
     },
     "grid": {
-     "hours": 13.216666666666667,
-     "priceChange": -0.1519433378412851,
+     "hours": 35.63333333333333,
+     "priceChange": -0.3215256593084046,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -784,14 +880,14 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:14Z off: swings in 72h, trend over 72h, last week replayed",
-     "valueUsd": 924.0283310793574,
+     "lastDecision": "09-27T15:06Z off: swings in 72h, trend over 72h, last week replayed",
+     "valueUsd": 839.2371703457978,
      "brokeAt": null,
      "fillList": []
     },
     "gridLoose": {
-     "hours": 13.216666666666667,
-     "priceChange": -0.1519433378412851,
+     "hours": 35.63333333333333,
+     "priceChange": -0.3215256593084046,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -799,8 +895,8 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:14Z off: swings in 72h, last week replayed",
-     "valueUsd": 924.0283310793574,
+     "lastDecision": "09-27T15:06Z off: swings in 72h, last week replayed",
+     "valueUsd": 839.2371703457978,
      "brokeAt": null,
      "fillList": []
     }
@@ -811,11 +907,11 @@
    "launchpad": "Pons v2",
    "fee": 0.06,
    "type": "A",
-   "vol24": 9407.5193164442,
+   "vol24": 5014.9898500521,
    "sim": {
     "desk": {
-     "hours": 14.033333333333333,
-     "priceChange": 0.09379236098520671,
+     "hours": 36.35,
+     "priceChange": 0.24794682877636331,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -823,22 +919,24 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:05Z wait: RF is +4.2% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T15:12Z wait: RF is +5.4% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 14.033333333333333,
-     "priceChange": 0.09379236098520671,
-     "vsHold": -0.008004622950488871,
-     "vsTaker": 0.011920058495877628,
-     "fills": 1,
-     "sells": 1,
+     "hours": 36.35,
+     "priceChange": 0.24794682877636331,
+     "vsHold": -0.03589878264184099,
+     "vsTaker": 0.02098507640437508,
+     "fills": 2,
+     "sells": 2,
      "perUnitMedian": 0.08967347602759768,
-     "open": [],
-     "soldFrac": 0.15,
-     "lastDecision": "09-26T17:05Z close: chase: the market walked away",
-     "valueUsd": 1085.036965549395,
+     "open": [
+      "ask -0.1%"
+     ],
+     "soldFrac": 0.2775,
+     "lastDecision": "09-26T19:32Z place: Rally: a take-profit ask rests from 10.1% to 100.6% above the time-weighted price.",
+     "valueUsd": 1203.1470568215461,
      "brokeAt": null,
      "fillList": [
       {
@@ -846,23 +944,27 @@
        "side": "ask",
        "perUnitVsTaker": 0.08967347602759768,
        "fromSpot": 0.024293067465941842
+      },
+      {
+       "t": 1790447160,
+       "side": "ask",
+       "perUnitVsTaker": 0.08900127716216177,
+       "fromSpot": 0.023661200532431925
       }
      ]
     },
     "grid": {
-     "hours": 14.033333333333333,
-     "priceChange": 0.09379236098520671,
-     "vsHold": -0.0032563866749431014,
-     "vsTaker": 0.007102669884188506,
-     "fills": 1,
-     "sells": 1,
-     "perUnitMedian": 0.10326478471125,
-     "open": [
-      "ask +6.7%"
-     ],
-     "soldFrac": 0.15,
-     "lastDecision": "09-26T16:16Z place: armed: ask [7.565e-8, 7.943e-8]",
-     "valueUsd": 1043.4870817203985,
+     "hours": 36.35,
+     "priceChange": 0.24794682877636331,
+     "vsHold": -0.016251081614248708,
+     "vsTaker": 0.015224193384836271,
+     "fills": 2,
+     "sells": 2,
+     "perUnitMedian": 0.13755726899354515,
+     "open": [],
+     "soldFrac": 0.2775,
+     "lastDecision": "09-27T15:12Z off: trend over 72h",
+     "valueUsd": 1105.7076306987137,
      "brokeAt": null,
      "fillList": [
       {
@@ -870,25 +972,36 @@
        "side": "ask",
        "perUnitVsTaker": 0.10326478471125,
        "fromSpot": 0.037068897628574904
+      },
+      {
+       "t": 1790471340,
+       "side": "ask",
+       "perUnitVsTaker": 0.13755726899354515,
+       "fromSpot": 0.06930383285393216
       }
      ]
     },
     "gridLoose": {
-     "hours": 14.033333333333333,
-     "priceChange": 0.09379236098520671,
-     "vsHold": -1.1102230246251565e-16,
-     "vsTaker": -1.1102230246251565e-16,
-     "fills": 0,
-     "sells": 0,
-     "perUnitMedian": null,
-     "open": [
-      "ask +6.7%"
-     ],
-     "soldFrac": 0,
-     "lastDecision": "09-26T16:16Z place: armed: ask [7.565e-8, 8.321e-8]",
-     "valueUsd": 1046.8961804926032,
+     "hours": 36.35,
+     "priceChange": 0.24794682877636331,
+     "vsHold": -0.001570547733138028,
+     "vsTaker": 0.011684054575011649,
+     "fills": 1,
+     "sells": 1,
+     "perUnitMedian": 0.1643269849447495,
+     "open": [],
+     "soldFrac": 0.15,
+     "lastDecision": "09-27T15:12Z off: swings in 72h",
+     "valueUsd": 1122.208160490107,
      "brokeAt": null,
-     "fillList": []
+     "fillList": [
+      {
+       "t": 1790511900,
+       "side": "ask",
+       "perUnitVsTaker": 0.1643269849447495,
+       "fromSpot": 0.09446736584806437
+      }
+     ]
     }
    }
   },
@@ -897,11 +1010,11 @@
    "launchpad": "Pons v2",
    "fee": 0.04,
    "type": "A",
-   "vol24": 12057.4010636678,
+   "vol24": 15888.7891790128,
    "sim": {
     "desk": {
-     "hours": 13.833333333333334,
-     "priceChange": 0.21180198266192374,
+     "hours": 36.5,
+     "priceChange": 0.18291568670705027,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -909,22 +1022,24 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:09Z wait: RF is +4.5% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T15:17Z wait: RF is -8.4% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 13.833333333333334,
-     "priceChange": 0.21180198266192374,
-     "vsHold": -0.035951717818874296,
-     "vsTaker": 0.02713288485061338,
-     "fills": 3,
-     "sells": 3,
+     "hours": 36.5,
+     "priceChange": 0.18291568670705027,
+     "vsHold": -0.023196782949293837,
+     "vsTaker": 0.03394190000322572,
+     "fills": 4,
+     "sells": 4,
      "perUnitMedian": 0.0710616347859494,
-     "open": [],
-     "soldFrac": 0.38587499999999997,
-     "lastDecision": "09-26T17:09Z close: chase: the market walked away",
-     "valueUsd": 1168.2356197289098,
+     "open": [
+      "ask -0.3%"
+     ],
+     "soldFrac": 0.47799374999999994,
+     "lastDecision": "09-27T13:18Z place: Resting 15.0% of the bank's RF for sale 2.1% above the market; the buyer who takes it pays the pool's 4.00% fee.",
+     "valueUsd": 1155.475848275192,
      "brokeAt": null,
      "fillList": [
       {
@@ -944,21 +1059,29 @@
        "side": "ask",
        "perUnitVsTaker": 0.07053902961832148,
        "fromSpot": 0.027717468433588577
+      },
+      {
+       "t": 1790465640,
+       "side": "ask",
+       "perUnitVsTaker": 0.06648901503686244,
+       "fromSpot": 0.023829454435387865
       }
      ]
     },
     "grid": {
-     "hours": 13.833333333333334,
-     "priceChange": 0.21180198266192374,
-     "vsHold": -0.0012020106250710816,
-     "vsTaker": 0.006413837729433158,
+     "hours": 36.5,
+     "priceChange": 0.18291568670705027,
+     "vsHold": 0.0007670176726082278,
+     "vsTaker": 0.006486392623503923,
      "fills": 1,
      "sells": 1,
      "perUnitMedian": 0.08530897818840488,
-     "open": [],
+     "open": [
+      "ask +29.0%"
+     ],
      "soldFrac": 0.15,
-     "lastDecision": "09-26T17:09Z off: last week replayed",
-     "valueUsd": 1104.5716865891054,
+     "lastDecision": "09-27T15:17Z off: trend over 72h",
+     "valueUsd": 1092.2950108082841,
      "brokeAt": null,
      "fillList": [
       {
@@ -970,21 +1093,28 @@
      ]
     },
     "gridLoose": {
-     "hours": 13.833333333333334,
-     "priceChange": 0.21180198266192374,
-     "vsHold": 0,
-     "vsTaker": 0,
-     "fills": 0,
-     "sells": 0,
-     "perUnitMedian": null,
+     "hours": 36.5,
+     "priceChange": 0.18291568670705027,
+     "vsHold": 0.008967322852606374,
+     "vsTaker": 0.010009274357353437,
+     "fills": 1,
+     "sells": 1,
+     "perUnitMedian": 0.12459292533938116,
      "open": [
-      "ask +3.3%"
+      "ask +26.0%"
      ],
-     "soldFrac": 0,
-     "lastDecision": "09-26T16:11Z place: armed: ask [9.733e-8, 1.071e-7]",
-     "valueUsd": 1105.900991330962,
+     "soldFrac": 0.15,
+     "lastDecision": "09-27T11:00Z off: last week replayed",
+     "valueUsd": 1101.2452982148857,
      "brokeAt": null,
-     "fillList": []
+     "fillList": [
+      {
+       "t": 1790473740,
+       "side": "ask",
+       "perUnitVsTaker": 0.12459292533938116,
+       "fromSpot": 0.07960920832580598
+      }
+     ]
     }
    }
   },
@@ -993,11 +1123,11 @@
    "launchpad": "IndexFeeHook",
    "fee": 0.0397,
    "type": "A",
-   "vol24": 18841.9465621878,
+   "vol24": 34432.2966258708,
    "sim": {
     "desk": {
-     "hours": 14.3,
-     "priceChange": -0.04524400241501125,
+     "hours": 35.53333333333333,
+     "priceChange": -0.08427500588068082,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -1005,30 +1135,30 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:03Z wait: RF is -3.0% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T14:00Z wait: RF is -2.9% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 14.3,
-     "priceChange": -0.04524400241501125,
-     "vsHold": -1.1102230246251565e-16,
-     "vsTaker": -1.1102230246251565e-16,
+     "hours": 35.53333333333333,
+     "priceChange": -0.08427500588068082,
+     "vsHold": 0,
+     "vsTaker": 0,
      "fills": 0,
      "sells": 0,
      "perUnitMedian": null,
      "open": [
-      "ask +4.3%"
+      "ask +1.2%"
      ],
      "soldFrac": 0,
-     "lastDecision": "09-26T15:05Z place: Resting 15.0% of the bank's RF for sale 2.0% above the market; the buyer who takes it pays the pool's 3.97% fee.",
-     "valueUsd": 954.7559975849887,
+     "lastDecision": "09-27T08:05Z place: Resting 15.0% of the bank's RF for sale 2.0% above the market; the buyer who takes it pays the pool's 3.97% fee.",
+     "valueUsd": 915.7249941193191,
      "brokeAt": null,
      "fillList": []
     },
     "grid": {
-     "hours": 14.3,
-     "priceChange": -0.04524400241501125,
+     "hours": 35.53333333333333,
+     "priceChange": -0.08427500588068082,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -1036,14 +1166,14 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:03Z off: swings in 72h, trend over 72h, last week replayed",
-     "valueUsd": 977.3779987924944,
+     "lastDecision": "09-27T14:00Z off: swings in 72h, trend over 72h",
+     "valueUsd": 957.8624970596595,
      "brokeAt": null,
      "fillList": []
     },
     "gridLoose": {
-     "hours": 14.3,
-     "priceChange": -0.04524400241501125,
+     "hours": 35.53333333333333,
+     "priceChange": -0.08427500588068082,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -1051,8 +1181,8 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:03Z off: swings in 72h, last week replayed",
-     "valueUsd": 977.3779987924944,
+     "lastDecision": "09-27T14:00Z off: swings in 72h",
+     "valueUsd": 957.8624970596595,
      "brokeAt": null,
      "fillList": []
     }
@@ -1063,11 +1193,11 @@
    "launchpad": "DTFFeeHook",
    "fee": 0.0397,
    "type": "A",
-   "vol24": 38137.6576037637,
+   "vol24": 36580.9509831844,
    "sim": {
     "desk": {
-     "hours": 14.483333333333333,
-     "priceChange": -0.047446046502723216,
+     "hours": 36.65,
+     "priceChange": -0.07271813826004692,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -1075,30 +1205,37 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:00Z wait: RF is -3.2% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T15:01Z wait: RF is -3.2% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 14.483333333333333,
-     "priceChange": -0.047446046502723216,
-     "vsHold": 0,
-     "vsTaker": 0,
-     "fills": 0,
-     "sells": 0,
-     "perUnitMedian": null,
+     "hours": 36.65,
+     "priceChange": -0.07271813826004692,
+     "vsHold": 0.009181802326937882,
+     "vsTaker": 0.010898232491217907,
+     "fills": 1,
+     "sells": 1,
+     "perUnitMedian": 0.07336194155200504,
      "open": [
-      "ask +2.7%"
+      "ask +2.4%"
      ],
-     "soldFrac": 0,
-     "lastDecision": "09-26T14:00Z place: Resting 15.0% of the bank's RF for sale 2.5% above the market; the buyer who takes it pays the pool's 3.97% fee.",
-     "valueUsd": 952.5539534972767,
+     "soldFrac": 0.15,
+     "lastDecision": "09-27T15:01Z place: Resting 15.0% of the bank's RF for sale 2.0% above the market; the buyer who takes it pays the pool's 3.97% fee.",
+     "valueUsd": 935.7959804958044,
      "brokeAt": null,
-     "fillList": []
+     "fillList": [
+      {
+       "t": 1790476440,
+       "side": "ask",
+       "perUnitVsTaker": 0.07336194155200504,
+       "fromSpot": 0.03074947247239046
+      }
+     ]
     },
     "grid": {
-     "hours": 14.483333333333333,
-     "priceChange": -0.047446046502723216,
+     "hours": 36.65,
+     "priceChange": -0.07271813826004692,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -1106,14 +1243,14 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:00Z off: swings in 72h, trend over 72h, last week replayed",
-     "valueUsd": 976.2769767486383,
+     "lastDecision": "09-27T15:01Z off: swings in 72h, trend over 72h, last week replayed",
+     "valueUsd": 963.6409308699766,
      "brokeAt": null,
      "fillList": []
     },
     "gridLoose": {
-     "hours": 14.483333333333333,
-     "priceChange": -0.047446046502723216,
+     "hours": 36.65,
+     "priceChange": -0.07271813826004692,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -1121,8 +1258,8 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:00Z off: swings in 72h, last week replayed",
-     "valueUsd": 976.2769767486383,
+     "lastDecision": "09-27T15:01Z off: swings in 72h, last week replayed",
+     "valueUsd": 963.6409308699766,
      "brokeAt": null,
      "fillList": []
     }
@@ -1133,11 +1270,11 @@
    "launchpad": "single-pool hook",
    "fee": 0.0397,
    "type": "A",
-   "vol24": 18115.5585074998,
+   "vol24": 13226.1803170987,
    "sim": {
     "desk": {
-     "hours": 14.266666666666667,
-     "priceChange": -0.059404755852356605,
+     "hours": 36.266666666666666,
+     "priceChange": 0.3197530446865937,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -1145,24 +1282,24 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:05Z wait: RF is -6.6% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T15:12Z wait: RF is +11.7% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 14.266666666666667,
-     "priceChange": -0.059404755852356605,
-     "vsHold": -0.0001417712473211763,
-     "vsTaker": 0.012088768856587606,
-     "fills": 1,
-     "sells": 1,
-     "perUnitMedian": 0.08659417322304153,
+     "hours": 36.266666666666666,
+     "priceChange": 0.3197530446865937,
+     "vsHold": -0.14075762114672508,
+     "vsTaker": 0.03173466566345451,
+     "fills": 5,
+     "sells": 5,
+     "perUnitMedian": 0.0656453063437148,
      "open": [
-      "ask +0.5%"
+      "ask -1.6%"
      ],
-     "soldFrac": 0.15,
-     "lastDecision": "09-26T15:08Z place: Resting 15.0% of the bank's RF for sale 1.7% above the market; the buyer who takes it pays the pool's 3.97% fee.",
-     "valueUsd": 940.4618947866562,
+     "soldFrac": 0.5562946874999999,
+     "lastDecision": "09-27T08:26Z place: Rally: a take-profit ask rests from 10.2% to 100.8% above the time-weighted price.",
+     "valueUsd": 1133.9877456153613,
      "brokeAt": null,
      "fillList": [
       {
@@ -1170,21 +1307,45 @@
        "side": "ask",
        "perUnitVsTaker": 0.08659417322304153,
        "fromSpot": 0.04345638454608691
+      },
+      {
+       "t": 1790446020,
+       "side": "ask",
+       "perUnitVsTaker": 0.06499139039445345,
+       "fromSpot": 0.02271123219579363
+      },
+      {
+       "t": 1790451720,
+       "side": "ask",
+       "perUnitVsTaker": 0.0656453063437148,
+       "fromSpot": 0.023339187681869156
+      },
+      {
+       "t": 1790458920,
+       "side": "ask",
+       "perUnitVsTaker": 0.06507777722529196,
+       "fromSpot": 0.02279418946944789
+      },
+      {
+       "t": 1790464020,
+       "side": "ask",
+       "perUnitVsTaker": 0.06572825022251161,
+       "fromSpot": 0.023418838688678
       }
      ]
     },
     "grid": {
-     "hours": 14.266666666666667,
-     "priceChange": -0.059404755852356605,
-     "vsHold": 0.0008372532371334618,
-     "vsTaker": 0.0067339604624823135,
-     "fills": 1,
-     "sells": 1,
-     "perUnitMedian": 0.10014707429572778,
+     "hours": 36.266666666666666,
+     "priceChange": 0.3197530446865937,
+     "vsHold": -0.04497047356307571,
+     "vsTaker": 0.014995887079663595,
+     "fills": 3,
+     "sells": 3,
+     "perUnitMedian": 0.08217754893560292,
      "open": [],
-     "soldFrac": 0.15,
-     "lastDecision": "09-26T17:05Z off: trend over 72h",
-     "valueUsd": 971.1100068988858,
+     "soldFrac": 0.38587499999999997,
+     "lastDecision": "09-27T15:12Z off: trend over 72h",
+     "valueUsd": 1107.7163258588255,
      "brokeAt": null,
      "fillList": [
       {
@@ -1192,25 +1353,52 @@
        "side": "ask",
        "perUnitVsTaker": 0.10014707429572778,
        "fromSpot": 0.056471235446187595
+      },
+      {
+       "t": 1790458920,
+       "side": "ask",
+       "perUnitVsTaker": 0.08063966549210244,
+       "fromSpot": 0.03773827077206593
+      },
+      {
+       "t": 1790501280,
+       "side": "ask",
+       "perUnitVsTaker": 0.08217754893560292,
+       "fromSpot": 0.03921510024285957
       }
      ]
     },
     "gridLoose": {
-     "hours": 14.266666666666667,
-     "priceChange": -0.059404755852356605,
-     "vsHold": 0,
-     "vsTaker": 0,
-     "fills": 0,
-     "sells": 0,
-     "perUnitMedian": null,
+     "hours": 36.266666666666666,
+     "priceChange": 0.3197530446865937,
+     "vsHold": -0.021888069699258828,
+     "vsTaker": 0.013975888189233121,
+     "fills": 2,
+     "sells": 2,
+     "perUnitMedian": 0.11926139430580873,
      "open": [
-      "ask +8.7%"
+      "bid -23.0%",
+      "bid -12.7%",
+      "ask -2.1%"
      ],
-     "soldFrac": 0,
-     "lastDecision": "09-26T03:27Z place: armed: ask [0.000001195, 0.000001315]",
-     "valueUsd": 970.2976220738216,
+     "soldFrac": 0.27749999999999997,
+     "lastDecision": "09-27T13:13Z place: armed: ask [0.000001510, 0.000001661]",
+     "valueUsd": 1134.4890641797128,
      "brokeAt": null,
-     "fillList": []
+     "fillList": [
+      {
+       "t": 1790464020,
+       "side": "ask",
+       "perUnitVsTaker": 0.11926139430580873,
+       "fromSpot": 0.07482671695186838
+      },
+      {
+       "t": 1790514780,
+       "side": "ask",
+       "perUnitVsTaker": 0.10316542208988588,
+       "fromSpot": 0.05936975483291751
+      }
+     ]
     }
    }
   },
@@ -1245,7 +1433,7 @@
    "launchpad": "unidentified launch hook 0xDa3B...Ca80 (lpFee 0.3%)",
    "fee": 0.003,
    "type": "A?",
-   "vol24": 2491932.90337891,
+   "vol24": 0,
    "sim": {
     "desk": null,
     "standing": null,
@@ -1258,18 +1446,18 @@
    "launchpad": "unidentified launch hook 0xbE3F...0a80 (lpFee 0.3%)",
    "fee": 0.003,
    "type": "A?",
-   "vol24": 14039479.9868665,
+   "vol24": 0,
    "sim": {
     "desk": {
      "hours": 6.283333333333333,
      "priceChange": -0.1585912270818608,
-     "vsHold": 2.3221975047495205,
+     "vsHold": 2.3221942811883136,
      "fills": 4,
      "vsTaker": 0,
      "perUnitMedian": null,
      "open": [],
      "trades": 4,
-     "tollUsd": 5.963103925454075,
+     "tollUsd": 5.963102421122152,
      "lastDecision": "09-26T09:13Z buy: RF is 43.1% under its 24h average and not collapsing: buy with 50.0% of the WETH, paying the toll",
      "brokeAt": null,
      "breakEven": 0.10803324099723
@@ -1357,11 +1545,11 @@
    "launchpad": "hook 0xb3cA...e8cC, dynamic fee",
    "fee": 0.003,
    "type": "A?",
-   "vol24": 10834819.9866053,
+   "vol24": 13740540.6276939,
    "sim": {
     "desk": {
-     "hours": 13.65,
-     "priceChange": 0.02784695003949733,
+     "hours": 35.95,
+     "priceChange": 0.027846966758587,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -1369,52 +1557,58 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:07Z wait: RF is +0.0% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T15:00Z wait: RF is +0.9% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 13.65,
-     "priceChange": 0.02784695003949733,
-     "vsHold": 0,
-     "vsTaker": 0,
+     "hours": 35.95,
+     "priceChange": 0.027846966758587,
+     "vsHold": 2.220446049250313e-16,
+     "vsTaker": 2.220446049250313e-16,
      "fills": 0,
      "sells": 0,
      "perUnitMedian": null,
-     "open": [],
+     "open": [
+      "ask +4.3%"
+     ],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:07Z close: chase: the market walked away",
-     "valueUsd": 1027.8469500394972,
+     "lastDecision": "09-27T00:01Z place: Resting 15.0% of the bank's RF for sale 2.2% above the market; the buyer who takes it pays the pool's 0.30% fee.",
+     "valueUsd": 1027.8469667585873,
      "brokeAt": null,
      "fillList": []
     },
     "grid": {
-     "hours": 13.65,
-     "priceChange": 0.02784695003949733,
-     "vsHold": 0,
-     "vsTaker": 0,
+     "hours": 35.95,
+     "priceChange": 0.027846966758587,
+     "vsHold": 2.220446049250313e-16,
+     "vsTaker": 2.220446049250313e-16,
      "fills": 0,
      "sells": 0,
      "perUnitMedian": null,
-     "open": [],
+     "open": [
+      "ask +3.7%"
+     ],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:07Z off: last week replayed",
-     "valueUsd": 1013.9234750197486,
+     "lastDecision": "09-27T15:00Z off: swings in 72h",
+     "valueUsd": 1013.9234833792937,
      "brokeAt": null,
      "fillList": []
     },
     "gridLoose": {
-     "hours": 13.65,
-     "priceChange": 0.02784695003949733,
-     "vsHold": 0,
-     "vsTaker": 0,
+     "hours": 35.95,
+     "priceChange": 0.027846966758587,
+     "vsHold": 2.220446049250313e-16,
+     "vsTaker": 2.220446049250313e-16,
      "fills": 0,
      "sells": 0,
      "perUnitMedian": null,
-     "open": [],
+     "open": [
+      "ask +3.7%"
+     ],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:07Z off: last week replayed",
-     "valueUsd": 1013.9234750197486,
+     "lastDecision": "09-27T15:00Z off: swings in 72h",
+     "valueUsd": 1013.9234833792937,
      "brokeAt": null,
      "fillList": []
     }
@@ -1425,11 +1619,11 @@
    "launchpad": "Long.xyz (Doppler multicurve)",
    "fee": 0.007,
    "type": "A",
-   "vol24": 202572.435469299,
+   "vol24": 158280.135719002,
    "sim": {
     "desk": {
-     "hours": 14.2,
-     "priceChange": -0.14948748745866347,
+     "hours": 36.5,
+     "priceChange": -0.24222993743620957,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -1437,24 +1631,24 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:02Z wait: RF is -12.0% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T15:03Z wait: RF is -5.7% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 14.2,
-     "priceChange": -0.14948748745866347,
-     "vsHold": 0.0632136448661691,
-     "vsTaker": 0.009950210622138966,
-     "fills": 2,
-     "sells": 2,
-     "perUnitMedian": 0.032187149681643934,
+     "hours": 36.5,
+     "priceChange": -0.24222993743620957,
+     "vsHold": 0.12784001984580695,
+     "vsTaker": 0.016745923832605536,
+     "fills": 4,
+     "sells": 4,
+     "perUnitMedian": 0.03195494775514285,
      "open": [
-      "ask +10.0%"
+      "ask +8.2%"
      ],
-     "soldFrac": 0.27749999999999997,
-     "lastDecision": "09-26T17:02Z place: Resting 15.0% of the bank's RF for sale 7.0% above the market; the buyer who takes it pays the pool's 0.70% fee.",
-     "valueUsd": 904.2765084633576,
+     "soldFrac": 0.47799375,
+     "lastDecision": "09-27T15:03Z place: Resting 15.0% of the bank's RF for sale 3.1% above the market; the buyer who takes it pays the pool's 0.70% fee.",
+     "valueUsd": 854.6434024005039,
      "brokeAt": null,
      "fillList": [
       {
@@ -1468,21 +1662,33 @@
        "side": "ask",
        "perUnitVsTaker": 0.03119224072328053,
        "fromSpot": 0.023973895038217563
+      },
+      {
+       "t": 1790482980,
+       "side": "ask",
+       "perUnitVsTaker": 0.03195494775514285,
+       "fromSpot": 0.024731263120856717
+      },
+      {
+       "t": 1790494380,
+       "side": "ask",
+       "perUnitVsTaker": 0.03093539594179573,
+       "fromSpot": 0.02371884817020331
       }
      ]
     },
     "grid": {
-     "hours": 14.2,
-     "priceChange": -0.14948748745866347,
-     "vsHold": 0.015104101053902808,
-     "vsTaker": 0.0035827806061947687,
+     "hours": 36.5,
+     "priceChange": -0.24222993743620957,
+     "vsHold": 0.023815228384598708,
+     "vsTaker": 0.0037403077581033006,
      "fills": 1,
      "sells": 1,
      "perUnitMedian": 0.04506144136557477,
      "open": [],
      "soldFrac": 0.15,
-     "lastDecision": "09-26T17:02Z off: trend over 72h",
-     "valueUsd": 939.2314202661361,
+     "lastDecision": "09-27T15:03Z off: trend over 72h",
+     "valueUsd": 899.8158790256789,
      "brokeAt": null,
      "fillList": [
       {
@@ -1494,19 +1700,19 @@
      ]
     },
     "gridLoose": {
-     "hours": 14.2,
-     "priceChange": -0.14948748745866347,
-     "vsHold": 0,
-     "vsTaker": 0,
+     "hours": 36.5,
+     "priceChange": -0.24222993743620957,
+     "vsHold": -1.1102230246251565e-16,
+     "vsTaker": -1.1102230246251565e-16,
      "fills": 0,
      "sells": 0,
      "perUnitMedian": null,
      "open": [
-      "ask +20.4%"
+      "ask +35.1%"
      ],
      "soldFrac": 0,
-     "lastDecision": "09-26T14:05Z place: armed: ask [0.00002220, 0.00002442]",
-     "valueUsd": 925.2562562706681,
+     "lastDecision": "09-27T04:01Z off: last week replayed",
+     "valueUsd": 878.8850312818952,
      "brokeAt": null,
      "fillList": []
     }
@@ -1517,11 +1723,11 @@
    "launchpad": "StonkFun reward v1 (Raydium CLMM 4%)",
    "fee": 0.04,
    "type": "A",
-   "vol24": 24963.2913353888,
+   "vol24": 27916.8097928269,
    "sim": {
     "desk": {
-     "hours": 13.883333333333333,
-     "priceChange": -0.01842161375090634,
+     "hours": 35.833333333333336,
+     "priceChange": -0.01440327218156745,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -1529,60 +1735,91 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:17Z wait: RF is +0.3% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T15:18Z wait: RF is +6.1% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 13.883333333333333,
-     "priceChange": -0.01842161375090634,
-     "vsHold": -1.1102230246251565e-16,
-     "vsTaker": -1.1102230246251565e-16,
-     "fills": 0,
-     "sells": 0,
-     "perUnitMedian": null,
+     "hours": 35.833333333333336,
+     "priceChange": -0.01440327218156745,
+     "vsHold": -0.026627275799158467,
+     "vsTaker": 0.02441757725641658,
+     "fills": 3,
+     "sells": 3,
+     "perUnitMedian": 0.0688305977700141,
      "open": [
-      "ask +2.3%"
+      "ask +16.9%"
      ],
-     "soldFrac": 0,
-     "lastDecision": "09-26T17:17Z place: Resting 15.0% of the bank's RF for sale 4.1% above the market; the buyer who takes it pays the pool's 4.00% fee.",
-     "valueUsd": 981.5783862490936,
+     "soldFrac": 0.38587499999999997,
+     "lastDecision": "09-27T12:01Z place: Rally: a take-profit ask rests from 10.1% to 100.6% above the time-weighted price.",
+     "valueUsd": 959.3529719200629,
      "brokeAt": null,
-     "fillList": []
+     "fillList": [
+      {
+       "t": 1790504400,
+       "side": "ask",
+       "perUnitVsTaker": 0.06881329402197789,
+       "fromSpot": 0.026060762261098658
+      },
+      {
+       "t": 1790504460,
+       "side": "ask",
+       "perUnitVsTaker": 0.06948114354848656,
+       "fromSpot": 0.02670189780654697
+      },
+      {
+       "t": 1790507460,
+       "side": "ask",
+       "perUnitVsTaker": 0.0688305977700141,
+       "fromSpot": 0.026077373859213493
+      }
+     ]
     },
     "grid": {
-     "hours": 13.883333333333333,
-     "priceChange": -0.01842161375090634,
-     "vsHold": 0,
-     "vsTaker": 0,
-     "fills": 0,
-     "sells": 0,
-     "perUnitMedian": null,
-     "open": [
-      "ask +2.9%"
-     ],
-     "soldFrac": 0,
-     "lastDecision": "09-26T17:17Z off: trend over 72h, last week replayed",
-     "valueUsd": 990.7891931245468,
+     "hours": 35.833333333333336,
+     "priceChange": -0.01440327218156745,
+     "vsHold": 0.003722598087478657,
+     "vsTaker": 0.005789620549828234,
+     "fills": 1,
+     "sells": 1,
+     "perUnitMedian": 0.0798018716551736,
+     "open": [],
+     "soldFrac": 0.15,
+     "lastDecision": "09-27T15:18Z off: trend over 72h, last week replayed",
+     "valueUsd": 996.4941531999566,
      "brokeAt": null,
-     "fillList": []
+     "fillList": [
+      {
+       "t": 1790509440,
+       "side": "ask",
+       "perUnitVsTaker": 0.0798018716551736,
+       "fromSpot": 0.0366097967889667
+      }
+     ]
     },
     "gridLoose": {
-     "hours": 13.883333333333333,
-     "priceChange": -0.01842161375090634,
-     "vsHold": -0.0014649307125992328,
-     "vsTaker": -0.0014649307125992328,
-     "fills": 0,
-     "sells": 0,
-     "perUnitMedian": null,
+     "hours": 35.833333333333336,
+     "priceChange": -0.01440327218156745,
+     "vsHold": -0.0013244062969882675,
+     "vsTaker": 0.007118628997226706,
+     "fills": 1,
+     "sells": 1,
+     "perUnitMedian": 0.10683627964546627,
      "open": [
-      "ask -6.0%"
+      "ask +11.4%"
      ],
-     "soldFrac": 0,
-     "lastDecision": "09-26T17:17Z off: last week replayed",
-     "valueUsd": 989.3377556058273,
+     "soldFrac": 0.15,
+     "lastDecision": "09-27T15:18Z off: last week replayed",
+     "valueUsd": 991.4834955044153,
      "brokeAt": null,
-     "fillList": []
+     "fillList": [
+      {
+       "t": 1790507040,
+       "side": "ask",
+       "perUnitVsTaker": 0.10683627964546627,
+       "fromSpot": 0.06256282845964756
+      }
+     ]
     }
    }
   },
@@ -1617,11 +1854,11 @@
    "launchpad": "StonkFun reward v3 (1% pool + 3% transfer tax)",
    "fee": 0.04,
    "type": "B",
-   "vol24": 2140229.85306007,
+   "vol24": 1681966.50515593,
    "sim": {
     "desk": {
-     "hours": 14.333333333333334,
-     "priceChange": -0.24800751149735667,
+     "hours": 36.666666666666664,
+     "priceChange": -0.10167671229809461,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -1629,56 +1866,131 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:00Z wait: RF is -17.9% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T16:00Z wait: RF is +6.6% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 14.333333333333334,
-     "priceChange": -0.24800751149735667,
-     "vsHold": -0.01765141177499996,
-     "vsTaker": -0.01765141177499996,
-     "fills": 0,
-     "sells": 0,
-     "perUnitMedian": null,
+     "hours": 36.666666666666664,
+     "priceChange": -0.10167671229809461,
+     "vsHold": -0.15811535309412594,
+     "vsTaker": -0.018427892217958042,
+     "fills": 10,
+     "sells": 10,
+     "perUnitMedian": 0.06819775366803627,
      "open": [
-      "ask +3.8%"
+      "ask +10.5%"
      ],
-     "soldFrac": 0,
-     "lastDecision": "09-26T17:00Z place: Resting 15.0% of the bank's RF for sale 5.9% above the market; the buyer who takes it pays the pool's 4.00% fee.",
-     "valueUsd": 738.7187594363763,
+     "soldFrac": 0.7752596720298999,
+     "lastDecision": "09-27T16:00Z place: Rally: a take-profit ask rests from 10.3% to 100.9% above the time-weighted price.",
+     "valueUsd": 756.2845838742426,
      "brokeAt": null,
-     "fillList": []
+     "fillList": [
+      {
+       "t": 1790457960,
+       "side": "ask",
+       "perUnitVsTaker": 0.07730680001950052,
+       "fromSpot": 0.03421452801872049
+      },
+      {
+       "t": 1790471280,
+       "side": "ask",
+       "perUnitVsTaker": 0.06819775366803627,
+       "fromSpot": 0.02546984352131476
+      },
+      {
+       "t": 1790474940,
+       "side": "ask",
+       "perUnitVsTaker": 0.07023731437838832,
+       "fromSpot": 0.027427821803252872
+      },
+      {
+       "t": 1790479440,
+       "side": "ask",
+       "perUnitVsTaker": 0.0675347959185848,
+       "fromSpot": 0.024833404081841426
+      },
+      {
+       "t": 1790482020,
+       "side": "ask",
+       "perUnitVsTaker": 0.06806493564958882,
+       "fromSpot": 0.02534233822360532
+      },
+      {
+       "t": 1790487060,
+       "side": "ask",
+       "perUnitVsTaker": 0.07074880610566625,
+       "fromSpot": 0.02791885386143944
+      },
+      {
+       "t": 1790489100,
+       "side": "ask",
+       "perUnitVsTaker": 0.06792405999617723,
+       "fromSpot": 0.025207097596329886
+      },
+      {
+       "t": 1790503980,
+       "side": "ask",
+       "perUnitVsTaker": 0.06872920762409418,
+       "fromSpot": 0.02598003931913051
+      },
+      {
+       "t": 1790507880,
+       "side": "ask",
+       "perUnitVsTaker": 0.06521753581970224,
+       "fromSpot": 0.02260883438691419
+      },
+      {
+       "t": 1790511300,
+       "side": "ask",
+       "perUnitVsTaker": 0.06650516452140498,
+       "fromSpot": 0.02384495794054864
+      }
+     ]
     },
     "grid": {
-     "hours": 14.333333333333334,
-     "priceChange": -0.24800751149735667,
-     "vsHold": 0,
-     "vsTaker": 0,
-     "fills": 0,
-     "sells": 0,
-     "perUnitMedian": null,
+     "hours": 36.666666666666664,
+     "priceChange": -0.10167671229809461,
+     "vsHold": -0.007807165556056983,
+     "vsTaker": 0.006666505853314408,
+     "fills": 1,
+     "sells": 1,
+     "perUnitMedian": 0.1505968172243768,
      "open": [],
-     "soldFrac": 0,
-     "lastDecision": "09-26T17:00Z off: trend over 72h, last week replayed",
-     "valueUsd": 875.9962442513216,
+     "soldFrac": 0.15,
+     "lastDecision": "09-27T16:00Z off: last week replayed",
+     "valueUsd": 941.751381757949,
      "brokeAt": null,
-     "fillList": []
+     "fillList": [
+      {
+       "t": 1790505300,
+       "side": "ask",
+       "perUnitVsTaker": 0.1505968172243768,
+       "fromSpot": 0.10457294453540156
+      }
+     ]
     },
     "gridLoose": {
-     "hours": 14.333333333333334,
-     "priceChange": -0.24800751149735667,
-     "vsHold": 0,
-     "vsTaker": 0,
-     "fills": 0,
-     "sells": 0,
-     "perUnitMedian": null,
+     "hours": 36.666666666666664,
+     "priceChange": -0.10167671229809461,
+     "vsHold": -0.006320474268443732,
+     "vsTaker": 0.008174884337647015,
+     "fills": 1,
+     "sells": 1,
+     "perUnitMedian": 0.17767338805821953,
      "open": [],
-     "soldFrac": 0,
-     "lastDecision": "09-26T17:00Z off: last week replayed",
-     "valueUsd": 875.9962442513216,
+     "soldFrac": 0.15,
+     "lastDecision": "09-27T16:00Z off: last week replayed",
+     "valueUsd": 943.162492104399,
      "brokeAt": null,
-     "fillList": []
+     "fillList": [
+      {
+       "t": 1790505480,
+       "side": "ask",
+       "perUnitVsTaker": 0.17767338805821953,
+       "fromSpot": 0.13056645253589072
+      }
+     ]
     }
    }
   },
@@ -1687,11 +1999,11 @@
    "launchpad": "Ember (Meteora DAMM v2, flagship pool)",
    "fee": 0.01,
    "type": "A",
-   "vol24": 583064.468396218,
+   "vol24": 313909.41325666,
    "sim": {
     "desk": {
-     "hours": 14.333333333333334,
-     "priceChange": 0.12484152795484316,
+     "hours": 36.7,
+     "priceChange": 0.06557026413302314,
      "vsHold": 0,
      "fills": 0,
      "vsTaker": 0,
@@ -1699,24 +2011,24 @@
      "open": [],
      "trades": 0,
      "tollUsd": 0,
-     "lastDecision": "09-26T17:00Z wait: RF is +4.3% against its 24h average; the desk trades only past 30.0% either way",
+     "lastDecision": "09-27T16:00Z wait: RF is -2.9% against its 24h average; the desk trades only past 30.0% either way",
      "brokeAt": null,
      "breakEven": 0.10803324099723
     },
     "standing": {
-     "hours": 14.333333333333334,
-     "priceChange": 0.12484152795484316,
-     "vsHold": -0.01060158298931757,
-     "vsTaker": 0.014236793865569863,
-     "fills": 3,
-     "sells": 3,
-     "perUnitMedian": 0.037649955641937405,
+     "hours": 36.7,
+     "priceChange": 0.06557026413302314,
+     "vsHold": 0.01684679778400411,
+     "vsTaker": 0.02327861314651969,
+     "fills": 6,
+     "sells": 6,
+     "perUnitMedian": 0.03696845341893695,
      "open": [
-      "ask +5.5%"
+      "ask +4.2%"
      ],
-     "soldFrac": 0.385875,
-     "lastDecision": "09-26T16:00Z place: Resting 15.0% of the bank's RF for sale 2.0% above the market; the buyer who takes it pays the pool's 1.00% fee.",
-     "valueUsd": 1112.916427146399,
+     "soldFrac": 0.622850484375,
+     "lastDecision": "09-27T16:00Z place: Resting 15.0% of the bank's RF for sale 4.3% above the market; the buyer who takes it pays the pool's 1.00% fee.",
+     "valueUsd": 1083.5217108975198,
      "brokeAt": null,
      "fillList": [
       {
@@ -1736,12 +2048,30 @@
        "side": "ask",
        "perUnitVsTaker": 0.037649955641937405,
        "fromSpot": 0.0272734560855179
+      },
+      {
+       "t": 1790479380,
+       "side": "ask",
+       "perUnitVsTaker": 0.03696845341893695,
+       "fromSpot": 0.026598768884747548
+      },
+      {
+       "t": 1790483280,
+       "side": "ask",
+       "perUnitVsTaker": 0.03600492572737135,
+       "fromSpot": 0.02564487647009761
+      },
+      {
+       "t": 1790505060,
+       "side": "ask",
+       "perUnitVsTaker": 0.034792139321099924,
+       "fromSpot": 0.024444217927888978
       }
      ]
     },
     "grid": {
-     "hours": 14.333333333333334,
-     "priceChange": 0.12484152795484316,
+     "hours": 36.7,
+     "priceChange": 0.06557026413302314,
      "vsHold": 0,
      "vsTaker": 0,
      "fills": 0,
@@ -1749,26 +2079,26 @@
      "perUnitMedian": null,
      "open": [],
      "soldFrac": 0,
-     "lastDecision": "09-26T17:00Z off: trend over 72h",
-     "valueUsd": 1062.4207639774215,
+     "lastDecision": "09-27T16:00Z off: trend over 72h",
+     "valueUsd": 1032.7851320665116,
      "brokeAt": null,
      "fillList": []
     },
     "gridLoose": {
-     "hours": 14.333333333333334,
-     "priceChange": 0.12484152795484316,
-     "vsHold": -0.0010434218185139121,
-     "vsTaker": 0.007978397040350416,
+     "hours": 36.7,
+     "priceChange": 0.06557026413302314,
+     "vsHold": 0.003230867367719936,
+     "vsTaker": 0.008173954043273701,
      "fills": 1,
      "sells": 1,
      "perUnitMedian": 0.11222574207778435,
      "open": [
-      "bid -6.5%",
-      "ask +4.2%"
+      "bid -1.3%",
+      "ask +10.0%"
      ],
      "soldFrac": 0.15,
      "lastDecision": "09-26T15:00Z place: armed: ask [0.04235, 0.04658]",
-     "valueUsd": 1061.3122109718452,
+     "valueUsd": 1036.1219238475715,
      "brokeAt": null,
      "fillList": [
       {
@@ -1786,7 +2116,7 @@
    "launchpad": "pump.fun (PumpSwap)",
    "fee": 0.0125,
    "type": "A",
-   "vol24": 58261941.0494095,
+   "vol24": 0.1726283141,
    "sim": {
     "desk": {
      "hours": 0.7833333333333333,
@@ -1805,8 +2135,8 @@
     "standing": {
      "hours": 0.7833333333333333,
      "priceChange": -0.030524216275303995,
-     "vsHold": 0,
-     "vsTaker": 0,
+     "vsHold": -1.1102230246251565e-16,
+     "vsTaker": -1.1102230246251565e-16,
      "fills": 0,
      "sells": 0,
      "perUnitMedian": null,
@@ -1830,7 +2160,7 @@
      "open": [],
      "soldFrac": 0,
      "lastDecision": "09-26T04:07Z off: trend over 72h, last week replayed",
-     "valueUsd": 984.7378918623479,
+     "valueUsd": 984.7378918623481,
      "brokeAt": 1790406060,
      "fillList": []
     },
@@ -1845,7 +2175,7 @@
      "open": [],
      "soldFrac": 0,
      "lastDecision": "09-26T04:07Z off: trend over 72h, last week replayed",
-     "valueUsd": 984.7378918623479,
+     "valueUsd": 984.7378918623481,
      "brokeAt": 1790406060,
      "fillList": []
     }
@@ -1856,7 +2186,7 @@
    "launchpad": "pump.fun (PumpSwap)",
    "fee": 0.0125,
    "type": "A",
-   "vol24": 43562526.1726216,
+   "vol24": 0,
    "sim": {
     "desk": null,
     "standing": null,

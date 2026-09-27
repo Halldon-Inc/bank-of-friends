@@ -1,5 +1,7 @@
 # The First Bank of Friends
 
+![The First Bank of Friends in 30 seconds](docs/media/demo.gif)
+
 **Sign once, and your Rare Friend's RF and WETH rewards are harvested into your own safe deposit box. The bank's swap
 desk trades the pooled funds through the $RAREFRIENDS pool when a move pays even after the 5% toll in and out, and
 because that toll is what every activated Friend is paid, members get their share of it back: the more Friends bank
@@ -8,6 +10,7 @@ here, the cheaper every trade gets. Take everything home, with a receipt, any ti
 - **Play:** <https://bank-of-friends-nu.vercel.app> (no wallet, no install). The Desk opens an account, the Trading
   Floor is the swap desk live from chain (with a simulated week that ends on a sample receipt), the Vault holds your
   box and your receipt.
+- **Straight to a station:** [the swap desk](https://bank-of-friends-nu.vercel.app/?open=floor), [the desk](https://bank-of-friends-nu.vercel.app/?open=desk), [the vault](https://bank-of-friends-nu.vercel.app/?open=vault)
 - **Research and the live desk:** <https://bank-of-friends-nu.vercel.app/docs>
 - **The economy:** [docs/TOKENOMICS.md](docs/TOKENOMICS.md). **Evidence:** [docs/TAKER.md](docs/TAKER.md)
   (`npm run taker`) and the live forward test [docs/PAPER.md](docs/PAPER.md).
@@ -70,6 +73,9 @@ npm run taker            # the swap desk: RF, 16 pools in and out of sample, syn
 npm run test:taker       # the swap desk's rules
 npm run paper -- --tick  # the live forward test across launchpads, one pass
 npm run economy          # research: resting orders instead of swaps
+node scripts/record-demo.mjs <url>   # the 30s demo; then:
+#   ffmpeg -ss 1.2 -i docs/media/demo.webm -c:v libx264 -pix_fmt yuv420p -crf 23 -movflags +faststart -an docs/media/demo.mp4
+#   ffmpeg -ss 1.2 -i docs/media/demo.webm -vf "fps=10,scale=860:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" docs/media/demo.gif
 npm run derive           # every parameter, labelled MEASURED / DERIVED / CHOICE
 npm run history          # pull every swap in the pool's history
 npm run backtest:gated   # the desk against the whole tape, gated and ungated
