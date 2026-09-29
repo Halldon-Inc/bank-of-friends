@@ -170,15 +170,17 @@ dl { margin: 0; }
 /* Two kinds of artwork need two treatments.
    A hardwired Generations Friend renders as an isometric WORLD that occupies only
    the middle of its 512x512 SVG, so at tile size the character is an unreadable
-   speck. Zoom-crop those. Genesis portraits and un-hardwired temp Friends are
-   full-bleed pixel art and must NOT be zoomed or they lose their heads. */
+   speck. lib/friend-art crops those to the Friend itself. Genesis portraits and
+   un-hardwired temp Friends are full-bleed pixel art and must NOT be zoomed or they
+   lose their heads (the old generation-based zoom did exactly that to them). */
 .friend-art { position: relative; overflow: hidden; aspect-ratio: 1; background: var(--paper); }
 .friend-art img {
   width: 100%; height: 100%; display: block;
   image-rendering: pixelated;
   transform-origin: center 46%;
 }
-.friend-art.world img { transform: scale(2.15); }
+/* A Generations world arrives already framed on its Friend (lib/friend-art), so no zoom here. */
+.friend-art.world img { transform: none; }
 .friend-art.portrait img { transform: scale(1); }
 .friend figcaption { min-width: 0; }
 .friend-id {
@@ -264,10 +266,9 @@ a { color: var(--ink); text-underline-offset: 3px; }
   width: 100%; aspect-ratio: 1; display: block; background: var(--paper);
   image-rendering: pixelated;
 }
-/* A hardwired Generations Friend is an isometric world in the middle of a 512px
-   SVG and is an unreadable speck at tile size; a Genesis portrait is full-bleed. */
-.picker-friend img.world { object-fit: none; object-position: center; transform: scale(2.1); }
-.picker-friend > img.world { clip-path: inset(0); }
+/* A hardwired Generations Friend is a speck in a 512px world, so lib/friend-art crops
+   the SVG itself to the Friend; a fixed centre zoom here cropped a Gen-2 out entirely. */
+.picker-friend img.world { object-fit: cover; }
 .picker-friend { overflow: hidden; }
 .picker-art { display: block; overflow: hidden; }
 .picker-label { display: block; font-size: 0.68rem; letter-spacing: 0.04em; margin-top: 0.4rem; overflow-wrap: anywhere; }
@@ -497,7 +498,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
   grid-row: span 3; width: 34px; height: 34px; border: 1px solid var(--line);
   image-rendering: pixelated; background: var(--paper);
 }
-.vault-list img.world { object-fit: cover; object-position: center; transform: scale(1.9); }
+.vault-list img.world { object-fit: cover; }
 .vault-list .picker-noart { grid-row: span 3; width: 34px; height: 34px; border: 1px dotted var(--line); }
 .vault-name { letter-spacing: 0.05em; }
 .vault-meta { color: var(--dim); grid-column: 2 / -1; }
@@ -567,7 +568,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
   width: 26px; height: 26px; border: 1px solid var(--ink); background: var(--paper);
   image-rendering: pixelated; object-fit: cover; display: block;
 }
-.hall-portrait.world { object-fit: none; object-position: center 46%; transform: none; }
+.hall-portrait.world { object-fit: cover; transform: none; }
 
 /* The ticker runs in the marquee's lit screen, which hall-art draws into the
    facade under the bank's name. This box sits exactly on that screen. */
@@ -747,7 +748,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
   width: 54%; aspect-ratio: 1; image-rendering: pixelated; object-fit: cover; display: block;
   border: 1px solid var(--ink); background: var(--paper);
 }
-.door img.world { object-fit: none; object-position: center 46%; }
+.door img.world { object-fit: cover; }
 .door.is-vacant { background: repeating-linear-gradient(45deg, var(--paper) 0 5px, #e6e6e6 5px 6px); }
 .door.is-pending { border-style: dashed; }
 .door.is-pending img { opacity: 0.45; filter: grayscale(1); }
@@ -767,7 +768,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
   grid-row: span 2; width: 38px; height: 38px; border: 1px solid var(--ink);
   image-rendering: pixelated; background: var(--paper); object-fit: cover;
 }
-.box-door img.world { object-fit: none; object-position: center 46%; }
+.box-door img.world { object-fit: cover; }
 .box-name { font-size: 0.72rem; letter-spacing: 0.04em; overflow-wrap: anywhere; }
 .box-meta { font-size: 0.58rem; color: var(--dim); }
 .box-asset { display: grid; grid-template-columns: 4.6ch 1fr auto; gap: 8px; align-items: center; font-size: 0.62rem; margin: 4px 0; }

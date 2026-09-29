@@ -23,6 +23,7 @@ import Receipt, { type ReceiptLines } from "./Receipt";
 import type { WalletFriend } from "./Hall";
 import { Arrival } from "./AccountPanel";
 import { VaultHeadline, type BankTotals, type ProtocolIdle } from "./VaultHolds";
+import { framedArt, AVATAR_PAD } from "@/lib/friend-art";
 
 const n = (v: number, d = 0) =>
   v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -40,7 +41,7 @@ type Door =
 
 function Portrait({ src, collection }: { src: string | null; collection: string }) {
   // eslint-disable-next-line @next/next/no-img-element
-  return src ? <img src={src} alt="" className={collection === "Generations" ? "world" : "portrait"} />
+  return src ? <img src={framedArt(src, AVATAR_PAD)} alt="" className={collection === "Generations" ? "world" : "portrait"} />
     : <span className="door-noart" aria-hidden="true" />;
 }
 

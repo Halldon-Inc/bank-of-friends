@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { framedArt, TILE_PAD } from "@/lib/friend-art";
 
 /**
  * Pick a Friend by looking at it.
@@ -91,7 +92,7 @@ export default function FriendPicker() {
                 {f.imageUrl ? (
                   <span className="picker-art">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={f.imageUrl} alt="" className={f.collection === "Generations" && f.generation >= 1 ? "world" : "portrait"} />
+                    <img src={framedArt(f.imageUrl, TILE_PAD)} alt="" className={f.collection === "Generations" && f.generation >= 1 ? "world" : "portrait"} />
                   </span>
                 ) : (
                   <span className="picker-noart" aria-hidden="true" />

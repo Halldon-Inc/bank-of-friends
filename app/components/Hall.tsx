@@ -23,6 +23,7 @@ import { renderWorld, project, unproject, validateWorld } from "@rarefriends/fri
 import { createWorldMovement } from "@rarefriends/friendsdk/movement";
 import { HALLS, hallFor, fit, type Hall as HallShape } from "@/lib/hall-world";
 import { renderBank } from "@/lib/hall-art";
+import { framedArt, friendSprite, AVATAR_PAD } from "@/lib/friend-art";
 import { loadAccounts, addAccount, removeAccount, accountId, type Account } from "@/lib/accounts";
 import AccountPanel from "./AccountPanel";
 import VaultPanel from "./VaultPanel";
@@ -280,10 +281,12 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd, walletFriends = [
   useEffect(() => {
     let live = true;
     if (!friend.imageUrl) { setRows(null); return; }
-    // Genesis art is an 8x8 portrait; a Generations tile is a 512px world with the
-    // character in the middle, so it is sampled larger and then cropped to subject.
-    const size = friend.collection === "Genesis" ? 16 : 48;
-    bitmapFromArt(friend.imageUrl, size)
+    // Genesis art is an 8x8 portrait. A Generations world is cut down to the Friend
+    // alone (lib/friend-art: its 18px sprite on black) and cropped to subject; the
+    // whole 512px world, sampled as before, mixed terrain into the sprite.
+    const sprite = friend.collection === "Genesis" ? null : friendSprite(friend.imageUrl);
+    const size = friend.collection === "Genesis" ? 16 : sprite ? 36 : 48;
+    bitmapFromArt(sprite ?? friend.imageUrl, size)
       .then((r) => { if (live) setRows(toSixteen(friend.collection === "Genesis" ? r : cropToSubject(r))); })
       .catch(() => { if (live) setRows(null); });
     return () => { live = false; };
@@ -548,7 +551,7 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd, walletFriends = [
       <div className="hall-bar">
         {friend.imageUrl
           // eslint-disable-next-line @next/next/no-img-element
-          ? <img className={`hall-portrait ${friend.collection === "Generations" && friend.generation >= 1 ? "world" : "portrait"}`} src={friend.imageUrl} alt="" />
+          ? <img className={`hall-portrait ${friend.collection === "Generations" && friend.generation >= 1 ? "world" : "portrait"}`} src={framedArt(friend.imageUrl, AVATAR_PAD)} alt="" />
           : null}
         <strong>{friend.label}</strong>
         {/* BOTH sides, always: RF and WETH together are the market-making fund, and

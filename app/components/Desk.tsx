@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Sparkline from "./Sparkline";
 import type { Desk } from "@/lib/desk";
+import { framedArt, TILE_PAD } from "@/lib/friend-art";
 
 const n = (v: number, d = 0) =>
   v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -342,7 +343,7 @@ export default function DeskView() {
               {f.image ? (
                 <div className={`friend-art ${f.collection === "Generations" && f.generation >= 1 ? "world" : "portrait"}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.image} alt={`${f.collection} #${f.id}`} />
+                  <img src={framedArt(f.image, TILE_PAD)} alt={`${f.collection} #${f.id}`} />
                 </div>
               ) : (
                 <div className="friend-art portrait" style={{ border: "1px dotted var(--line)" }} />

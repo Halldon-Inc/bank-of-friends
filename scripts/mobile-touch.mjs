@@ -297,6 +297,13 @@ for (const vp of VIEWPORTS) {
     expect(await page.locator(".hall-modal").count() === 1, "picker: typing the wallet opened nothing behind it");
     const zoomed = await page.evaluate(() => window.visualViewport ? window.visualViewport.scale : 1);
     expect(zoomed <= 1.01, `picker: typing did not zoom the page (scale ${zoomed})`);
+    // Every Generations world is cropped to its own Friend (lib/friend-art), never a fixed centre zoom.
+    const frames = await page.evaluate(() => [...document.querySelectorAll(".picker-friend img.world")].map((i) => {
+      const src = decodeURIComponent(i.getAttribute("src") ?? "");
+      const vb = /viewBox="([^"]+)"/.exec(src)?.[1] ?? "";
+      return { framed: vb !== "" && vb !== "0 0 512 512", transform: getComputedStyle(i).transform };
+    }));
+    expect(frames.every((f) => f.framed && f.transform === "none"), `picker: ${frames.length} Generations tiles framed on their Friend`);
     await shot("picker-friends");
     await panelChecks(page, vp, "picker with friends");
     const pick = page.locator(".picker-friend:not(.is-inert)").first();
