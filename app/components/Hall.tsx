@@ -242,6 +242,8 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd, walletFriends = [
   const mover = useRef<ReturnType<typeof createWorldMovement> | null>(null);
   const raf = useRef<number | undefined>(undefined);
   const openRef = useRef(false);
+  /** A sign tapped from across the hall: walk there, and open it on arrival. */
+  const headingRef = useRef<null | Station>(null);
 
   /*
    * THE LIVE DESK. One read feeds the floor's headline, the board's lamp and the
@@ -318,10 +320,13 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd, walletFriends = [
   useEffect(() => {
     mover.current = createWorldMovement(world as never, hall.spawn as never, { speed: 108, radius: 9 });
     const down = (e: KeyboardEvent) => {
+      // Typing a wallet into the picker is not walking: its "d" and "e" used to move
+      // the Friend and open whichever destination it stood beside.
+      if ((e.target as HTMLElement | null)?.closest?.("input, textarea, select, [contenteditable]")) return;
       const k = e.key;
       if (k.toLowerCase() === "e" && nearRef.current) { setOpen(nearRef.current); return; }
       if (k === "Escape") { setOpen(null); return; }
-      if (mover.current?.setKey(k, true)) e.preventDefault();
+      if (mover.current?.setKey(k, true)) { headingRef.current = null; e.preventDefault(); }
     };
     const up = (e: KeyboardEvent) => { mover.current?.setKey(e.key, false); };
     const blur = () => mover.current?.stop();
@@ -369,6 +374,7 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd, walletFriends = [
           if (d <= t.reach && d < best) { best = d; hit = t.id; }
         }
         if (hit !== nearRef.current) { nearRef.current = hit; setNear(hit); }
+        if (hit && hit === headingRef.current) { headingRef.current = null; setOpen(hit); }
       }
       raf.current = requestAnimationFrame(tick);
     };
@@ -415,9 +421,25 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd, walletFriends = [
     const sx = viewBox.x + (e.clientX - r.left - offX) / scale;
     const sy = viewBox.y + (e.clientY - r.top - offY) / scale;
     const [wx, wy] = unproject(sx, sy);
+    headingRef.current = null;
     // moveTo returns false when the point is unreachable; ignore rather than jump.
     mover.current?.moveTo([wx, wy] as never);
   }, [open]);
+
+  /*
+   * A SIGN IS A DESTINATION, NOT ONLY A DOOR. On a phone the sign is the obvious
+   * thing to tap, and it used to be disabled until you stood beside it: the tap fell
+   * through to the floor and walked you at the furniture under it, which on the
+   * trading floor is unreachable, so nothing happened at all. Now a sign out of reach
+   * walks you to its standing spot and opens on arrival; one in reach opens at once.
+   */
+  const onSign = useCallback((id: Station) => {
+    if (nearRef.current === id) { headingRef.current = null; setOpen(id); return; }
+    const t = hallRef.current.stations.find((x) => x.id === id);
+    if (!t) return;
+    headingRef.current = id;
+    if (!mover.current?.moveTo(t.position as never)) headingRef.current = null;
+  }, []);
 
   /* Where the keeper walks and where the ticker runs, as percentages of the frame. */
   const pct = useCallback((px: number, py: number) => ({
@@ -641,8 +663,9 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd, walletFriends = [
               data-station={sg.id}
               data-art={sg.art}
               style={{ left: `${sg.left}%`, top: `${sg.top}%` }}
-              onClick={() => near === sg.id && setOpen(sg.id as Station)}
-              disabled={near !== sg.id}
+              // Its own tap, so the floor under it does not also get one.
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => onSign(sg.id as Station)}
             >
               <span>{sg.label}</span>
               <small>{near === sg.id ? "E / tap to open" : sg.hint}</small>
@@ -651,7 +674,7 @@ export default function Hall({ friend, onLeave, rfUsd, ethUsd, walletFriends = [
         </div>
       </div>
 
-      <p className="hall-hint">{touch ? "Tap where you want to go." : "Walk with WASD or the arrows, or tap where you want to go."}</p>
+      <p className="hall-hint">{touch ? "Tap a sign to go there, or anywhere to walk." : "Walk with WASD or the arrows, or tap where you want to go."}</p>
 
       {open && (
         <div className="hall-modal" role="dialog" aria-modal="true" aria-label={TITLES[open]}>

@@ -22,6 +22,7 @@
     "sweep:game": "node scripts/game-viewport-sweep.mjs",
     "sweep:hall": "node scripts/hall-sweep.mjs",
     "play:hall": "node scripts/hall-play.mjs",
+    "sweep:mobile": "node scripts/mobile-touch.mjs",
     "keeper": "node scripts/keeper.mjs",
     "test:desk": "node --test scripts/desk-plan.test.mjs",
     "rehearse:desk": "node scripts/rehearse-desk.mjs",

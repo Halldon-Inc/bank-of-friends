@@ -89,8 +89,10 @@ export default function FriendPicker() {
                 onClick={() => setPicked(picked === f.id ? null : f.id)}
               >
                 {f.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={f.imageUrl} alt="" className={f.collection === "Generations" && f.generation >= 1 ? "world" : "portrait"} />
+                  <span className="picker-art">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={f.imageUrl} alt="" className={f.collection === "Generations" && f.generation >= 1 ? "world" : "portrait"} />
+                  </span>
                 ) : (
                   <span className="picker-noart" aria-hidden="true" />
                 )}

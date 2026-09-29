@@ -89,8 +89,12 @@ export default function HallShell({ showcase, rfUsd, ethUsd }: { showcase: HallF
                     onClick={() => { setFriend(f); setPicking(false); }}
                   >
                     {f.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={f.imageUrl} alt="" className={f.collection === "Generations" && f.generation >= 1 ? "world" : "portrait"} />
+                      // The frame clips the zoomed world tile; on the img itself the clip
+                      // scaled with it and the tile covered its own label.
+                      <span className="picker-art">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={f.imageUrl} alt="" className={f.collection === "Generations" && f.generation >= 1 ? "world" : "portrait"} />
+                      </span>
                     ) : <span className="picker-noart" aria-hidden="true" />}
                     <span className="picker-label">{f.label}</span>
                     <span className="picker-meta">{f.activated ? `${n(f.idleRf, 0)} RF + ${f.idleWeth.toFixed(4)} WETH idle` : "not activated"}</span>

@@ -269,6 +269,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
 .picker-friend img.world { object-fit: none; object-position: center; transform: scale(2.1); }
 .picker-friend > img.world { clip-path: inset(0); }
 .picker-friend { overflow: hidden; }
+.picker-art { display: block; overflow: hidden; }
 .picker-label { display: block; font-size: 0.68rem; letter-spacing: 0.04em; margin-top: 0.4rem; overflow-wrap: anywhere; }
 .picker-meta { display: block; font-size: 0.64rem; color: var(--dim); overflow-wrap: anywhere; }
 .picker-tag {
@@ -341,6 +342,8 @@ a { color: var(--ink); text-underline-offset: 3px; }
   cursor: pointer; animation: promptPop 220ms cubic-bezier(.2,1.5,.4,1) both;
 }
 .hall-prompt.is-near small { color: var(--ink); }
+/* Out of reach, a sign walks you to it, so it is always something you can press. */
+.hall-prompt { cursor: pointer; }
 @keyframes promptPop { from { transform: translate(-50%, -100%) scale(0.9); } to { transform: translate(-50%, -100%) scale(1); } }
 
 .hall-bar {
@@ -612,7 +615,9 @@ a { color: var(--ink); text-underline-offset: 3px; }
   94%, 100% { left: var(--kx0); top: var(--ky0); }
 }
 .keeper-tick {
-  position: absolute; left: 50%; top: -30%; transform: translateX(-50%);
+  /* Never less than its own height above the keeper: at -30% alone it sat on the
+     teller's cap wherever the hall draws the keeper small (a phone held sideways). */
+  position: absolute; left: 50%; top: min(-30%, -17px); transform: translateX(-50%);
   white-space: nowrap; line-height: 1;
   font-size: 10px; letter-spacing: 0.06em; color: var(--ink);
   background: #ccff00; border: 1px solid var(--ink); padding: 1px 4px;
@@ -872,3 +877,50 @@ a { color: var(--ink); text-underline-offset: 3px; }
 .close-home .close-total { font-weight: 700; }
 .box .close-open { margin-top: 10px; }
 .floor-back { margin-top: 14px; }
+
+/* ============================================================ touch screens */
+/* A thumb needs about 44px and a phone needs type it can read at arm's length. All
+   of it is scoped to a coarse pointer, so the desktop hall is exactly as it was.
+   Inputs go to 16px because iOS zooms the whole page into any smaller field. */
+@media (pointer: coarse) {
+  /* The HUD keeps its drawn size and answers a 44px tap around it: every pixel the
+     row grows is taken from the hall, and on a 320px phone the pediment's plate has
+     none to spare. */
+  .hall-bar button, .hall-bar .hall-docs { position: relative; }
+  .hall-bar button::after, .hall-bar .hall-docs::after {
+    content: ""; position: absolute; left: 0; right: 0; top: calc(50% - 22px); bottom: calc(50% - 22px);
+  }
+  /* The signs keep their drawn size, which the sweep fits between the furniture;
+     only the area that answers a tap grows. */
+  .hall-prompt::before { content: ""; position: absolute; inset: -6px -4px; }
+
+  .hall-panel header { padding: 0 0 0 12px; }
+  .hall-panel header button { width: 48px; height: 48px; font-size: 1.5rem; padding: 0; }
+
+  .hall-lever, .acct-close, .box-actions button, .vault-holds-cta, .picker-form button {
+    min-height: 44px;
+  }
+  .acct-close { padding: 0 14px; font-size: 10.5px; }
+  .vault-holds-cta { display: inline-flex; align-items: center; padding: 0 12px; margin-top: 4px; font-size: 10.5px; }
+  .box-actions button { font-size: 10.5px; }
+  .floor-shares button { min-height: 44px; display: inline-flex; align-items: center; padding: 0 12px; font-size: 11px; }
+  .acct-cap input, .picker-form input { font-size: 16px; min-height: 44px; box-sizing: border-box; }
+  .acct-switch { min-height: 44px; align-items: center; }
+  .acct-switch input { width: 20px; height: 20px; margin-top: 0; flex: none; }
+  .acct-signs { padding: 0 8px; }
+  .acct-signs summary { padding: 15px 0; font-size: 11px; line-height: 14px; }
+
+  /* Nothing under 10px. */
+  .sim-stamp, .acct-tests, .acct-steps code, .pool-seg b, .door-no { font-size: 10px; }
+  .door-tag { font-size: 10px; letter-spacing: 0; }
+  .acct-kicker, .floor-mode, .hall-regime, .vault-holds-kicker, .receipt-table thead th,
+  .vault-legend, .pool-key, .box-meta, .box-pnl-line, .acct-head, .receipt-usd, .receipt-note { font-size: 10.5px; }
+  .hall-small, .floor-breakeven, .floor-swaps, .pool-row, .box-asset, .acct-switch, .receipt-head,
+  .floor-order, .vault-holds-sub, .picker-meta, .picker-tag, .acct-steps, .arrival > div, .receipt-table,
+  .vault-holds-waiting, .acct-cap, .acct-plain, .picker-label { font-size: 11px; }
+}
+/* Six doors across a phone left each one 39px, too small to tap and too narrow to
+   label legibly. Four across keeps the same 24 doors, as six rows. */
+@media (pointer: coarse) and (max-width: 560px) {
+  .door-wall { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+}
