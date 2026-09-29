@@ -76,6 +76,7 @@ npm run economy          # research: resting orders instead of swaps
 node scripts/record-demo.mjs <url>   # the 30s demo; then:
 #   ffmpeg -ss 1.2 -i docs/media/demo.webm -c:v libx264 -pix_fmt yuv420p -crf 23 -movflags +faststart -an docs/media/demo.mp4
 #   ffmpeg -ss 1.2 -i docs/media/demo.webm -vf "fps=10,scale=860:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" docs/media/demo.gif
+#   ffmpeg -i docs/media/demo.mp4 -vf "fps=10,scale=720:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=32:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" docs/media/demo-lite.gif
 npm run derive           # every parameter, labelled MEASURED / DERIVED / CHOICE
 npm run history          # pull every swap in the pool's history
 npm run backtest:gated   # the desk against the whole tape, gated and ungated
